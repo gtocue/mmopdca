@@ -1,35 +1,67 @@
+# =========================================================
+# pyproject.toml  ―  mmopdca ルート
+# ---------------------------------------------------------
+#  ● PEP 621 構成          : [project] セクションにメタ情報
+#  ● ランタイム依存        : project.dependencies = [...]
+#  ● 開発 / CI 依存        : tool.poetry.group.dev.dependencies
+#  ● build-backend         : poetry-core
+# ---------------------------------------------------------
+
 [project]
-name = "mmopdca"
-version = "0.1.0"
-description = "命令書型予測アプリ (pivot-ready)"
-authors = [
-    {name = "gtocue",email = "gtocue510@gmail.com"}
-]
-license = {text = "MIT"}
-readme = "README.md"
-requires-python = "^3.11"
+name            = "mmopdca"
+version         = "0.1.0"
+description     = "命令書型予測アプリ (pivot-ready)"
+authors         = [{ name = "gtocue", email = "gtocue510@gmail.com" }]
+license         = { text = "MIT" }
+readme          = "README.md"
+requires-python = ">=3.11,<3.13"
+
+# ────────────── Runtime Dependencies ──────────────
+#
+# ・表記は semver 互換。括弧 “( )” は使わず `>=, <` を記述
+# ・PostgreSQL/psycopg は optional → extras で有効化
+#
 dependencies = [
-    "fastapi (>=0.115.12,<0.116.0)",
-    "pydantic (>=2.7.2,<3.0.0)",
-    "uvicorn[standard] (>=0.34.2,<0.35.0)",
-    "python-dotenv (>=1.1.0,<2.0.0)",
-    "pytz (>=2025.2,<2026.0)",
-    "pandas (>=2.2.3,<3.0.0)",
-    "numpy (>=2.2.5,<3.0.0)",
-    "scikit-learn (>=1.6.1,<2.0.0)",
-    "yfinance (>=0.2.56,<0.3.0)",
-    "plotly (>=6.0.1,<7.0.0)"
+  "fastapi>=0.115.12,<0.116.0",
+  "pydantic>=2.7.2,<3.0.0",
+  "uvicorn[standard]>=0.34.2,<0.35.0",
+  "python-dotenv>=1.1.0,<2.0.0",
+  "pytz>=2025.2,<2026.0",
+  "pandas>=2.2.3,<3.0.0",
+  "numpy>=2.2.5,<3.0.0",
+  "scikit-learn>=1.6.1,<2.0.0",
+  "yfinance>=0.2.56,<0.3.0",
+  "plotly>=6.0.1,<7.0.0",
+  "psycopg[binary] (>=3.1,<4)",
 ]
 
-[tool.poetry]
-package-mode = false   # ← ★ ここに移す
+# ─────────── Optional deps (extras) ───────────
+#
+#   poetry add --group db "psycopg[binary]>=3.1,<4"
+#
+[project.optional-dependencies]
+db = [
+  "psycopg[binary]>=3.1,<4.0.0"
+]
 
+# ────────────── Poetry-specific ──────────────
+[tool.poetry]
+package-mode = false          # ← lib 化するサブパッケージだけ true に昇格する方針
+
+# ────────────── Dev / CI deps ──────────────
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"
-black = "^25.1.0"
-isort = "^6.0.1"
-mypy = "^1.15.0"
+black  = "^25.1.0"
+isort  = "^6.0.1"
+mypy   = "^1.15.0"
+uvicorn = { version = "^0.34.2", extras = ["standard"] }
+
+# ────────────── Build backend ──────────────
+alembic = "^1.15.2"
+
+[tool.poetry.group.db.dependencies]
+psycopg = {version = ">=3.1,<4", extras = ["binary"]}
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
+requires      = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"

@@ -1,15 +1,16 @@
-# ASSIST_KEY: このファイルは【core/schemas/do_schemas.py】に位置するユニットです.
+# =========================================================
+# ASSIST_KEY: このファイルは【core/schemas/do_schemas.py】に位置するユニットです
+# =========================================================
 #
 # 【概要】
 #   Do フェーズで使う Pydantic スキーマ群。
-#   - DoCreateRequest : Plan 実行指示 & 追加パラメータ
-#   - DoResponse      : Do 実行結果 (API 返却用)
-#
+#   - DoCreateRequest : Plan 実行指示
+#   - DoResponse      : Do 実行結果／進捗
 # ---------------------------------------------------------
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal
+from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, Field, conlist
 
@@ -33,5 +34,5 @@ class DoCreateRequest(BaseModel):
 class DoResponse(BaseModel):
     do_id: str
     plan_id: str
-    status: Literal["DONE", "FAILED"]
-    result: Dict[str, Any]
+    status: Literal["PENDING", "RUNNING", "DONE", "FAILED"]
+    result: Optional[Dict[str, Any]] = None

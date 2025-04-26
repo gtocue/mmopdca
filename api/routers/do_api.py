@@ -3,51 +3,28 @@
 # =========================================================
 #
 # 【概要】
-#   このユニットは DoRouter として、
-#   既存 Plan の実行（特徴量生成＋モデル推論）を HTTP API で公開します。
+#   DoRouter ― Plan で定義されたジョブを「Do フェーズ」として実行する
+#   HTTP API を提供する。
 #
-# 【主な役割】
-#   - POST /do/{plan_id}  : Plan を受け取り Do を非同期実行
-#   - GET  /do/{do_id}    : 単一 Do 結果を取得
-#   - GET  /do/           : Do 一覧を返す
-#
-# 【連携先・依存関係】
-#   - 他ユニット :
-#       ・core/do/coredo_executor.py          … Do 処理の本体
-#       ・core/plan/plan_repository.py (予定)… Plan の取得
-#   - 外部設定 :
-#       ・pdca_data["do"] 共有ストア
-#       ・settings/do.yaml（TODO: ジョブキュー設定）
-#
-# 【ルール遵守】
-#   1) メイン銘柄 "Close_main" / "Open_main" は直接扱わない
-#   2) 市場名 suffix で区別（例: "Close_SP500"）
-#   3) **全体コード** を返却
-#   4) 本ヘッダーは必ず残す
-#   5) 機能削除は要相談
-#   6) pdca_data[...] に統一
-#
-# 【注意事項】
-#   - 現段階ではインメモリ辞書で擬似永続化。後に DB / メッセージブローカへ置換予定
-#   - バックグラウンド処理は Celery/Kafka 連携を見越し async stub 実装
 # ---------------------------------------------------------
 
 from __future__ import annotations
 
 import uuid
-from typing import Dict, List
+from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 
-from core.do.coredo_executor import run_do  # Do 本体
-from core.schemas.do_schemas import DoCreateRequest, DoResponse   # ←schemas 追加予定
+from core.do.coredo_executor import run_do
+from core.schemas.do_schemas import DoCreateRequest, DoResponse
+from core.repository.factory import get_repo
 
 router = APIRouter(prefix="/do", tags=["do"])
 
-# ―――――――――――――――――――――――――――――――――――――――
-# 仮ストア（TODO: DB / Redis へ移行）
-# ―――――――――――――――――――――――――――――――――――――――
-_PDCA_DO_STORE: Dict[str, Dict] = {}
+# ──────────────────────────────────────────────────────────
+# バックエンドは環境変数 DB_BACKEND=memory|sqlite|postgres で自動判定
+# ──────────────────────────────────────────────────────────
+_do_repo = get_repo("do")          # public.do などに自動生成
 
 
 # =========================================================
@@ -63,60 +40,73 @@ async def create_do(
     plan_id: str,
     body: DoCreateRequest,
     bg: BackgroundTasks,
-):
+) -> DoResponse:
     """
-    指定された Plan を Do フェーズで実行し
-    特徴量計算 → モデル推論 → 結果を pdca_data["do"] に保存します。
+    指定された Plan を Do フェーズで実行する。
     """
     do_id = f"do-{uuid.uuid4().hex[:8]}"
-    _PDCA_DO_STORE[do_id] = {
-        "plan_id": plan_id,
-        "status": "PENDING",
-        "result": None,
-    }
 
-    # バックグラウンドで実処理
+    record = {
+        "do_id":    do_id,
+        "plan_id":  plan_id,
+        "status":   "PENDING",
+        "result":   None,
+    }
+    _do_repo.create(do_id, record)          # ★ ここが辞書→Repo へ
+
+    # バックグラウンド実行
     bg.add_task(_execute_do_async, do_id, plan_id, body)
 
-    return {"do_id": do_id, "status": "PENDING"}
+    return DoResponse(**record)
 
 
 # =========================================================
-# GET /do/{do_id}  ― Do 結果取得
+# GET /do/{do_id}
 # =========================================================
-@router.get(
-    "/{do_id}",
-    response_model=DoResponse,
-    summary="Get Do",
-)
-async def get_do(do_id: str):
-    if do_id not in _PDCA_DO_STORE:
-        raise HTTPException(status_code=404, detail="Do not found")
-    return _PDCA_DO_STORE[do_id]
+@router.get("/{do_id}", response_model=DoResponse, summary="Get Do")
+async def get_do(do_id: str) -> DoResponse:
+    rec = _do_repo.get(do_id)
+    if rec is None:
+        raise HTTPException(404, "Do not found")
+    return DoResponse(**rec)
 
 
 # =========================================================
-# GET /do/  ― Do 一覧
+# GET /do/
 # =========================================================
-@router.get(
-    "/",
-    response_model=List[DoResponse],
-    summary="List Do",
-)
-async def list_do():
-    return list(_PDCA_DO_STORE.values())
+@router.get("/", response_model=list[DoResponse], summary="List Do")
+async def list_do() -> list[DoResponse]:
+    return [DoResponse(**r) for r in _do_repo.list()]
 
 
 # ---------------------------------------------------------
 # internal helpers
 # ---------------------------------------------------------
-def _execute_do_async(do_id: str, plan_id: str, params: DoCreateRequest) -> None:
-    """同期関数として実 Do 処理を呼び出し、ストアを更新"""
+def _execute_do_async(
+    do_id: str,
+    plan_id: str,
+    params: DoCreateRequest,
+) -> None:
+    """同期で run_do を呼び出し、Repo に状態を反映する"""
+    def _save(state: dict) -> None:
+        """後方互換の無い簡易 upsert（delete→create）"""
+        _do_repo.delete(do_id)
+        _do_repo.create(do_id, state)
+
+    # RUNNING
+    rec = _do_repo.get(do_id)
+    rec["status"] = "RUNNING"
+    _save(rec)
+
+    # 実ジョブ
     try:
-        _PDCA_DO_STORE[do_id]["status"] = "RUNNING"
-        result = run_do(plan_id, params.dict())  # 実処理
-        _PDCA_DO_STORE[do_id]["status"] = "DONE"
-        _PDCA_DO_STORE[do_id]["result"] = result
-    except Exception as ex:  # noqa: BLE001
-        _PDCA_DO_STORE[do_id]["status"] = "ERROR"
-        _PDCA_DO_STORE[do_id]["result"] = str(ex)
+        result = run_do(plan_id, params.model_dump())
+
+        rec["status"] = "DONE"
+        rec["result"] = result
+        _save(rec)
+
+    except Exception as exc:        # noqa: BLE001
+        rec["status"] = "FAILED"
+        rec["result"] = {"error": str(exc)}
+        _save(rec)
