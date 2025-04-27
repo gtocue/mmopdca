@@ -22,7 +22,7 @@ def test_plan_do_flow():
         "indicators": [{"name":"SMA","window":5}],
     }
     with httpx.Client() as c:
-        assert c.post(f"{BASE}/plan/", json=plan).status_code == 200
+        assert c.post(f"{BASE}/plan/", json=plan).status_code == 201
         do_r = c.post(f"{BASE}/do/{plan_id}", json={"symbol":"AAPL","start":"2024-01-01","end":"2024-12-31"})
         do_id = do_r.json()["do_id"]
     assert asyncio.run(wait_done(do_id))

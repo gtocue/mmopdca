@@ -1,12 +1,9 @@
 # =========================================================
-# ASSIST_KEY: このファイルは【core/repository/postgres_impl.py】に位置するユニットです
+# ASSIST_KEY: core/repository/postgres_impl.py
 # =========================================================
 #
-# 概要:
-#   - JSONB ストア (id, data, created_at) を提供する共通 Repository
-#   - テーブルが既に存在しても created_at 列が無ければ起動時に自動追加
-#   - autocommit=True でトランザクションを簡素化（MVP）
-# ----------------------------------------------------------
+# PostgreSQL 汎用 JSONB ストア（tenant_id, id, data, created_at）
+# ---------------------------------------------------------------
 
 from __future__ import annotations
 
@@ -14,16 +11,28 @@ import json
 import os
 from typing import Any, Dict, List
 
-import psycopg
-from psycopg.rows import dict_row
+try:
+    import psycopg                        # <-- ★ optional import
+    from psycopg.rows import dict_row
+except ModuleNotFoundError:               # psycopg 未インストールなら…
+    psycopg = None                        # 型は捨ててダミー化
+    dict_row = None                       # Repository を使わなければ問題なし
 
 from .base import BaseRepository
 
-# ---------- 接続シングルトン ----------
-_CX: psycopg.Connection | None = None
+# ------------------------------------------------------------------
+# connection helper
+# ------------------------------------------------------------------
+_CX = None
 
 
-def _connect() -> psycopg.Connection:
+def _connect():
+    if psycopg is None:                   # <-- ★ ここで検知してエラー
+        raise RuntimeError(
+            "psycopg がありません。PostgreSQL を使うには "
+            "`poetry install --with db` で依存を入れてください。"
+        )
+
     dsn = os.getenv("PG_DSN")
     if dsn:
         return psycopg.connect(dsn, autocommit=True)
@@ -38,59 +47,83 @@ def _connect() -> psycopg.Connection:
     )
 
 
-def _cx() -> psycopg.Connection:
-    global _CX  # noqa: PLW0603
+def _cx():
+    global _CX
     if _CX is None or _CX.closed:
         _CX = _connect()
     return _CX
 
 
-# ---------- Repository ----------
+# ------------------------------------------------------------------
+# Repository
+# ------------------------------------------------------------------
 class PostgresRepository(BaseRepository):
     """
-    テーブル (id TEXT PK , data JSONB , created_at TIMESTAMPTZ) を
-    アプリ起動時に自動生成／補正して使う超軽量リポジトリ
+    Optional な PostgreSQL 用 Repository。
+    psycopg が無い環境でインスタンス化すると RuntimeError を投げる。
     """
 
     def __init__(self, table: str, schema: str = "public") -> None:
+        if psycopg is None:
+            raise RuntimeError(
+                "psycopg がインストールされていません。"
+                " `poetry install --with db` を実行するか "
+                "DB_BACKEND を memory / sqlite にして下さい。"
+            )
+
         self.schema = schema
         self.table = table
 
         ddl = f"""
         CREATE SCHEMA IF NOT EXISTS "{schema}";
         CREATE TABLE IF NOT EXISTS "{schema}"."{table}" (
-            id         TEXT  PRIMARY KEY,
+            id         TEXT PRIMARY KEY,
             data       JSONB NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
-        -- 既存に created_at が無ければ追加
         ALTER TABLE "{schema}"."{table}"
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ
             NOT NULL DEFAULT now();
         """
         with _cx().cursor() as cur:
             cur.execute(ddl)
-
-    # ---------- CRUD ----------
+            
+    # ------------------------------------------------------------------ #
+    # CRUD
+    # ------------------------------------------------------------------ #
     def create(self, obj_id: str, data: Dict[str, Any]) -> None:
-        sql = f'INSERT INTO "{self.schema}"."{self.table}"(id,data) VALUES (%s,%s)'
+        sql = (
+            f'INSERT INTO "{self.schema}"."{self.table}" '
+            "(tenant_id, id, data) VALUES (%s, %s, %s) "
+            "ON CONFLICT (tenant_id, id) DO UPDATE SET data = EXCLUDED.data"
+        )
         with _cx().cursor() as cur:
-            cur.execute(sql, (obj_id, json.dumps(data)))
+            cur.execute(sql, (self.tenant_id, obj_id, json.dumps(data)))
 
     def get(self, obj_id: str) -> Dict[str, Any] | None:
-        sql = f'SELECT data FROM "{self.schema}"."{self.table}" WHERE id=%s'
+        sql = (
+            f'SELECT data FROM "{self.schema}"."{self.table}" '
+            "WHERE tenant_id = %s AND id = %s"
+        )
         with _cx().cursor(row_factory=dict_row) as cur:
-            cur.execute(sql, (obj_id,))
+            cur.execute(sql, (self.tenant_id, obj_id))
             row = cur.fetchone()
         return row["data"] if row else None
 
     def list(self) -> List[Dict[str, Any]]:
-        sql = f'SELECT data FROM "{self.schema}"."{self.table}"'
+        sql = (
+            f'SELECT data FROM "{self.schema}"."{self.table}" '
+            "WHERE tenant_id = %s "
+            "ORDER BY created_at DESC"
+        )
         with _cx().cursor(row_factory=dict_row) as cur:
-            cur.execute(sql)
+            cur.execute(sql, (self.tenant_id,))
             return [r["data"] for r in cur.fetchall()]
 
     def delete(self, obj_id: str) -> None:
-        sql = f'DELETE FROM "{self.schema}"."{self.table}" WHERE id=%s'
+        sql = (
+            f'DELETE FROM "{self.schema}"."{self.table}" '
+            "WHERE tenant_id = %s AND id = %s"
+        )
         with _cx().cursor() as cur:
-            cur.execute(sql, (obj_id,))
+            cur.execute(sql, (self.tenant_id, obj_id))

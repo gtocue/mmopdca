@@ -1,69 +1,134 @@
 # =========================================================
-# ASSIST_KEY: このファイルは【core/repository/sqlite_impl.py】に位置するユニットです
+# ASSIST_KEY: core/repository/sqlite_impl.py
 # =========================================================
 #
-# 【概要】
-#   SQLite 永続化レポジトリ（汎用 key-value ストア）
-#   - BaseRepository を継承して create / get / list / delete を実装
-#
-# ---------------------------------------------------------
+# SQLite 汎用 JSON ストア（tenant_id, id, data, created_at）
+# -----------------------------------------------------------
 
 from __future__ import annotations
 
 import json
 import sqlite3
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, List
 
 from .base import BaseRepository
 
-# --------------------------------------------------
-# SQLiteRepository
-# --------------------------------------------------
+_SQLITE_PRAGMA_FK = "PRAGMA foreign_keys = ON;"
+
+
 class SQLiteRepository(BaseRepository):
     """
-    任意テーブルを {id TEXT PRIMARY KEY, data TEXT(JSON)} スキーマで保存する
+    {tenant_id, id} を複合 PK にした JSON ストア Repository
     """
 
-    def __init__(self, path: str = "mmopdca.db", table: str = "plan") -> None:
-        # テーブル名をダブルクォートで必ずエスケープ
-        self.table: str = table
-        self.quoted: str = f'"{table}"'
+    def __init__(
+        self,
+        path: str | Path = "mmopdca.db",
+        table: str = "plan",
+        tenant_id: str = "public",
+    ) -> None:
+        self.table = table
+        self.tenant_id = tenant_id
+        self.quoted = f'"{table}"'
 
-        # NOTE: check_same_thread=False ⇒ FastAPI のスレッド間共有を許可
-        self.conn = sqlite3.connect(path, check_same_thread=False)
+        self.conn = sqlite3.connect(str(path), check_same_thread=False)
+        self.conn.execute(_SQLITE_PRAGMA_FK)
 
-        # テーブル作成
-        self.conn.execute(
-            f"CREATE TABLE IF NOT EXISTS {self.quoted} ("
-            "id TEXT PRIMARY KEY, "
-            "data TEXT NOT NULL)"
-        )
-        self.conn.commit()
+        self._ensure_schema()
 
-    # ----------------- CRUD -----------------
+    # ------------------------------------------------------------------ #
+    # スキーマ保証
+    # ------------------------------------------------------------------ #
+    def _ensure_schema(self) -> None:
+        with self.conn:  # autocommit
+            # ① 新規作成
+            self.conn.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {self.quoted} (
+                    tenant_id  TEXT NOT NULL DEFAULT 'public',
+                    id         TEXT NOT NULL,
+                    data       TEXT NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (tenant_id, id)
+                );
+                """
+            )
+
+            # ② 旧テーブル救済（列追加）
+            cols = {
+                row[1]  # (cid, name, type, notnull, dflt_value, pk)
+                for row in self.conn.execute(
+                    f"PRAGMA table_info({self.quoted});"
+                ).fetchall()
+            }
+            if "tenant_id" not in cols:
+                self.conn.execute(
+                    f"""
+                    ALTER TABLE {self.quoted}
+                    ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'public';
+                """
+                )
+                # 既存 PK(id) を複合 PK に作り直すのは難しいため、
+                # 移行時は dump/restore を推奨（MVP ではスキップ）
+
+            # ③ created_at 降順インデックス
+            self.conn.execute(
+                f"""
+                CREATE INDEX IF NOT EXISTS idx_{self.table}__tenant_created_at
+                ON {self.quoted}(tenant_id, created_at DESC);
+                """
+            )
+
+    # ------------------------------------------------------------------ #
+    # CRUD
+    # ------------------------------------------------------------------ #
     def create(self, obj_id: str, data: Dict[str, Any]) -> None:
-        self.conn.execute(
-            f"INSERT OR REPLACE INTO {self.quoted}(id, data) VALUES(?, ?)",
-            (obj_id, json.dumps(data, ensure_ascii=False)),
-        )
-        self.conn.commit()
+        with self.conn:
+            self.conn.execute(
+                f"""
+                INSERT OR REPLACE INTO {self.quoted}
+                    (tenant_id, id, data)
+                VALUES(?, ?, ?)
+                """,
+                (self.tenant_id, obj_id, json.dumps(data, ensure_ascii=False)),
+            )
 
     def get(self, obj_id: str) -> Dict[str, Any] | None:
         cur = self.conn.execute(
-            f"SELECT data FROM {self.quoted} WHERE id = ?", (obj_id,)
+            f"""
+            SELECT data FROM {self.quoted}
+            WHERE tenant_id = ? AND id = ?
+            """,
+            (self.tenant_id, obj_id),
         )
         row = cur.fetchone()
         return json.loads(row[0]) if row else None
 
-    def list(self) -> list[Dict[str, Any]]:
-        cur = self.conn.execute(f"SELECT data FROM {self.quoted}")
+    def list(self) -> List[Dict[str, Any]]:
+        cur = self.conn.execute(
+            f"""
+            SELECT data FROM {self.quoted}
+            WHERE tenant_id = ?
+            ORDER BY created_at DESC
+            """,
+            (self.tenant_id,),
+        )
         return [json.loads(r[0]) for r in cur.fetchall()]
 
     def delete(self, obj_id: str) -> None:
-        self.conn.execute(f"DELETE FROM {self.quoted} WHERE id = ?", (obj_id,))
-        self.conn.commit()
+        with self.conn:
+            self.conn.execute(
+                f"""
+                DELETE FROM {self.quoted}
+                WHERE tenant_id = ? AND id = ?
+                """,
+                (self.tenant_id, obj_id),
+            )
 
-    # ----------------- housekeeping -----------------
+    # ------------------------------------------------------------------ #
+    # housekeeping
+    # ------------------------------------------------------------------ #
     def __del__(self) -> None:  # noqa: D401
         try:
             self.conn.close()

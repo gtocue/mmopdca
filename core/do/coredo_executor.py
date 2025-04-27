@@ -1,132 +1,208 @@
-# ASSIST_KEY: このファイルは【core/do/coredo_executor.py】に位置するユニットです.
+# =========================================================
+# core/do/coredo_executor.py
+# =========================================================
 #
-# 【概要】
-#   Do フェーズ実行エンジン (CoreDoExecutor)。
-#   Plan で決定した銘柄・期間・指標を用い、データ取得 → 特徴量生成 →
-#   簡易モデル推論までを行う MVP 実装。
+# Do フェーズ ― MVP 実装
+#   1. 価格取得      : Yahoo Finance
+#   2. 指標計算      : SMA / EMA / RSI（プラグイン置換しやすい構造）
+#   3. 予測モデル    : 線形回帰で「翌日終値」を推定
 #
-# 【主な役割】
-#   - run_do()            : 外向け API。Plan パラメータで実行し結果 dict を返す
-#   - _download_prices()  : yfinance で株価ロー・ハイ・終値など取得
-#   - _add_indicators()   : SMA 等の基本指標を Pandas で付与
-#
-# 【連携先・依存関係】
-#   - 他ユニット : core/schemas/do_schemas.DoCreateRequest
-#   - 外部設定   : なし（将来 settings.yaml へ切り出し予定）
-#
-# 【ルール遵守】
-#   1) メイン銘柄 "Close_main", "Open_main" は直接扱わない
-#   2) 市場は "Close_Nikkei_225", "Open_Nikkei_225" の suffix を使う
-#   3) コード返却は全体コードで行う
-#   4) ファイル先頭に本ファイル名を記載する
-#   5) 機能削除は事前相談（今回は追加のみ）
-#   6) pdca_data[...] に統一する（本ユニットは pdca_data を直接扱わない）
-#
-# 【注意事項】
-#   - ハードコード多数 → “MVP デモ” 用。実運用では DI & 設定化してください
+# 【ルール 2025-04-27】
+#   7) Plan-ID × run_no で “何回でも” 実行できる設計
+#      └ 呼び出し側（DoCreateRequest）が **run_no:int** を必須で送る
+#      └ run_id = f"{plan_id}__{run_no:04d}"
+#   8) params は将来拡張のため **dict[str, Any]** 固定
 # ---------------------------------------------------------
 
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from datetime import datetime, timezone
+from typing import Any, Callable, List, Tuple
 
+import numpy as np
 import pandas as pd
 import yfinance as yf
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-
-# ======================================================================
+# ────────────────────────────────────────────────
 # Public API
-# ======================================================================
-def run_do(plan_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
+# ────────────────────────────────────────────────
+def run_do(plan_id: str, params: dict[str, Any]) -> dict[str, Any]:
     """
-    Plan パラメータを受け取り、単一銘柄の簡易モデルで予測を行う。
+    Do フェーズを 1 回実行し結果を JSON 互換 dict で返す。
 
     Parameters
     ----------
     plan_id : str
-        紐付く Plan の ID（ログ用）
-    params : dict
-        DoCreateRequest の内容 (symbol, start, end, indicators ...)
-
-    Returns
-    -------
-    dict
+        呼び出し元 Plan の ID
+    params  : dict[str, Any]
         {
-            "summary": {...},
-            "predictions": [...],
-            "metrics": {...}
+          "run_no"    : int,               # ★必須
+          "symbol"    : str,
+          "start"     : "YYYY-MM-DD",
+          "end"       : "YYYY-MM-DD",
+          "indicators": [                  # optional
+              {"name": "SMA", "window": 5},
+              {"name": "EMA", "window":20}
+          ]
         }
     """
-    symbol: str = params["symbol"]
-    start: str = params["start"]
-    end: str = params["end"]
-    indicators: List[Dict[str, Any]] = params.get("indicators", [])
+    symbol, start, end, ind_cfg, run_no = _parse_params(params)
+    run_id = f"{plan_id}__{run_no:04d}"
 
-    logger.info("[Do] ▸ plan_id=%s  symbol=%s  %s→%s", plan_id, symbol, start, end)
+    logger.info("[Do] ▶ run_id=%s  %s  %s→%s", run_id, symbol, start, end)
 
-    # -- データ取得 & 前処理 ------------------------------------------------
+    # 1. price download -------------------------------------------------
     df = _download_prices(symbol, start, end)
-    df = _add_indicators(df, indicators)
 
-    # -- 超簡易モデル：5 日 SMA → 翌日終値を線形回帰 -------------------------
+    # 2. indicator engineering -----------------------------------------
+    df = _add_indicators(df, ind_cfg)
     if len(df) < 30:
-        raise RuntimeError("Not enough price data (≥30 rows required)")
+        raise RuntimeError("Not enough rows (≥30) after preprocessing")
 
+    # 3. training / inference ------------------------------------------
+    preds, model, feature_cols, metrics = _train_and_predict(df)
+
+    # 4. build response -------------------------------------------------
+    last30: List[Tuple[str, float]] = list(
+        zip(
+            df.index[-30:].strftime("%Y-%m-%d").tolist(),
+            preds[-30:].round(4).tolist(),
+        )
+    )
+
+    return {
+        "run_id": run_id,
+        "created_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "summary": {
+            "rows": int(len(df)),
+            "features_used": feature_cols,
+            "coef": np.round(model.coef_, 6).tolist(),
+            "intercept": float(round(model.intercept_, 6)),
+        },
+        "metrics": metrics,
+        "predictions": last30,  # [[date, value], ...] (最新30件)
+    }
+
+
+# ────────────────────────────────────────────────
+# helpers
+# ────────────────────────────────────────────────
+def _parse_params(
+    params: dict[str, Any],
+) -> Tuple[str, str, str, List[dict[str, Any]], int]:
+    """必須キー検査と型・デフォルト補完"""
+
+    def _req(key: str) -> Any:
+        if key not in params:
+            raise RuntimeError(f"missing required param: '{key}'")
+        return params[key]
+
+    symbol: str = str(_req("symbol"))
+    start: str = str(_req("start"))
+    end: str = str(_req("end"))
+    run_no: int = int(_req("run_no"))  # ★必須
+
+    indicators = params.get("indicators") or [{"name": "SMA", "window": 5}]
+    if not isinstance(indicators, list):
+        raise RuntimeError("indicators must be list[dict]")
+
+    for ind in indicators:
+        if "name" not in ind:
+            raise RuntimeError("indicator item requires 'name'")
+
+    return symbol, start, end, indicators, run_no
+
+
+def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
+    df = yf.download(symbol, start=start, end=end, progress=False, auto_adjust=False)
+    if df.empty:
+        raise RuntimeError(f"No price data for '{symbol}'")
+    # 明示列のみ残し null Close 行は除外
+    return (
+        df[["Open", "High", "Low", "Close", "Adj Close", "Volume"]]
+        .dropna(subset=["Close"])
+        .copy()
+    )
+
+
+# ---------- indicator builders ----------
+def _sma(close: pd.Series, win: int) -> pd.Series:
+    return close.rolling(win, min_periods=win).mean()
+
+
+def _ema(close: pd.Series, win: int) -> pd.Series:
+    return close.ewm(span=win, adjust=False).mean()
+
+
+def _rsi(close: pd.Series, win: int) -> pd.Series:
+    delta = close.diff()
+    gain = delta.clip(lower=0).rolling(win, min_periods=win).mean()
+    loss = -delta.clip(upper=0).rolling(win, min_periods=win).mean()
+    rs = gain / loss.replace(0, 1e-9)
+    return 100 - (100 / (1 + rs))
+
+
+_IND_FUNCS: dict[str, Callable[[pd.Series, int], pd.Series]] = {
+    "SMA": _sma,
+    "EMA": _ema,
+    "RSI": _rsi,
+}
+
+
+def _add_indicators(df: pd.DataFrame, cfg: List[dict[str, Any]]) -> pd.DataFrame:
+    close = df["Close"]
+    for ind in cfg:
+        name = ind["name"].upper()
+        win = int(ind.get("window", 5))
+        col = f"{name}_{win}"
+
+        func = _IND_FUNCS.get(name)
+        if func is None:
+            raise RuntimeError(f"Unsupported indicator '{name}'")
+
+        if col not in df.columns:  # 冪等
+            df[col] = func(close, win)
+
+    # safety-net：最低限 SMA_5 は追加
+    if "SMA_5" not in df.columns:
+        df["SMA_5"] = _sma(close, 5)
+
+    return df.dropna()
+
+
+def _train_and_predict(
+    df: pd.DataFrame,
+) -> Tuple[np.ndarray, LinearRegression, List[str], dict[str, float]]:
+    df = df.copy()
     df["target"] = df["Close"].shift(-1)
     df = df.dropna()
 
-    X = df[["SMA_5"]]
-    y = df["target"]
+    feature_cols = [c for c in df.columns if c.startswith(("SMA_", "EMA_", "RSI_"))]
+    if not feature_cols:
+        raise RuntimeError("No usable features – add SMA / EMA / RSI indicators")
+
+    X = df[feature_cols].values
+    y = df["target"].values
 
     model = LinearRegression()
     model.fit(X, y)
     preds = model.predict(X)
 
-    logger.info("[Do] ✓ completed rows=%d  r2=%.4f", len(df), model.score(X, y))
-
-    return {
-        "summary": {
-            "rows": len(df),
-            "coef": float(model.coef_[0]),
-            "intercept": float(model.intercept_),
-        },
-        "predictions": [float(p) for p in preds[:30]],  # 先頭 30 件だけ返す
-        "metrics": {
-            "r2": float(model.score(X, y)),
-        },
+    metrics = {
+        "r2": float(round(r2_score(y, preds), 6)),
+        "rmse": float(round(mean_squared_error(y, preds, squared=False), 6)),
     }
 
-
-# ======================================================================
-# Internal helpers
-# ======================================================================
-def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
-    """yfinance で OHLCV を取得"""
-    df = yf.download(symbol, start=start, end=end, progress=False)
-    if df.empty:
-        raise RuntimeError(f"No price data for '{symbol}'")
-    return df
-
-
-def _add_indicators(df: pd.DataFrame, indicators: List[Dict[str, Any]]) -> pd.DataFrame:
-    """
-    指定されたインジケータを DataFrame に付与。
-    現状は SMA のみ対応。
-    """
-    for ind in indicators:
-        if ind["name"].upper() == "SMA":
-            win = int(ind.get("window", 5))
-            col = f"SMA_{win}"
-            if col not in df.columns:
-                df[col] = df["Close"].rolling(win).mean()
-
-    # モデルで必須の 5 日 SMA が無ければ自動で付与
-    if "SMA_5" not in df.columns:
-        df["SMA_5"] = df["Close"].rolling(5).mean()
-
-    return df
+    logger.info(
+        "[Do] ✓ rows=%d  r2=%.4f  rmse=%.4f",
+        len(df),
+        metrics["r2"],
+        metrics["rmse"],
+    )
+    return preds, model, feature_cols, metrics

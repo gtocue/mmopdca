@@ -6,10 +6,10 @@
 #   PlanRouter ― “Plan（命令書）” を CRUD する REST エンドポイント。
 #
 # 【主な役割】
-#   - POST /plan/        : Plan の新規登録
-#   - GET  /plan/{id}    : 1 件取得
-#   - GET  /plan/        : 一覧取得
-#   - DELETE /plan/{id}  : 削除
+#   - POST  /plan/        : Plan の新規登録
+#   - GET   /plan/{id}    : 1 件取得
+#   - GET   /plan/        : 一覧取得
+#   - DELETE/plan/{id}    : 削除
 #
 # 【連携先・依存関係】
 #   - core.schemas.command.PlanCommand  … 型バリデーション
@@ -46,7 +46,7 @@ _repo = get_repo(table="plan")
 # ==================================================
 @router.post(
     "/",
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_201_CREATED,  # ★ 201 = Created
     summary="Create Plan",
 )
 def create_plan(cmd: PlanCommand):
@@ -54,7 +54,7 @@ def create_plan(cmd: PlanCommand):
     Plan を登録。`id` が重複している場合は **409 Conflict** を返す。
     """
     if _repo.get(cmd.id):
-        raise HTTPException(409, "id already exists")
+        raise HTTPException(status.HTTP_409_CONFLICT, "id already exists")
 
     _repo.create(cmd.id, cmd.model_dump(mode="json"))
     return {"ok": True, "id": cmd.id}
@@ -71,7 +71,7 @@ def create_plan(cmd: PlanCommand):
 def get_plan(cmd_id: str):
     plan = _repo.get(cmd_id)
     if plan is None:
-        raise HTTPException(404, "not found")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
     return PlanCommand(**plan)  # 型を復元して返却
 
 
@@ -100,5 +100,6 @@ def delete_plan(cmd_id: str):
     Plan を削除。存在しなければ **404 Not Found**。
     """
     if _repo.get(cmd_id) is None:
-        raise HTTPException(404, "not found")
-    _repo.delete(cmd_id)     # MemoryRepository / SQLiteRepository ともに delete 実装済み
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
+    _repo.delete(cmd_id)
+    

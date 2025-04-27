@@ -1,26 +1,23 @@
-# =========================================================
-# pyproject.toml  ―  mmopdca ルート
-# ---------------------------------------------------------
-#  ● PEP 621 構成          : [project] セクションにメタ情報
-#  ● ランタイム依存        : project.dependencies = [...]
-#  ● 開発 / CI 依存        : tool.poetry.group.dev.dependencies
-#  ● build-backend         : poetry-core
-# ---------------------------------------------------------
+# ----------------------------------------------------------
+# pyproject.toml — mmopdca root
+#   * PEP 621 metadata          : [project] section
+#   * Runtime dependencies      : project.dependencies
+#   * Dev / CI dependencies     : [tool.poetry.group.dev.dependencies]
+#   * Optional DB dependencies  : [tool.poetry.group.db.dependencies]
+#   * Adapter entry-points      : [project.entry-points."mmopdca_adapters"]
+#   * Build backend             : poetry-core
+# ----------------------------------------------------------
 
 [project]
 name            = "mmopdca"
 version         = "0.1.0"
-description     = "命令書型予測アプリ (pivot-ready)"
+description     = "command-DSL-driven forecasting app (pivot-ready)"
 authors         = [{ name = "gtocue", email = "gtocue510@gmail.com" }]
 license         = { text = "MIT" }
 readme          = "README.md"
 requires-python = ">=3.11,<3.13"
 
-# ────────────── Runtime Dependencies ──────────────
-#
-# ・表記は semver 互換。括弧 “( )” は使わず `>=, <` を記述
-# ・PostgreSQL/psycopg は optional → extras で有効化
-#
+# ---------- Runtime dependencies ----------
 dependencies = [
   "fastapi>=0.115.12,<0.116.0",
   "pydantic>=2.7.2,<3.0.0",
@@ -31,37 +28,36 @@ dependencies = [
   "numpy>=2.2.5,<3.0.0",
   "scikit-learn>=1.6.1,<2.0.0",
   "yfinance>=0.2.56,<0.3.0",
-  "plotly>=6.0.1,<7.0.0",
-  "psycopg[binary] (>=3.1,<4)",
+  "plotly>=6.0.1,<7.0.0"
 ]
 
-# ─────────── Optional deps (extras) ───────────
-#
-#   poetry add --group db "psycopg[binary]>=3.1,<4"
-#
-[project.optional-dependencies]
-db = [
-  "psycopg[binary]>=3.1,<4.0.0"
-]
+# ---------- Adapter entry-points ----------
+[project.entry-points."mmopdca_adapters"]
+stock_us = "plugins.stock_us.adapter:StockUSAdapter"
 
-# ────────────── Poetry-specific ──────────────
+# ---------- Poetry settings ----------
 [tool.poetry]
-package-mode = false          # ← lib 化するサブパッケージだけ true に昇格する方針
+package-mode = true   # needed for entry-points
 
-# ────────────── Dev / CI deps ──────────────
+[[tool.poetry.packages]]
+include = "common_core"
+
+[[tool.poetry.packages]]
+include = "plugins"
+
+# ---------- Dev / CI dependencies ----------
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.3.5"
-black  = "^25.1.0"
-isort  = "^6.0.1"
-mypy   = "^1.15.0"
-uvicorn = { version = "^0.34.2", extras = ["standard"] }
-
-# ────────────── Build backend ──────────────
+pytest  = "^8.3.5"
+black   = "^25.1.0"
+isort   = "^6.0.1"
+mypy    = "^1.15.0"
 alembic = "^1.15.2"
 
+# ---------- Optional DB dependencies ----------
 [tool.poetry.group.db.dependencies]
-psycopg = {version = ">=3.1,<4", extras = ["binary"]}
+psycopg = { version = ">=3.1,<4.0.0", extras = ["binary"] }
 
+# ---------- Build backend ----------
 [build-system]
 requires      = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
