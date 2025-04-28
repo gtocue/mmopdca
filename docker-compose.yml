@@ -1,0 +1,102 @@
+# ------------------------------------------------------------------
+# docker-compose.yml   – すべてのサービスをまとめて起動
+#   $ docker compose up -d
+# ------------------------------------------------------------------
+services:
+  # -------------------------------------------------------------- #
+  # FastAPI / Uvicorn                                              #
+  # -------------------------------------------------------------- #
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.main_api
+    container_name: mmopdca_api
+    command: >
+      uvicorn api.main_api:app
+             --host 0.0.0.0 --port 8001 --proxy-headers
+    env_file: .env
+    ports:
+      - "8001:8001"
+    depends_on: [ db, redis ]
+    restart: unless-stopped
+
+  # -------------------------------------------------------------- #
+  # Celery Worker                                                  #
+  # -------------------------------------------------------------- #
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile # worker/beat 共通ベース
+      target: runtime
+    container_name: mmopdca_worker
+    command: >
+      celery -A core.do.coredo_executor worker --loglevel=info
+    env_file: .env
+    depends_on: [ db, redis ]
+    restart: on-failure
+
+  # -------------------------------------------------------------- #
+  # Celery Beat (スケジューラ)                                     #
+  # -------------------------------------------------------------- #
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: mmopdca_beat
+    command: >
+      celery -A core.do.coredo_executor beat --loglevel=info
+    env_file: .env
+    depends_on: [ db, redis ]
+    restart: on-failure
+
+  # -------------------------------------------------------------- #
+  # Redis (ブローカー/結果バックエンド)                            #
+  # -------------------------------------------------------------- #
+  redis:
+    image: redis:7-alpine
+    container_name: mmopdca_redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # -------------------------------------------------------------- #
+  # PostgreSQL                                                     #
+  # -------------------------------------------------------------- #
+  db:
+    image: postgres:16-alpine
+    container_name: mmopdca_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mmopdca}
+      POSTGRES_USER: ${POSTGRES_USER:-mmop_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # -------------------------------------------------------------- #
+  # pgAdmin (OPTIONAL) – dev プロファイル                          #
+  # -------------------------------------------------------------- #
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: mmopdca_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on: [ db ]
+    restart: unless-stopped
+    profiles: [ "dev" ]
+
+# ------------------------------------------------------------------
+volumes:
+  pg_data:
+  redis_data:
+  pgadmin_data:

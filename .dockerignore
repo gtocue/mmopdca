@@ -1,0 +1,16 @@
+# ビルドコンテキストを最小化
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.sqlite*
+*.db
+*.log
+tests
+notebooks
+infra/k8s
+infra/terraform
+.idea
+.vscode

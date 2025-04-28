@@ -11,24 +11,33 @@
 [project]
 name            = "mmopdca"
 version         = "0.1.0"
-description     = "command-DSL-driven forecasting app (pivot-ready)"
+description     = "Command-DSL-driven forecasting SaaS (MVP)"
 authors         = [{ name = "gtocue", email = "gtocue510@gmail.com" }]
 license         = { text = "MIT" }
-readme          = "README.md"
+readme          = "README.md"           # ← ファイルが無い場合は空で置いてください
 requires-python = ">=3.11,<3.13"
 
 # ---------- Runtime dependencies ----------
 dependencies = [
+  # Web / API
   "fastapi>=0.115.12,<0.116.0",
-  "pydantic>=2.7.2,<3.0.0",
   "uvicorn[standard]>=0.34.2,<0.35.0",
+
+  # Core
+  "pydantic>=2.7.2,<3.0.0",
   "python-dotenv>=1.1.0,<2.0.0",
-  "pytz>=2025.2,<2026.0",
+
+  # Data / ML
   "pandas>=2.2.3,<3.0.0",
   "numpy>=2.2.5,<3.0.0",
   "scikit-learn>=1.6.1,<2.0.0",
   "yfinance>=0.2.56,<0.3.0",
-  "plotly>=6.0.1,<7.0.0"
+  "plotly>=6.0.1,<7.0.0",
+
+  # Queue
+  "celery[redis]>=5.3,<6.0.0",
+  "redis>=5.0,<6.0.0",
+  "celery>=5.3,<6.0"       # ← ★追加
 ]
 
 # ---------- Adapter entry-points ----------
@@ -37,10 +46,14 @@ stock_us = "plugins.stock_us.adapter:StockUSAdapter"
 
 # ---------- Poetry settings ----------
 [tool.poetry]
-package-mode = true   # needed for entry-points
+package-mode = true        # 必要に応じて false でも可
 
+# インストール対象パッケージ（src ルートではないため個別指定）
 [[tool.poetry.packages]]
 include = "common_core"
+
+[[tool.poetry.packages]]
+include = "core"
 
 [[tool.poetry.packages]]
 include = "plugins"
