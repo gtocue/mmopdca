@@ -1,7 +1,9 @@
 # ------------------------------------------------------------------
-# docker-compose.yml   – すべてのサービスをまとめて起動
+# docker-compose.yml – すべてのサービスを一括起動
 #   $ docker compose up -d
 # ------------------------------------------------------------------
+version: "3.8" # Compose v2 でも互換性を保つ無難なバージョン
+
 services:
   # -------------------------------------------------------------- #
   # FastAPI / Uvicorn                                              #
@@ -9,15 +11,22 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.main_api
+      dockerfile: Dockerfile.main_api # FastAPI 用イメージ
     container_name: mmopdca_api
-    command: >
-      uvicorn api.main_api:app
-             --host 0.0.0.0 --port 8001 --proxy-headers
+    command:
+      - uvicorn
+      - api.main_api:app
+      - --host=0.0.0.0
+      - --port=8001
+      - --proxy-headers
     env_file: .env
     ports:
       - "8001:8001"
-    depends_on: [ db, redis ]
+    depends_on:
+      db:
+        condition: service_healthy # ← DB 起動完了を待つ
+      redis:
+        condition: service_started
     restart: unless-stopped
 
   # -------------------------------------------------------------- #
@@ -26,17 +35,25 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile # worker/beat 共通ベース
+      dockerfile: Dockerfile # Worker/Beat 共通
       target: runtime
     container_name: mmopdca_worker
-    command: >
-      celery -A core.do.coredo_executor worker --loglevel=info
+    command:
+      - celery
+      - -A
+      - core.celery_app:celery_app # Celery アプリを明示
+      - worker
+      - --loglevel=info
     env_file: .env
-    depends_on: [ db, redis ]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: on-failure
 
   # -------------------------------------------------------------- #
-  # Celery Beat (スケジューラ)                                     #
+  # Celery Beat – スケジューラ                                     #
   # -------------------------------------------------------------- #
   beat:
     build:
@@ -44,14 +61,22 @@ services:
       dockerfile: Dockerfile
       target: runtime
     container_name: mmopdca_beat
-    command: >
-      celery -A core.do.coredo_executor beat --loglevel=info
+    command:
+      - celery
+      - -A
+      - core.celery_app:celery_app
+      - beat
+      - --loglevel=info
     env_file: .env
-    depends_on: [ db, redis ]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: on-failure
 
   # -------------------------------------------------------------- #
-  # Redis (ブローカー/結果バックエンド)                            #
+  # Redis – Celery ブローカー / リザルトバックエンド               #
   # -------------------------------------------------------------- #
   redis:
     image: redis:7-alpine
@@ -69,17 +94,23 @@ services:
     image: postgres:16-alpine
     container_name: mmopdca_db
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-mmopdca}
-      POSTGRES_USER: ${POSTGRES_USER:-mmop_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pg_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      # ← API/Worker が待機するヘルスチェック
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
   # -------------------------------------------------------------- #
-  # pgAdmin (OPTIONAL) – dev プロファイル                          #
+  # pgAdmin – dev profile だけで起動                                #
   # -------------------------------------------------------------- #
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -91,9 +122,11 @@ services:
       - "8080:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
-    depends_on: [ db ]
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
-    profiles: [ "dev" ]
+    profiles: [ "dev" ] # `--profile dev` でのみ起動
 
 # ------------------------------------------------------------------
 volumes:

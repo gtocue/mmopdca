@@ -3,16 +3,22 @@
 # =========================================================
 #
 # Do フェーズ ― MVP 実装
-#   1. 価格取得      : Yahoo Finance
+#   1. 価格取得      : Yahoo-Finance (yfinance 0.2.*)
 #   2. 指標計算      : SMA / EMA / RSI（プラグイン置換しやすい構造）
 #   3. 予測モデル    : 線形回帰で「翌日終値」を推定
 #
 # 【ルール 2025-04-27】
 #   7) Plan-ID × run_no で “何回でも” 実行できる設計
-#      └ 呼び出し側（DoCreateRequest）が **run_no:int** を必須で送る
-#      └ run_id = f"{plan_id}__{run_no:04d}"
+#        └ 呼び出し側（DoCreateRequest）が **run_no:int** を必須で送る
+#        └ run_id = f"{plan_id}__{run_no:04d}"
 #   8) params は将来拡張のため **dict[str, Any]** 固定
-# ---------------------------------------------------------
+#
+# NOTE
+# ──────────────────────────────────────────────────────────
+#  ▸ yfinance 0.2.* + pandas 2.x ではカラム名がすべて小文字になるため
+#    _download_prices() 内で `str.capitalize()` して旧 API と互換にする。
+#  ▸ 新しい指標を追加する場合は _IND_FUNCS に登録するだけで OK。
+# =========================================================
 
 from __future__ import annotations
 
@@ -43,9 +49,9 @@ def run_do(plan_id: str, params: dict[str, Any]) -> dict[str, Any]:
     params  : dict[str, Any]
         {
           "run_no"    : int,               # ★必須
-          "symbol"    : str,
-          "start"     : "YYYY-MM-DD",
-          "end"       : "YYYY-MM-DD",
+          "symbol"    : str,               # ★必須
+          "start"     : "YYYY-MM-DD",      # ★必須
+          "end"       : "YYYY-MM-DD",      # ★必須
           "indicators": [                  # optional
               {"name": "SMA", "window": 5},
               {"name": "EMA", "window":20}
@@ -120,9 +126,21 @@ def _parse_params(
 
 
 def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
+    """
+    yfinance → pandas.DataFrame を旧 API と同じ列名に整形して返す。
+
+    * pandas-2.x / yfinance-0.2.x ではすべて小文字で返るため先頭大文字化
+    """
     df = yf.download(symbol, start=start, end=end, progress=False, auto_adjust=False)
     if df.empty:
         raise RuntimeError(f"No price data for '{symbol}'")
+
+    # --- 旧バージョンとの互換（open→Open, adj close→Adj Close, …）---
+    df.columns = [c.capitalize() for c in df.columns]
+    if "Adj close" in df.columns:
+        df = df.rename(columns={"Adj close": "Adj Close"})
+    # -----------------------------------------------------------------
+
     # 明示列のみ残し null Close 行は除外
     return (
         df[["Open", "High", "Low", "Close", "Adj Close", "Volume"]]

@@ -1,43 +1,55 @@
 # =========================================================
-# ASSIST_KEY: 【core/repository/base.py】
+# core/repository/base.py
 # =========================================================
 #
-# 【概要】
-#   Repository 実装の共通インターフェース。
-#   create / get / list だけを抽象メソッドとして宣言します。
-#
-# 【主な役割】
-#   - MemoryRepository / SQLiteRepository などの親クラス
-#
-# 【連携先】
-#   - core/repository/memory_impl.py
-#   - core/repository/sqlite_impl.py
-#
-# 【ルール】
-#   1) 低レイヤなので pdca_data へは直接触れない
-#   2) 型安全 (typing) を必ず付与
+# 共通 Repository インターフェース
+# --------------------------------
+# * すべての Repository 実装（memory / sqlite / postgres …）の親。
+# * マルチテナント対応を見据えて `tenant_id` を追加。
+# * CRUD のシグネチャのみ定義し、実装は各サブクラスへ委譲。
 # ---------------------------------------------------------
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
 
 class BaseRepository(ABC):
-    """Repository Interface"""
+    """
+    抽象 Repository 基底クラス
 
-    def __init__(self, table: str):
-        self.table = table
+    Parameters
+    ----------
+    table : str
+        対象となるテーブル名・コレクション名など。
+    tenant_id : str, default ''
+        マルチテナント用 ID。シングルテナントの場合は空文字列。
+    """
 
-    # ---------- CRUD ----------
+    def __init__(self, *, table: str, tenant_id: str = "") -> None:
+        self.table: str = table
+        self.tenant_id: str = tenant_id
+
+    # -----------------------------------------------------
+    # CRUD 抽象メソッド
+    # -----------------------------------------------------
     @abstractmethod
-    def create(self, obj_id: str, data: Dict[str, Any]) -> None: ...
+    def create(self, obj_id: str, data: Dict[str, Any]) -> None:
+        """id をキーにオブジェクトを保存（同 ID があれば上書き）"""
+        raise NotImplementedError
 
     @abstractmethod
-    def get(self, obj_id: str) -> Dict[str, Any] | None: ...
+    def get(self, obj_id: str) -> Dict[str, Any] | None:
+        """id で 1 件取得。無ければ None"""
+        raise NotImplementedError
 
     @abstractmethod
-    def list(self) -> List[Dict[str, Any]]: ...
+    def list(self) -> List[Dict[str, Any]]:
+        """tenant 内のオブジェクトを新しい順で一覧取得"""
+        raise NotImplementedError
 
     @abstractmethod
-    def delete(self, obj_id: str) -> None: ...
+    def delete(self, obj_id: str) -> None:
+        """id を指定して削除（存在しなくてもエラーにしない）"""
+        raise NotImplementedError

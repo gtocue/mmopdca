@@ -7,8 +7,7 @@
 # ---------------------------------------------------------
 from __future__ import annotations
 
-from typing import Annotated, Any, Dict, Literal, Optional
-
+from typing import Any, Dict, List, Literal, Optional, Annotated
 from pydantic import BaseModel, Field, HttpUrl
 
 # ---------------------------------------------------------------------
@@ -42,14 +41,14 @@ class DoCreateRequest(BaseModel):
     """
     Do フェーズ実行のリクエスト。
 
-    - **すべて任意**: 指定しなければ Plan 側の値をそのまま継承します。
-    - `seq` / `run_tag` の 2 つで “同一 Plan 内の何度目か” を一意識別します。
+    - すべて任意。未指定なら Plan 側の値を継承。
+    - **`run_no` が必須**（旧フィールド `seq` が来たらフォールバック）。
     """
 
     # ---- Plan 設定オーバーライド ----
     symbol: Optional[str] = Field(
         default=None,
-        description="銘柄シンボル（例: AAPL, ETH-USD）",
+        description="ティッカーシンボル（例: AAPL, ETH-USD）",
         examples=["AAPL"],
     )
     start: Optional[str] = Field(
@@ -67,10 +66,16 @@ class DoCreateRequest(BaseModel):
     ] = Field(default=None, description="追加テクニカル指標リスト")
 
     # ---- 実行メタ ----
-    seq: int = Field(
-        1,
+    run_no: Optional[int] = Field(
+        default=None,
         ge=1,
-        description="同一 Plan 内での実行シーケンス番号 (1, 2, …)",
+        description="必須。1,2,3… と連番を渡す（未指定なら seq を流用）",
+        examples=[1, 2],
+    )
+    seq: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="旧フィールド（残っていれば run_no に流用）",
         examples=[1, 2],
     )
     run_tag: Optional[str] = Field(
@@ -79,6 +84,21 @@ class DoCreateRequest(BaseModel):
         description="自由ラベル（A/B テストや cron 名など）",
         examples=["baseline", "weekly-run"],
     )
+
+ # ★★★ ここが追加 ★★★
+    run_no: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="executor 互換の連番（指定しなければ seq→1 を流用）",
+        examples=[1],
+    )
+    
+    # --------------------------------------------------
+    # バリデーション: seq → run_no フォールバック
+    # --------------------------------------------------
+    def model_post_init(self, __context: Any) -> None:  # noqa: D401
+        if self.run_no is None and self.seq is not None:
+            object.__setattr__(self, "run_no", self.seq)
 
 
 # ---------------------------------------------------------------------
@@ -101,7 +121,7 @@ class DoResponse(BaseModel):
     seq: int = Field(
         1,
         ge=1,
-        description="DoCreateRequest.seq のエコーバック（未指定なら 1）",
+        description="DoCreateRequest.run_no のエコーバック（互換のため 'seq' に格納）",
     )
     run_tag: Optional[str] = Field(
         default=None,
@@ -121,10 +141,6 @@ class DoResponse(BaseModel):
             "  • DONE   : メトリクスや artefact URI など\n"
             "  • FAILED : {'error': '...'} など"
         ),
-        examples=[
-            {"accuracy": 0.83, "model_uri": "s3://bucket/model.pt"},
-            {"error": "ValueError: window must be > 0"},
-        ],
     )
 
     # ----- 付加情報（将来拡張）-----
