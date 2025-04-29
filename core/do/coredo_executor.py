@@ -1,25 +1,21 @@
 # =========================================================
 # core/do/coredo_executor.py
-# =========================================================
-#
+# ---------------------------------------------------------
 # Do フェーズ ― MVP 実装
 #   1. 価格取得      : Yahoo-Finance (yfinance 0.2.*)
-#   2. 指標計算      : SMA / EMA / RSI（プラグイン置換しやすい構造）
-#   3. 予測モデル    : 線形回帰で「翌日終値」を推定
+#   2. 指標計算      : SMA / EMA / RSI
+#   3. 予測モデル    : 線形回帰で「翌営業日の終値」を推定
 #
 # 【ルール 2025-04-27】
-#   7) Plan-ID × run_no で “何回でも” 実行できる設計
-#        └ 呼び出し側（DoCreateRequest）が **run_no:int** を必須で送る
-#        └ run_id = f"{plan_id}__{run_no:04d}"
-#   8) params は将来拡張のため **dict[str, Any]** 固定
+#   • Plan-ID × run_no で何度でも実行できる
+#   • params は dict[str, Any] 固定
 #
 # NOTE
-# ──────────────────────────────────────────────────────────
-#  ▸ yfinance 0.2.* + pandas 2.x ではカラム名がすべて小文字になるため
-#    _download_prices() 内で `str.capitalize()` して旧 API と互換にする。
-#  ▸ 新しい指標を追加する場合は _IND_FUNCS に登録するだけで OK。
+#   ◦ 古い scikit-learn 互換で RMSE を手計算 fallback
+#   ◦ yfinance が MultiIndex を返した場合は flatten
+#   ◦ 返却する date は「予測対象日」＝ index + 1 BusinessDay
+#     ── 市場独自の休場日は params["holidays"] で拡張可 (下記参照)
 # =========================================================
-
 from __future__ import annotations
 
 import logging
@@ -29,8 +25,9 @@ from typing import Any, Callable, List, Tuple
 import numpy as np
 import pandas as pd
 import yfinance as yf
+from pandas.tseries.offsets import BDay, CustomBusinessDay
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -40,48 +37,45 @@ logger.setLevel(logging.INFO)
 # ────────────────────────────────────────────────
 def run_do(plan_id: str, params: dict[str, Any]) -> dict[str, Any]:
     """
-    Do フェーズを 1 回実行し結果を JSON 互換 dict で返す。
+    Execute **one** Do-phase run and return JSON-serialisable dict.
 
-    Parameters
-    ----------
-    plan_id : str
-        呼び出し元 Plan の ID
-    params  : dict[str, Any]
-        {
-          "run_no"    : int,               # ★必須
-          "symbol"    : str,               # ★必須
-          "start"     : "YYYY-MM-DD",      # ★必須
-          "end"       : "YYYY-MM-DD",      # ★必須
-          "indicators": [                  # optional
-              {"name": "SMA", "window": 5},
-              {"name": "EMA", "window":20}
-          ]
-        }
+    必須キー
+    --------
+    symbol : str
+    start  : "YYYY-MM-DD"
+    end    : "YYYY-MM-DD"
+    run_no : int
+
+    任意キー
+    --------
+    indicators : list[dict]   # 各要素 {name: SMA|EMA|RSI, window:int}
+    holidays   : list[str]    # 市場固有の休場日 ["YYYY-MM-DD", ...]
     """
-    symbol, start, end, ind_cfg, run_no = _parse_params(params)
+    symbol, start, end, ind_cfg, run_no, holidays = _parse_params(params)
     run_id = f"{plan_id}__{run_no:04d}"
-
     logger.info("[Do] ▶ run_id=%s  %s  %s→%s", run_id, symbol, start, end)
 
-    # 1. price download -------------------------------------------------
+    # 1. price ----------------------------------------------------------
     df = _download_prices(symbol, start, end)
 
-    # 2. indicator engineering -----------------------------------------
+    # 2. indicators -----------------------------------------------------
     df = _add_indicators(df, ind_cfg)
     if len(df) < 30:
         raise RuntimeError("Not enough rows (≥30) after preprocessing")
 
-    # 3. training / inference ------------------------------------------
+    # 3. model ----------------------------------------------------------
     preds, model, feature_cols, metrics = _train_and_predict(df)
 
-    # 4. build response -------------------------------------------------
-    last30: List[Tuple[str, float]] = list(
-        zip(
-            df.index[-30:].strftime("%Y-%m-%d").tolist(),
-            preds[-30:].round(4).tolist(),
-        )
-    )
+    # 4. predictions with +1 Business Day -------------------------------
+    bday = _make_bday_offset(holidays)
+    target_dates = (df.index + bday).strftime("%Y-%m-%d")
 
+    last30: List[dict[str, Any]] = [
+        {"date": d, "price": float(round(p, 4))}
+        for d, p in zip(target_dates[-30:], preds[-30:])
+    ]
+
+    # 5. build response -------------------------------------------------
     return {
         "run_id": run_id,
         "created_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -92,7 +86,7 @@ def run_do(plan_id: str, params: dict[str, Any]) -> dict[str, Any]:
             "intercept": float(round(model.intercept_, 6)),
         },
         "metrics": metrics,
-        "predictions": last30,  # [[date, value], ...] (最新30件)
+        "predictions": last30,   # list[{"date": str, "price": float}]
     }
 
 
@@ -101,9 +95,7 @@ def run_do(plan_id: str, params: dict[str, Any]) -> dict[str, Any]:
 # ────────────────────────────────────────────────
 def _parse_params(
     params: dict[str, Any],
-) -> Tuple[str, str, str, List[dict[str, Any]], int]:
-    """必須キー検査と型・デフォルト補完"""
-
+) -> Tuple[str, str, str, List[dict[str, Any]], int, List[str]]:
     def _req(key: str) -> Any:
         if key not in params:
             raise RuntimeError(f"missing required param: '{key}'")
@@ -112,36 +104,62 @@ def _parse_params(
     symbol: str = str(_req("symbol"))
     start: str = str(_req("start"))
     end: str = str(_req("end"))
-    run_no: int = int(_req("run_no"))  # ★必須
+    run_no: int = int(_req("run_no"))
 
     indicators = params.get("indicators") or [{"name": "SMA", "window": 5}]
     if not isinstance(indicators, list):
         raise RuntimeError("indicators must be list[dict]")
-
     for ind in indicators:
         if "name" not in ind:
             raise RuntimeError("indicator item requires 'name'")
 
-    return symbol, start, end, indicators, run_no
+    holidays: List[str] = params.get("holidays", [])  # optional
+
+    return symbol, start, end, indicators, run_no, holidays
+
+
+def _make_bday_offset(holidays: List[str]):
+    """
+    Return a (Custom)BusinessDay(+1) to shift index safely.
+
+    * デフォルト → 土日除外のみ (BDay)
+    * holidays が渡されたらその日付も除外 (CustomBusinessDay)
+    """
+    if holidays:
+        # TODO: 外部カレンダー設定に移動する
+        return CustomBusinessDay(holidays=holidays)
+    return BDay()
 
 
 def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
-    """
-    yfinance → pandas.DataFrame を旧 API と同じ列名に整形して返す。
-
-    * pandas-2.x / yfinance-0.2.x ではすべて小文字で返るため先頭大文字化
-    """
-    df = yf.download(symbol, start=start, end=end, progress=False, auto_adjust=False)
+    df = yf.download(
+        symbol,
+        start=start,
+        end=end,
+        progress=False,
+        auto_adjust=False,
+        group_by="column",
+    )
     if df.empty:
         raise RuntimeError(f"No price data for '{symbol}'")
 
-    # --- 旧バージョンとの互換（open→Open, adj close→Adj Close, …）---
-    df.columns = [c.capitalize() for c in df.columns]
+    # ─── flatten MultiIndex ─────────────────────────────────
+    if isinstance(df.columns, pd.MultiIndex):
+        # pattern-A: (field, ticker)
+        try:
+            df = df.xs(symbol, level=1, axis=1, drop_level=True)
+        except KeyError:
+            # pattern-B: (ticker, field)
+            try:
+                df = df.xs(symbol, level=0, axis=1, drop_level=True)
+            except KeyError:
+                df.columns = ["_".join(map(str, c)) for c in df.columns]
+    # ────────────────────────────────────────────────
+
+    df.columns = [str(c).capitalize() for c in df.columns]
     if "Adj close" in df.columns:
         df = df.rename(columns={"Adj close": "Adj Close"})
-    # -----------------------------------------------------------------
 
-    # 明示列のみ残し null Close 行は除外
     return (
         df[["Open", "High", "Low", "Close", "Adj Close", "Volume"]]
         .dropna(subset=["Close"])
@@ -149,7 +167,7 @@ def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
     )
 
 
-# ---------- indicator builders ----------
+# ---------- indicators ----------
 def _sma(close: pd.Series, win: int) -> pd.Series:
     return close.rolling(win, min_periods=win).mean()
 
@@ -184,11 +202,10 @@ def _add_indicators(df: pd.DataFrame, cfg: List[dict[str, Any]]) -> pd.DataFrame
         if func is None:
             raise RuntimeError(f"Unsupported indicator '{name}'")
 
-        if col not in df.columns:  # 冪等
+        if col not in df.columns:
             df[col] = func(close, win)
 
-    # safety-net：最低限 SMA_5 は追加
-    if "SMA_5" not in df.columns:
+    if "SMA_5" not in df.columns:  # safety-net
         df["SMA_5"] = _sma(close, 5)
 
     return df.dropna()
@@ -212,15 +229,15 @@ def _train_and_predict(
     model.fit(X, y)
     preds = model.predict(X)
 
-    metrics = {
-        "r2": float(round(r2_score(y, preds), 6)),
-        "rmse": float(round(mean_squared_error(y, preds, squared=False), 6)),
-    }
+    # -- RMSE: fallback for old scikit-learn -----------------
+    try:
+        rmse = mean_squared_error(y, preds, squared=False)
+    except TypeError:
+        rmse = np.sqrt(mean_squared_error(y, preds))
+    # --------------------------------------------------------
 
-    logger.info(
-        "[Do] ✓ rows=%d  r2=%.4f  rmse=%.4f",
-        len(df),
-        metrics["r2"],
-        metrics["rmse"],
-    )
-    return preds, model, feature_cols, metrics
+    r2 = float(np.corrcoef(y, preds)[0, 1] ** 2)
+
+    logger.info("[Do] ✓ rows=%d  r2=%.4f  rmse=%.4f", len(df), r2, rmse)
+
+    return preds, model, feature_cols, {"r2": r2, "rmse": float(round(rmse, 6))}
