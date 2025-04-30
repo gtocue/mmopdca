@@ -1,0 +1,53 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://mmopdca.dev/schemas/dsl/do_v1.json",
+    "title": "Do-DSL v1",
+    "description": "Plan を基に実行パラメータを補足する DSL – Do フェーズ用",
+    "type": "object",
+    "required": [
+        "version",
+        "plan_id",
+        "run_no"
+    ],
+    "properties": {
+        "version": {
+            "const": "1.0"
+        },
+        "plan_id": {
+            "type": "string"
+        },
+        "run_no": {
+            "type": "integer",
+            "minimum": 1
+        },
+        "run_tag": {
+            "type": "string",
+            "description": "A/B テスト名など"
+        },
+        "overrides": {
+            "type": "object",
+            "description": "Plan の値を上書きしたい場合だけ指定",
+            "properties": {
+                "symbol": {
+                    "type": "string"
+                },
+                "period": {
+                    "$ref": "plan_v1.json#/properties/period"
+                },
+                "indicators": {
+                    "$ref": "plan_v1.json#/properties/indicators"
+                }
+            },
+            "additionalProperties": false
+        },
+        "holidays": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "format": "date"
+            },
+            "description": "市場固有の休場日"
+        }
+    },
+    "additionalProperties": false
+}

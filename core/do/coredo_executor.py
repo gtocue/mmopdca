@@ -2,7 +2,7 @@
 # core/do/coredo_executor.py
 # ---------------------------------------------------------
 # Do フェーズ ― MVP 実装
-#   1. 価格取得      : Yahoo-Finance (yfinance 0.2.*)
+#   1. 価格取得      : IDataSource (既定は Yahoo-Finance)
 #   2. 指標計算      : SMA / EMA / RSI
 #   3. 予測モデル    : 線形回帰で「翌営業日の終値」を推定
 #
@@ -14,7 +14,7 @@
 #   ◦ 古い scikit-learn 互換で RMSE を手計算 fallback
 #   ◦ yfinance が MultiIndex を返した場合は flatten
 #   ◦ 返却する date は「予測対象日」＝ index + 1 BusinessDay
-#     ── 市場独自の休場日は params["holidays"] で拡張可 (下記参照)
+#     ── 市場独自の休場日は params["holidays"] で拡張可
 # =========================================================
 from __future__ import annotations
 
@@ -24,10 +24,24 @@ from typing import Any, Callable, List, Tuple
 
 import numpy as np
 import pandas as pd
-import yfinance as yf
 from pandas.tseries.offsets import BDay, CustomBusinessDay
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
+
+# ----------------------------------------------------------
+# データソースはプラガブル (core.datasource.get_source → IDataSource)
+# ----------------------------------------------------------
+try:
+    from core.datasource import get_source
+
+    _DATASOURCE = get_source()  # 動的に Yahoo / Premium を取得
+except Exception:  # noqa: BLE001
+    _DATASOURCE = None
+
+    import yfinance as yf  # フォールバック
+    logging.getLogger(__name__).warning(
+        "[Do] datasource fallback to yfinance because core.datasource is missing"
+    )
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -86,7 +100,7 @@ def run_do(plan_id: str, params: dict[str, Any]) -> dict[str, Any]:
             "intercept": float(round(model.intercept_, 6)),
         },
         "metrics": metrics,
-        "predictions": last30,   # list[{"date": str, "price": float}]
+        "predictions": last30,  # list[{date, price}]
     }
 
 
@@ -113,7 +127,7 @@ def _parse_params(
         if "name" not in ind:
             raise RuntimeError("indicator item requires 'name'")
 
-    holidays: List[str] = params.get("holidays", [])  # optional
+    holidays: List[str] = params.get("holidays", [])
 
     return symbol, start, end, indicators, run_no, holidays
 
@@ -126,45 +140,57 @@ def _make_bday_offset(holidays: List[str]):
     * holidays が渡されたらその日付も除外 (CustomBusinessDay)
     """
     if holidays:
-        # TODO: 外部カレンダー設定に移動する
+        # TODO: 外部カレンダー設定へ移動
         return CustomBusinessDay(holidays=holidays)
     return BDay()
 
 
+# ----------------------------------------------------------
+# price downloader (IDataSource / yfinance fallback)
+# ----------------------------------------------------------
 def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
-    df = yf.download(
-        symbol,
-        start=start,
-        end=end,
-        progress=False,
-        auto_adjust=False,
-        group_by="column",
-    )
+    if _DATASOURCE is not None:
+        df = _DATASOURCE.fetch_ohlcv(symbol=symbol, start=start, end=end)
+    else:  # yfinance 直接呼び出しフォールバック
+        import yfinance as yf
+
+        df = yf.download(
+            symbol,
+            start=start,
+            end=end,
+            progress=False,
+            auto_adjust=False,
+            group_by="column",
+        )
+
+        # ---- flatten MultiIndex --------------------------------------
+        if isinstance(df.columns, pd.MultiIndex):
+            try:  # (field, ticker)
+                df = df.xs(symbol, level=1, axis=1, drop_level=True)
+            except KeyError:
+                try:  # (ticker, field)
+                    df = df.xs(symbol, level=0, axis=1, drop_level=True)
+                except KeyError:
+                    df.columns = ["_".join(map(str, c)) for c in df.columns]
+        # --------------------------------------------------------------
+
+        df.columns = [str(c).capitalize() for c in df.columns]
+        if "Adj close" in df.columns:
+            df = df.rename(columns={"Adj close": "Adj Close"})
+
     if df.empty:
         raise RuntimeError(f"No price data for '{symbol}'")
 
-    # ─── flatten MultiIndex ─────────────────────────────────
-    if isinstance(df.columns, pd.MultiIndex):
-        # pattern-A: (field, ticker)
-        try:
-            df = df.xs(symbol, level=1, axis=1, drop_level=True)
-        except KeyError:
-            # pattern-B: (ticker, field)
-            try:
-                df = df.xs(symbol, level=0, axis=1, drop_level=True)
-            except KeyError:
-                df.columns = ["_".join(map(str, c)) for c in df.columns]
-    # ────────────────────────────────────────────────
+    # "Adj Close" が無いデータソースも許容
+    required = ["Open", "High", "Low", "Close", "Volume"]
+    if "Adj Close" in df.columns:
+        required.insert(4, "Adj Close")
 
-    df.columns = [str(c).capitalize() for c in df.columns]
-    if "Adj close" in df.columns:
-        df = df.rename(columns={"Adj close": "Adj Close"})
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise RuntimeError(f"missing required columns: {missing}")
 
-    return (
-        df[["Open", "High", "Low", "Close", "Adj Close", "Volume"]]
-        .dropna(subset=["Close"])
-        .copy()
-    )
+    return df[required].dropna(subset=["Close"]).copy()
 
 
 # ---------- indicators ----------

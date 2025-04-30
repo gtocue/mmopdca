@@ -1,0 +1,71 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://mmopdca.dev/schemas/dsl/plan_v1.json",
+    "title": "Plan-DSL v1",
+    "description": "予測ジョブの“設計図”を宣言する DSL – Plan フェーズ用",
+    "type": "object",
+    "required": [
+        "version",
+        "symbol",
+        "period"
+    ],
+    "properties": {
+        "version": {
+            "const": "1.0",
+            "description": "DSL のバージョン固定"
+        },
+        "symbol": {
+            "type": "string",
+            "pattern": "^[A-Z0-9\\.\\-_]+$",
+            "description": "ティッカー or アセット ID"
+        },
+        "period": {
+            "type": "object",
+            "required": [
+                "start",
+                "end"
+            ],
+            "properties": {
+                "start": {
+                    "type": "string",
+                    "format": "date"
+                },
+                "end": {
+                    "type": "string",
+                    "format": "date"
+                }
+            }
+        },
+        "indicators": {
+            "type": "array",
+            "description": "特徴量にしたいテクニカル指標",
+            "items": {
+                "type": "object",
+                "required": [
+                    "name"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "enum": [
+                            "SMA",
+                            "EMA",
+                            "RSI"
+                        ]
+                    },
+                    "window": {
+                        "type": "integer",
+                        "minimum": 2,
+                        "default": 5
+                    }
+                }
+            },
+            "default": []
+        },
+        "notes": {
+            "type": "string",
+            "description": "自由記述メモ（監査ログ用）"
+        }
+    },
+    "additionalProperties": false
+}
