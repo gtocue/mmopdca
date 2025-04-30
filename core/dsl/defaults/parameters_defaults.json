@@ -1,0 +1,10 @@
+{
+    "common": {
+        "num_layers": 2,
+        "dropout_rate": 0.05,
+        "learning_rate": 0.0005
+    },
+    "Parameter1": {
+        "value": 100
+    }
+}

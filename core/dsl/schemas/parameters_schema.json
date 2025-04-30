@@ -1,0 +1,254 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Preprocessing Config (with enable + value structure)",
+    "type": "object",
+    "properties": {
+        "missing_value_methods": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "string",
+                    "enum": [
+                        "On",
+                        "Off"
+                    ],
+                    "default": "Off"
+                },
+                "value": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": [
+                            "削除",
+                            "平均補完",
+                            "前日値で補完"
+                        ]
+                    },
+                    "default": [
+                        "前日値で補完"
+                    ]
+                }
+            },
+            "required": [
+                "enable",
+                "value"
+            ],
+            "additionalProperties": false
+        },
+        "outlier_methods": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "string",
+                    "enum": [
+                        "On",
+                        "Off"
+                    ],
+                    "default": "Off"
+                },
+                "value": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": [
+                            "なし",
+                            "3σ法",
+                            "IQR法",
+                            "Zスコア法",
+                            "ロバストスケーリング法"
+                        ]
+                    },
+                    "default": [
+                        "3σ法"
+                    ]
+                }
+            },
+            "required": [
+                "enable",
+                "value"
+            ],
+            "additionalProperties": false
+        },
+        "scaling_methods": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "string",
+                    "enum": [
+                        "On",
+                        "Off"
+                    ],
+                    "default": "Off"
+                },
+                "value": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": [
+                            "なし",
+                            "MinMaxスケーリング",
+                            "標準化"
+                        ]
+                    },
+                    "default": [
+                        "標準化"
+                    ]
+                }
+            },
+            "required": [
+                "enable",
+                "value"
+            ],
+            "additionalProperties": false
+        },
+        "feature_generation_methods": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "string",
+                    "enum": [
+                        "On",
+                        "Off"
+                    ],
+                    "default": "Off"
+                },
+                "value": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": [
+                            "なし",
+                            "多項式展開",
+                            "対数変換",
+                            "Box-Cox変換"
+                        ]
+                    },
+                    "default": [
+                        "なし"
+                    ]
+                }
+            },
+            "required": [
+                "enable",
+                "value"
+            ],
+            "additionalProperties": false
+        },
+        "dimensionality_reduction": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "string",
+                    "enum": [
+                        "On",
+                        "Off"
+                    ],
+                    "default": "Off"
+                },
+                "value": {
+                    "type": "object",
+                    "properties": {
+                        "use_pca": {
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "pca_components": {
+                            "type": "integer",
+                            "default": 5,
+                            "minimum": 1
+                        }
+                    },
+                    "required": [
+                        "use_pca",
+                        "pca_components"
+                    ],
+                    "additionalProperties": false
+                }
+            },
+            "required": [
+                "enable",
+                "value"
+            ],
+            "additionalProperties": false
+        },
+        "Normalization": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "string",
+                    "enum": [
+                        "On",
+                        "Off"
+                    ],
+                    "default": "Off"
+                },
+                "value": {
+                    "type": "object",
+                    "properties": {
+                        "method": {
+                            "type": "string",
+                            "default": "minmax"
+                        },
+                        "range": {
+                            "type": "array",
+                            "items": {
+                                "type": "number"
+                            },
+                            "default": [
+                                0,
+                                1
+                            ]
+                        }
+                    },
+                    "required": [
+                        "method",
+                        "range"
+                    ],
+                    "additionalProperties": false
+                }
+            },
+            "required": [
+                "enable",
+                "value"
+            ],
+            "additionalProperties": false
+        },
+        "OutlierRemoval": {
+            "type": "object",
+            "properties": {
+                "enable": {
+                    "type": "string",
+                    "enum": [
+                        "On",
+                        "Off"
+                    ],
+                    "default": "Off"
+                },
+                "value": {
+                    "type": "object",
+                    "properties": {
+                        "threshold": {
+                            "type": "number",
+                            "default": 3
+                        }
+                    },
+                    "required": [
+                        "threshold"
+                    ],
+                    "additionalProperties": false
+                }
+            },
+            "required": [
+                "enable",
+                "value"
+            ],
+            "additionalProperties": false
+        }
+    },
+    "required": [
+        "missing_value_methods",
+        "outlier_methods",
+        "scaling_methods"
+    ],
+    "additionalProperties": false
+}

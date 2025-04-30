@@ -1,0 +1,66 @@
+{
+    "models": {
+        "LSTM": {
+            "enable": true,
+            "dropout_rate": 0.05,
+            "learning_rate": 0.0005,
+            "num_layers": 2
+        },
+        "GRU": {
+            "enable": true,
+            "dropout_rate": 0.05,
+            "learning_rate": 0.0005,
+            "num_layers": 2
+        },
+        "Transformer": {
+            "enable": true,
+            "num_layers": 4,
+            "num_heads": 8,
+            "dropout_rate": 0.1,
+            "learning_rate": 0.0001
+        },
+        "CNN": {
+            "enable": true,
+            "num_filters": 64,
+            "kernel_size": 3,
+            "stride": 1,
+            "pool_size": 2,
+            "dropout_rate": 0.25,
+            "learning_rate": 0.001
+        },
+        "TemporalFusionTransformer": {
+            "enable": true,
+            "num_encoder_layers": 3,
+            "num_decoder_layers": 1,
+            "hidden_size": 64,
+            "attention_heads": 4,
+            "dropout_rate": 0.1,
+            "learning_rate": 0.001
+        },
+        "Informer": {
+            "enable": true,
+            "num_layers": 2,
+            "d_model": 512,
+            "num_heads": 8,
+            "dropout_rate": 0.1,
+            "learning_rate": 0.0005,
+            "prob_sparse": true
+        },
+        "Autoformer": {
+            "enable": true,
+            "num_layers": 2,
+            "d_model": 512,
+            "num_heads": 8,
+            "decomp_window": 25,
+            "dropout_rate": 0.1,
+            "learning_rate": 0.0005
+        },
+        "HybridEnsemble": {
+            "enable": true,
+            "weights": {
+                "deep_model": 0.5,
+                "classical_model": 0.5
+            }
+        }
+    }
+}

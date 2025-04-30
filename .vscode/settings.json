@@ -1,0 +1,28 @@
+{
+    // 1️⃣ YAML/JSON でスキーマ補完を効かせる
+    "yaml.schemas": {
+        "./core/schemas/dsl/plan_v1.json": "docs/samples/plan_sample.yaml",
+        "./core/schemas/dsl/do_v1.json": "docs/samples/do_sample.yaml"
+    },
+    "json.schemas": [
+        {
+            "fileMatch": [
+                "*plan*.json",
+                "plan_sample.json"
+            ],
+            "url": "./core/schemas/dsl/plan_v1.json"
+        },
+        {
+            "fileMatch": [
+                "*do*.json",
+                "do_sample.json"
+            ],
+            "url": "./core/schemas/dsl/do_v1.json"
+        }
+    ],
+    // 2️⃣ 余計なフォーマッタ衝突を防ぐ例（任意）
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": false
+    }
+}

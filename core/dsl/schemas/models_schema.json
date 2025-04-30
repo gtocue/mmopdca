@@ -1,0 +1,311 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Models Config",
+    "description": "Model-specific parameters in plan['models'].",
+    "type": "object",
+    "properties": {
+        "models": {
+            "type": "object",
+            "properties": {
+                "LSTM": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "dropout_rate": {
+                            "type": "number",
+                            "default": 0.05
+                        },
+                        "learning_rate": {
+                            "type": "number",
+                            "default": 0.0005
+                        },
+                        "num_layers": {
+                            "type": "integer",
+                            "default": 2
+                        }
+                    },
+                    "required": [
+                        "enable",
+                        "dropout_rate",
+                        "learning_rate",
+                        "num_layers"
+                    ],
+                    "additionalProperties": false
+                },
+                "GRU": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "dropout_rate": {
+                            "type": "number",
+                            "default": 0.05
+                        },
+                        "learning_rate": {
+                            "type": "number",
+                            "default": 0.0005
+                        },
+                        "num_layers": {
+                            "type": "integer",
+                            "default": 2
+                        }
+                    },
+                    "required": [
+                        "enable",
+                        "dropout_rate",
+                        "learning_rate",
+                        "num_layers"
+                    ],
+                    "additionalProperties": false
+                },
+                "Transformer": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "num_layers": {
+                            "type": "integer",
+                            "default": 4
+                        },
+                        "num_heads": {
+                            "type": "integer",
+                            "default": 8
+                        },
+                        "dropout_rate": {
+                            "type": "number",
+                            "default": 0.1
+                        },
+                        "learning_rate": {
+                            "type": "number",
+                            "default": 0.0001
+                        }
+                    },
+                    "required": [
+                        "enable",
+                        "num_layers",
+                        "num_heads",
+                        "dropout_rate",
+                        "learning_rate"
+                    ],
+                    "additionalProperties": false
+                },
+                "CNN": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "num_filters": {
+                            "type": "integer",
+                            "default": 64
+                        },
+                        "kernel_size": {
+                            "type": "integer",
+                            "default": 3
+                        },
+                        "stride": {
+                            "type": "integer",
+                            "default": 1
+                        },
+                        "pool_size": {
+                            "type": "integer",
+                            "default": 2
+                        },
+                        "dropout_rate": {
+                            "type": "number",
+                            "default": 0.25
+                        },
+                        "learning_rate": {
+                            "type": "number",
+                            "default": 0.001
+                        }
+                    },
+                    "required": [
+                        "enable",
+                        "num_filters",
+                        "kernel_size",
+                        "stride",
+                        "pool_size",
+                        "dropout_rate",
+                        "learning_rate"
+                    ],
+                    "additionalProperties": false
+                },
+                "TemporalFusionTransformer": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "num_encoder_layers": {
+                            "type": "integer",
+                            "default": 3
+                        },
+                        "num_decoder_layers": {
+                            "type": "integer",
+                            "default": 1
+                        },
+                        "hidden_size": {
+                            "type": "integer",
+                            "default": 64
+                        },
+                        "attention_heads": {
+                            "type": "integer",
+                            "default": 4
+                        },
+                        "dropout_rate": {
+                            "type": "number",
+                            "default": 0.1
+                        },
+                        "learning_rate": {
+                            "type": "number",
+                            "default": 0.001
+                        }
+                    },
+                    "required": [
+                        "enable",
+                        "num_encoder_layers",
+                        "num_decoder_layers",
+                        "hidden_size",
+                        "attention_heads",
+                        "dropout_rate",
+                        "learning_rate"
+                    ],
+                    "additionalProperties": false
+                },
+                "Informer": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "num_layers": {
+                            "type": "integer",
+                            "default": 2
+                        },
+                        "d_model": {
+                            "type": "integer",
+                            "default": 512
+                        },
+                        "num_heads": {
+                            "type": "integer",
+                            "default": 8
+                        },
+                        "dropout_rate": {
+                            "type": "number",
+                            "default": 0.1
+                        },
+                        "learning_rate": {
+                            "type": "number",
+                            "default": 0.0005
+                        },
+                        "prob_sparse": {
+                            "type": "boolean",
+                            "default": true
+                        }
+                    },
+                    "required": [
+                        "enable",
+                        "num_layers",
+                        "d_model",
+                        "num_heads",
+                        "dropout_rate",
+                        "learning_rate",
+                        "prob_sparse"
+                    ],
+                    "additionalProperties": false
+                },
+                "Autoformer": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "num_layers": {
+                            "type": "integer",
+                            "default": 2
+                        },
+                        "d_model": {
+                            "type": "integer",
+                            "default": 512
+                        },
+                        "num_heads": {
+                            "type": "integer",
+                            "default": 8
+                        },
+                        "decomp_window": {
+                            "type": "integer",
+                            "default": 25
+                        },
+                        "dropout_rate": {
+                            "type": "number",
+                            "default": 0.1
+                        },
+                        "learning_rate": {
+                            "type": "number",
+                            "default": 0.0005
+                        }
+                    },
+                    "required": [
+                        "enable",
+                        "num_layers",
+                        "d_model",
+                        "num_heads",
+                        "decomp_window",
+                        "dropout_rate",
+                        "learning_rate"
+                    ],
+                    "additionalProperties": false
+                },
+                "HybridEnsemble": {
+                    "type": "object",
+                    "properties": {
+                        "enable": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "weights": {
+                            "type": "object",
+                            "properties": {
+                                "deep_model": {
+                                    "type": "number",
+                                    "default": 0.5
+                                },
+                                "classical_model": {
+                                    "type": "number",
+                                    "default": 0.5
+                                }
+                            },
+                            "required": [
+                                "deep_model",
+                                "classical_model"
+                            ],
+                            "additionalProperties": false
+                        }
+                    },
+                    "required": [
+                        "enable",
+                        "weights"
+                    ],
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false,
+    "required": [
+        "models"
+    ]
+}

@@ -1,0 +1,130 @@
+{
+    "moving_averages": {
+        "SMA": {
+            "length": 20
+        },
+        "EMA": {
+            "length": 20
+        },
+        "WMA": {
+            "length": 20
+        },
+        "DEMA": {
+            "length": 20
+        },
+        "TEMA": {
+            "length": 20
+        },
+        "HMA": {
+            "length": 20
+        },
+        "T3": {
+            "length": 20,
+            "volume_factor": 0.7
+        }
+    },
+    "oscillators": {
+        "RSI": {
+            "period": 14
+        },
+        "Stoch": {
+            "k": 14,
+            "d": 3,
+            "smooth_k": 3
+        },
+        "StochRSI": {
+            "length": 14,
+            "k": 3,
+            "d": 3
+        },
+        "Williams_R": {
+            "period": 14
+        },
+        "CCI": {
+            "length": 20,
+            "constant": 0.015
+        },
+        "ROC": {
+            "length": 12
+        },
+        "Momentum": {
+            "length": 10
+        }
+    },
+    "trend": {
+        "MACD": {
+            "fast": 12,
+            "slow": 26,
+            "signal": 9
+        },
+        "Aroon": {
+            "length": 25
+        },
+        "ADX": {
+            "period": 14
+        },
+        "DMI": {
+            "period": 14
+        },
+        "Ichimoku": {
+            "tenkan": 9,
+            "kijun": 26,
+            "senkou_span_b": 52
+        },
+        "Coppock": {
+            "length": 14
+        }
+    },
+    "volatility": {
+        "BollingerBands": {
+            "length": 20,
+            "std": 2
+        },
+        "ATR": {
+            "period": 14
+        },
+        "StandardDeviation": {
+            "length": 20
+        },
+        "TrueRange": {
+            "some_param": true
+        }
+    },
+    "volume": {
+        "OBV": {
+            "use_adjusted_close": false
+        },
+        "CMF": {
+            "length": 20
+        },
+        "ADL": {
+            "accumulate_volume": true
+        }
+    },
+    "others": {
+        "VWAP": {
+            "use_intraday_volume": false
+        },
+        "UltimateOscillator": {
+            "short": 7,
+            "medium": 14,
+            "long": 28
+        },
+        "DonchianChannels": {
+            "length": 20
+        }
+    },
+    "sentiment": {
+        "SentimentAnalysis": {
+            "model": "BERT",
+            "threshold": 0.5
+        }
+    },
+    "sns": {
+        "SNSAnalysis": {
+            "platform": "Twitter",
+            "query": "#example",
+            "limit": 100
+        }
+    }
+}

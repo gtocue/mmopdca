@@ -1,0 +1,18 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Pandas TA Indicators Schema",
+    "description": "各インジケータの名前・パラメータをまとめた構造。セクションごとにobjectを持ち、その中は指標名をキーとするobject。",
+    "type": "object",
+    "patternProperties": {
+        "^[\\w\\s]+$": {
+            "type": "object",
+            "patternProperties": {
+                "^[\\w\\s]+$": {
+                    "type": "object"
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}

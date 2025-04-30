@@ -1,0 +1,13 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "market_ticker_mapping_schema.json",
+    "title": "Market Ticker Mapping Schema for plan.materials.markets",
+    "description": "各市場の正式名称（キー）と、そのティッカー（値）のマッピング。materials.markets で活用する。",
+    "type": "object",
+    "patternProperties": {
+        "^[\\w\\s&/\\-\\$\\+\\.]+$": {
+            "type": "string"
+        }
+    },
+    "additionalProperties": false
+}

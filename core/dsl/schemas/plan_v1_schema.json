@@ -1,0 +1,139 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "plan_v1_schema.json",
+    "title": "mmopdca Plan DSL v1",
+    "type": "object",
+    "required": [
+        "plan_id",
+        "owner",
+        "data",
+        "dates",
+        "indicators"
+    ],
+    "properties": {
+        "plan_id": {
+            "type": "string",
+            "pattern": "^[\\w\\-]+$"
+        },
+        "owner": {
+            "type": "string",
+            "format": "email"
+        },
+        "data": {
+            "type": "object",
+            "required": [
+                "source",
+                "universe",
+                "frequency"
+            ],
+            "properties": {
+                "source": {
+                    "type": "string",
+                    "enum": [
+                        "yfinance",
+                        "csv",
+                        "database"
+                    ]
+                },
+                "universe": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1
+                },
+                "frequency": {
+                    "type": "string",
+                    "enum": [
+                        "1d",
+                        "1h",
+                        "1m"
+                    ]
+                },
+                "normalizer": {
+                    "type": "object",
+                    "properties": {
+                        "to_cdm": {
+                            "type": "string"
+                        },
+                        "options": {
+                            "type": "object"
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false
+        },
+        "dates": {
+            "type": "object",
+            "required": [
+                "train_start",
+                "train_end"
+            ],
+            "properties": {
+                "train_start": {
+                    "type": "string",
+                    "format": "date"
+                },
+                "train_end": {
+                    "type": "string",
+                    "format": "date"
+                },
+                "predict_horizon": {
+                    "type": "integer",
+                    "minimum": 1
+                }
+            },
+            "additionalProperties": false
+        },
+        "indicators": {
+            "type": "object"
+        },
+        "preprocessing": {
+            "$ref": "preprocessing_schema.json"
+        },
+        "parameters": {
+            "$ref": "parameters_schema.json"
+        },
+        "models": {
+            "$ref": "models_schema.json"
+        },
+        "auto_tuning": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "n_trials": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "hyperparam_space": {
+                    "type": "object"
+                },
+                "evaluation_defaults": {
+                    "type": "object"
+                }
+            },
+            "additionalProperties": false
+        },
+        "cost_estimate": {
+            "type": "object",
+            "properties": {
+                "records": {
+                    "type": "integer"
+                },
+                "est_runtime_min": {
+                    "type": "number"
+                },
+                "est_cost_usd": {
+                    "type": "number"
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}

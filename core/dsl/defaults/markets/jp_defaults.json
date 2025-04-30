@@ -1,0 +1,22 @@
+{
+    "Nikkei 225": "^N225",
+    "TOPIX": "^TOPX",
+    "JPX-Nikkei 400": "^JPXNK400",
+    "日経 VI": "^VNKY",
+    "JGB 10Y": "JP10Y-JP",
+    "USD/JPY": "JPY=X",
+    "S&P 500": "^GSPC",
+    "Dow Jones Industrial Average": "^DJI",
+    "NASDAQ Composite": "^IXIC",
+    "FTSE 100": "^FTSE",
+    "DAX": "^GDAXI",
+    "Gold": "GC=F",
+    "Crude Oil": "CL=F",
+    "Copper": "HG=F",
+    "Rubber Futures (TOCOM)": "0#JRU:",
+    "Gold Futures (Osaka)": "0#JNKG:",
+    "半導体株 ETF (1618.T)": "1618.T",
+    "TOPIX 銀行 ETF (1615.T)": "1615.T",
+    "iShares MSCI Japan ETF": "EWJ",
+    "iShares China Large-Cap ETF": "FXI"
+}

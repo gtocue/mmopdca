@@ -1,0 +1,53 @@
+{
+    "missing_value_methods": {
+        "enable": "Off",
+        "value": [
+            "平均補完",
+            "前日値で補完"
+        ]
+    },
+    "outlier_methods": {
+        "enable": "Off",
+        "value": [
+            "3σ法",
+            "ロバストスケーリング法"
+        ]
+    },
+    "scaling_methods": {
+        "enable": "Off",
+        "value": [
+            "標準化"
+        ]
+    },
+    "feature_generation_methods": {
+        "enable": "Off",
+        "value": [
+            "なし",
+            "多項式展開",
+            "対数変換"
+        ]
+    },
+    "dimensionality_reduction": {
+        "enable": "Off",
+        "value": {
+            "use_pca": true,
+            "pca_components": 10
+        }
+    },
+    "Normalization": {
+        "enable": "Off",
+        "value": {
+            "method": "minmax",
+            "range": [
+                0,
+                1
+            ]
+        }
+    },
+    "OutlierRemoval": {
+        "enable": "Off",
+        "value": {
+            "threshold": 3
+        }
+    }
+}
