@@ -1,0 +1,18 @@
+# ./samples/plan_simple.yaml
+plan_id:   msft-demo-2024
+owner:     alice@example.com
+
+data:
+  source:    yfinance
+  universe:  ["MSFT"]
+  frequency: 1d
+
+dates:
+  train_start: "2023-01-01"
+  train_end:   "2024-01-01"
+  predict_horizon: 5
+
+indicators:
+  moving_averages:
+    SMA: {window: 20}
+    EMA: {window: 50}

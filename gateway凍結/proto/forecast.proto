@@ -1,0 +1,48 @@
+// =========================================================
+// ASSIST_KEY: このファイルは【gateway/proto/forecast.proto】に位置するユニットです
+// =========================================================
+//
+// 【概要】
+//   このユニットは ForecastService gRPC API のインターフェース定義を提供します。
+//
+// 【主な役割】
+//   - AI エージェントや別バックエンドが gRPC 経由で予測値を取得できるようにする。
+//   - HTTP /forecast と 1:1 のメッセージ構造を保持し実装コードを共有。
+//
+// 【連携先・依存関係】
+//   - gateway.adapter.mmop_bridge.run_forecast(): HTTP 版と同ロジックを共通利用
+//
+// 【ルール遵守】
+//   1) proto3 を使用
+//   2) フィールド番号は後方互換のためスキップせず連番
+//   3) Breaking change が必要な場合は必ず .proto の major バージョンを上げる
+// ---------------------------------------------------------
+
+syntax = "proto3";
+
+package gateway.forecast.v1;
+
+option go_package = "github.com/your-org/mmop-gateway/gen/go/forecast/v1;forecastv1";
+
+// --------------- Request / Response ----------------------
+
+message ForecastRequest {
+  string target       = 1;   // e.g. "SPY"
+  int32  horizon      = 2;   // days ahead (1–30)
+  map<string, string> context = 3; // optional kv context
+}
+
+message ForecastResponse {
+  double forecast  = 1;
+  double ci_lower  = 2;
+  double ci_upper  = 3;
+  string model_sha = 4;
+  string hash_link = 5;
+}
+
+// --------------- Service ---------------------------------
+
+service ForecastService {
+  // Predict asset price N-days ahead
+  rpc Predict (ForecastRequest) returns (ForecastResponse);
+}

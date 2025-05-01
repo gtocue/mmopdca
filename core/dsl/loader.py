@@ -2,29 +2,12 @@
 # ASSIST_KEY: 【core/dsl/loader.py】
 # =========================================================
 #
-# 【概要】
-#   PlanLoader ― Plan-DSL ファイル (*plan.yaml / .json*) を読み込み、
-#   defaults ＋ markets 変換 ＋ JSON-Schema 検証を行ったうえで
-#   “純粋 dict” を返却するファサード。
-#
-# 【主な機能・責務】
-#   - .env 変数で DSL_ROOT / DEFAULTS_DIR / SCHEMAS_DIR を上書き可
-#   - defaults/*.json を deep-merge して欠損フィールドを補完
-#   - defaults/markets_*_defaults.json を束ねて名称→ティッカー変換
-#   - schemas/*.json があれば fastjsonschema でセクション単位バリデート
-#   - legacy_dict() で旧システム互換 dict をワンステップで射影
-#
-# 【連携先・依存関係】
-#   - core/dsl/store/fs_store.py      : ファイル I/O
-#   - core/dsl/validator.py           : Schema + pydantic 検証
-#   - core/do/coredo_executor.py 等   : 下流ロジック
-#
-# 【ルール遵守】
-#   1) グローバル変数直書き禁止（環境変数か pdca_data 経由）
-#   2) “ハルシネーション禁止” – 不確かな仕様は TODO コメントで残す
-#   3) logging を使用し print() は使わない
+# PlanLoader ― Plan DSL を読み込み
+#   1. defaults deep-merge
+#   2. market 名 → ティッカー置換
+#   3. JSON-Schema + pydantic 検証（validate=True 時）
+# した dict を返す Facade。
 # ---------------------------------------------------------
-
 from __future__ import annotations
 
 import json
@@ -40,114 +23,118 @@ from .validator import DSLValidator
 
 try:
     import jsonschema  # type: ignore
-except ModuleNotFoundError:  # バリデーションを強制しない
-    jsonschema = None  # type: ignore
+except ModuleNotFoundError:          # バリデーションを強制しない
+    jsonschema = None                # type: ignore
 
 logger = logging.getLogger(__name__)
 
-# =====================================================================
-# ディレクトリ設定 (.env で上書き可)
-# =====================================================================
-DSL_ROOT = Path(
-    os.getenv("DSL_ROOT", Path(__file__).parent / "defaults")
-).expanduser().resolve()
+# ------------------------------------------------------------------
+# ディレクトリ設定（.env で上書き可）
+# ------------------------------------------------------------------
+DSL_ROOT     = Path(os.getenv("DSL_ROOT", Path(__file__).parent)).resolve()
+DEFAULTS_DIR = DSL_ROOT / "defaults"
+SCHEMAS_DIR  = DSL_ROOT / "schemas"
 
-DEFAULTS_DIR = Path(
-    os.getenv("DEFAULTS_DIR", DSL_ROOT / "defaults")
-).expanduser().resolve()
-
-SCHEMAS_DIR = Path(
-    os.getenv("SCHEMAS_DIR", DSL_ROOT / "schemas")
-).expanduser().resolve()
-
-_STORE = FSStore(DSL_ROOT)
+_STORE     = FSStore(DSL_ROOT)
 _VALIDATOR = DSLValidator(SCHEMAS_DIR)
 
-
-# =====================================================================
-# public API
-# =====================================================================
+# ==================================================================
+# public  API
+# ==================================================================
 class PlanLoader:
     """
-    Plan-DSL をロードし defaults マージ → markets 置換 →
-    スキーマ検証までを 1shot で実行する Facade。
+    Plan-DSL をロードして共通前処理を施す Facade。
+      * load(path)   : ファイル経由
+      * load_dict(d) : すでに dict 化された DSL
     """
 
     def __init__(self, validate: bool = True) -> None:
         if validate and jsonschema is None:
             logger.warning("jsonschema が無いため Schema 検証をスキップします")
-        self.validate_flag = validate and jsonschema is not None
+        self._validate = validate and jsonschema is not None
 
-        # ★ 1 回だけロードしてキャッシュ
-        self._defaults: Dict[str, Any] = _load_defaults()
+        # キャッシュ
+        self._defaults: Dict[str, Any]   = _load_defaults()
         self._market_map: dict[str, str] = _load_market_mapping()
 
-    # -----------------------------------------------------------------
-    # main
-    # -----------------------------------------------------------------
-    def load(self, plan_path: str | Path) -> Dict[str, Any]:
-        """Plan ファイル → dict (defaults マージ済み) を返す"""
-        logger.info("Loading plan: %s", plan_path)
-
-        plan_dict = _load_yaml_or_json(plan_path)
-        merged = _deep_merge(self._defaults, plan_dict)
+    # -------------------------------------------------------------
+    # ★ dict を直接受け取る
+    # -------------------------------------------------------------
+    def load_dict(self, plan: Dict[str, Any]) -> Dict[str, Any]:
+        merged = _deep_merge(self._defaults, plan)
         merged = _resolve_market_names(merged, self._market_map)
 
-        # ---- optional fastjsonschema ----
-        if self.validate_flag:
+        if self._validate:
             _validate_by_schemas(merged)
 
         return merged
 
-    # -----------------------------------------------------------------
-    # legacy compatibility hook
-    # -----------------------------------------------------------------
+    # -------------------------------------------------------------
+    # ファイル経由
+    # -------------------------------------------------------------
+    def load(self, plan_path: str | Path) -> Dict[str, Any]:
+        logger.info("Loading plan: %s", plan_path)
+        plan_dict = _load_yaml_or_json(plan_path)
+        return self.load_dict(plan_dict)          # ← 共通処理へ集約
+
+    # -------------------------------------------------------------
+    # legacy 互換フック
+    # -------------------------------------------------------------
     def legacy_dict(self, plan: Dict[str, Any]) -> Dict[str, Any]:
         """
-        既存コードが期待する “平坦な dict” へ射影。
-        *当面そのまま返す*。後方互換が壊れたらここで調整。
+        旧 Plan API が要求するフィールド（symbol / start / end）を
+        Plan DSL から補完して返す。
         """
-        # TODO: 旧フィールド名の rename が必要になればここで実装
-        return plan
+        legacy = dict(plan)  # シャローコピー
+
+        # symbol = universe の先頭
+        legacy.setdefault(
+            "symbol",
+            (plan.get("data", {}).get("universe") or [""])[0],
+        )
+        # start / end = train_start / train_end
+        dates = plan.get("dates", {})
+        legacy.setdefault("start", dates.get("train_start"))
+        legacy.setdefault("end",   dates.get("train_end"))
+
+        return legacy
 
 
-# =====================================================================
+# ==================================================================
 # internal helpers
-# =====================================================================
+# ==================================================================
 def _load_yaml_or_json(path: str | Path) -> Dict[str, Any]:
-    """拡張子を自動判定して YAML / JSON を dict 化"""
-    p = Path(path)
+    p = Path(path).expanduser()
     if not p.exists():
-        raise FileNotFoundError(path)
-
+        raise FileNotFoundError(p)
     txt = _STORE.read_text(p)
-    if p.suffix.lower() in (".yml", ".yaml"):
-        return yaml.safe_load(txt) or {}
-    return json.loads(txt)
+    return yaml.safe_load(txt) if p.suffix.lower() in (".yml", ".yaml") else json.loads(txt)
 
 
 def _load_defaults() -> Dict[str, Any]:
-    """defaults ディレクトリ配下 *.json を再帰的に読み込んで deep-merge"""
     merged: Dict[str, Any] = {}
     for fp in DEFAULTS_DIR.rglob("*.json"):
         try:
-            merged = _deep_merge(merged, json.loads(fp.read_text()))
-        except json.JSONDecodeError as exc:  # noqa: TRY003
-            logger.error("defaults JSON パース失敗: %s – %s", fp, exc)
-    logger.debug("defaults files loaded: %d", len(list(DEFAULTS_DIR.rglob('*.json'))))
+            merged = _deep_merge(
+                merged,
+                json.loads(fp.read_text(encoding="utf-8")),
+            )
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            logger.warning("defaults JSON スキップ: %s – %s", fp, exc)
     return merged
 
 
 def _load_market_mapping() -> dict[str, str]:
-    """markets/*_defaults.json を統合し 名称→ティッカー dict を返す"""
     mapping: dict[str, str] = {}
     for fp in (DEFAULTS_DIR / "markets").glob("*_defaults.json"):
-        mapping.update(json.loads(fp.read_text()))
+        try:
+            mapping.update(json.loads(fp.read_text(encoding="utf-8")))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            logger.warning("market defaults スキップ: %s – %s", fp, exc)
     return mapping
 
 
 def _deep_merge(dst: Dict[str, Any], src: Dict[str, Any]) -> Dict[str, Any]:
-    """辞書を再帰マージ（src 優先）"""
     out = dst.copy()
     for k, v in src.items():
         if k in out and isinstance(out[k], dict) and isinstance(v, dict):
@@ -157,42 +144,26 @@ def _deep_merge(dst: Dict[str, Any], src: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def _resolve_market_names(plan: Dict[str, Any], name2ticker: dict[str, str]) -> Dict[str, Any]:
-    """
-    data.universe 内で “正式名称” をティッカーへ置換する。
-    名称が未登録ならそのまま返す。
-    """
-    universe = plan.get("data", {}).get("universe")
-    if isinstance(universe, list):
-        plan["data"]["universe"] = [name2ticker.get(x, x) for x in universe]
+def _resolve_market_names(plan: Dict[str, Any], mp: dict[str, str]) -> Dict[str, Any]:
+    uni = plan.get("data", {}).get("universe")
+    if isinstance(uni, list):
+        plan["data"]["universe"] = [mp.get(x, x) for x in uni]
     return plan
 
 
 def _validate_by_schemas(plan: Dict[str, Any]) -> None:
-    """
-    schemas/*.json が存在すれば該当セクションのみ fastjsonschema で検証。
-    (例) preprocessing_schema.json → plan['preprocessing'] または plan['materials']['preprocessing']
-    """
     for schema_fp in SCHEMAS_DIR.glob("*_schema.json"):
-        section_key = schema_fp.stem.replace("_schema", "")
-        target = plan.get(section_key) or plan.get("materials", {}).get(section_key)
-        if target is None:
-            continue  # セクションが無ければ検証しない
-
-        try:
+        section = schema_fp.stem.replace("_schema", "")
+        target = plan.get(section) or plan.get("materials", {}).get(section)
+        if target is not None:
             _VALIDATOR.validate_json(target, schema_fp.name)
-        except ValueError as exc:  # DSLValidator が ValueError を送出
-            raise RuntimeError(f"[SchemaError] {schema_fp.name}: {exc}") from None
 
 
-# ---------------------------------------------------------------------
+# -----------------------------------------------------------------
 # CLI quick-test:
-#   python -m core.dsl.loader path/to/plan.yaml
-# ---------------------------------------------------------------------
+#   poetry run python -m core.dsl.loader samples/plan_mvp.yaml
+# -----------------------------------------------------------------
 if __name__ == "__main__":  # pragma: no cover
-    import sys
-    import pprint
-
-    _path = sys.argv[1] if len(sys.argv) > 1 else "samples/plan.yaml"
-    loader = PlanLoader(validate=False)
-    pprint.pp(loader.load(_path), depth=3, compact=True)
+    import sys, pprint
+    path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("samples/plan_mvp.yaml")
+    pprint.pp(PlanLoader(validate=False).load(path), depth=2, compact=True)

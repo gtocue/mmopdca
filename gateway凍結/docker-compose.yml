@@ -1,0 +1,22 @@
+services:
+  api: ...
+  worker: ...
+  beat: ...
+  redis: ...
+  db: ...
+
+  # ▼▼▼ ここから追加 ▼▼▼
+  gateway:
+    build: ./gateway
+    container_name: mmopdca_gateway # 任意
+    ports:
+      - "8081:8081"
+    environment:
+      - MMOP_API=http://api:8001 # ← service 名「api」に合わせた
+      - JWT_SECRET=local-dev-secret # TODO: .env に移す
+      - API_KEYS=dummy
+    depends_on:
+      api:
+        condition: service_started
+        required: true
+  # ▲▲▲ ここまで ▲▲▲

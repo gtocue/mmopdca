@@ -23,6 +23,6 @@
     // 2️⃣ 余計なフォーマッタ衝突を防ぐ例（任意）
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
-        "source.organizeImports": false
+        "source.organizeImports": "never"
     }
 }

@@ -1,5 +1,5 @@
 # =========================================================
-# ASSIST_KEY: このファイルは【api/routers/plan_api.py】に位置するユニットです
+# ASSIST_KEY: 【api/routers/plan_api.py】
 # =========================================================
 #
 # 【概要】
@@ -31,19 +31,16 @@ from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Response, status
 
-# ---------- 依存モジュール ----------
 from core.schemas.plan_schemas import PlanCreateRequest, PlanResponse
 from core.repository.factory import get_repo
 
 router = APIRouter(prefix="/plan", tags=["plan"])
 
 # --------------------------------------------------
-# Repository を DI で取得
-#   - DB_BACKEND=memory   → インメモリ
-#   - DB_BACKEND=sqlite   → SQLite (mmopdca.db)
-#   - DB_BACKEND=postgres → 今後拡張
+# Repository の DI
 # --------------------------------------------------
 _repo = get_repo(table="plan")
+
 
 # ==================================================
 # POST /plan/  ― Create
@@ -58,8 +55,8 @@ def create_plan(req: PlanCreateRequest) -> PlanResponse:
     """
     新しい Plan を登録する。
 
-    * `id` を省略した場合はサーバ側で `plan_<8桁>` を自動採番。
-    * 同じ `id` が既に存在する場合は **409 Conflict**。
+    * `id` を省略すると `plan_<8桁>` を自動採番。
+    * 同じ `id` が既にあれば **409 Conflict**。
     """
     plan_id: str = req.id or f"plan_{uuid4().hex[:8]}"
 
@@ -69,7 +66,6 @@ def create_plan(req: PlanCreateRequest) -> PlanResponse:
             detail=f"Plan id '{plan_id}' already exists",
         )
 
-    # 保存ドキュメントにメタ情報を付与
     doc = req.model_copy(update={"id": plan_id}).model_dump(mode="json")
     doc["created_at"] = datetime.now(timezone.utc).isoformat()
 
@@ -86,9 +82,6 @@ def create_plan(req: PlanCreateRequest) -> PlanResponse:
     summary="Get Plan by ID",
 )
 def get_plan(plan_id: str) -> PlanResponse:
-    """
-    単一 Plan を取得。存在しなければ **404 Not Found**。
-    """
     plan = _repo.get(plan_id)
     if plan is None:
         raise HTTPException(
@@ -107,9 +100,6 @@ def get_plan(plan_id: str) -> PlanResponse:
     summary="List Plans",
 )
 def list_plans() -> list[PlanResponse]:
-    """
-    登録済み Plan をすべて返す。
-    """
     return [PlanResponse(**p) for p in _repo.list()]
 
 
@@ -122,9 +112,6 @@ def list_plans() -> list[PlanResponse]:
     summary="Delete Plan",
 )
 def delete_plan(plan_id: str) -> Response:
-    """
-    Plan を削除。存在しなければ **404 Not Found**。
-    """
     if _repo.get(plan_id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
