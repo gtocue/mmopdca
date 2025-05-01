@@ -7,68 +7,93 @@
 #
 # 【主な役割】
 #   - Plan→Do の非同期実行
-#   - 実際の解析ロジックを呼び出すフックを提供（現状ダミー）
+#   - core.do.coredo_executor.run_do() を呼び出し
 #
 # 【連携先・依存関係】
-#   - core/models/do.py          : ステータス管理
-#   - core/repository/do_pg_impl : Do 保存
-#   - core/repository/postgres_impl : Plan 読み出し
+#   - core.models.do.DoStatus
+#   - core.repository.do_pg_impl.DoRepository
+#   - core.repository.postgres_impl.PostgresRepository   (plan 読み出し)
+#   - core.dsl.loader.PlanLoader                         (defaults 反映)
+#   - core.do.coredo_executor.run_do                     (既存ビジネスロジック)
 #
 # 【ルール遵守】
 #   1) ハードコード値には FIXME/TODO をつける
 #   2) print() ではなく logging を使用
 # ---------------------------------------------------------
-
 from __future__ import annotations
 
 import logging
-import random
-import time
 
-from celery import shared_task
+from celery import shared_task, Task
 
+from core.dsl.loader import PlanLoader
 from core.models.do import DoStatus
 from core.repository.do_pg_impl import DoRepository
 from core.repository.postgres_impl import PostgresRepository
+from core.do.coredo_executor import run_do as legacy_run_do
 
-# Repositories ------------------------------------------------------
-_do_repo = DoRepository()
-_plan_repo = PostgresRepository(table="plan")  # FIXME: ハードコード – schema 外部設定化の余地
+# ------------------------------------------------------------------
+# Repository DI
+# ------------------------------------------------------------------
+_plan_repo = PostgresRepository(table="plan")  # FIXME: schema 名を .env へ
+_do_repo   = DoRepository()
+_loader    = PlanLoader(validate=False)        # Plan 登録時に検証済み想定
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, name="run_do")
-def run_do(self, do_id: str, plan_id: str) -> None:  # noqa: D401
+# ------------------------------------------------------------------
+# Celery Task
+# ------------------------------------------------------------------
+@shared_task(bind=True, name="run_do", acks_late=True, max_retries=3)
+def run_do(self: Task, do_id: str, plan_id: str) -> None:  # noqa: D401
     """
-    Plan に基づき解析を実行する Celery タスク。
-    現状はダミーで数秒 sleep して成功させる。
+    Celery entry-point: Plan を解析し Do 結果を保存する。
+
+    Parameters
+    ----------
+    do_id   : str
+        Do 実行レコードの ID（予め UI / API で作成済）
+    plan_id : str
+        実行対象 Plan の ID
     """
-    do = _do_repo.get(do_id)
-    if not do:  # NOTE: 初期レコードが消えていた場合
-        logger.error("Do %s not found – abort", do_id)
+    # -- 前準備 -----------------------------------------------------
+    do_doc = _do_repo.get(do_id)
+    if do_doc is None:
+        logger.error("[Do] record %s not found – abort", do_id)
         return
 
-    # status -> running
-    do["status"] = DoStatus.RUNNING
-    _do_repo.create(do_id, do)
+    do_doc["status"] = DoStatus.RUNNING
+    _do_repo.create(do_id, do_doc)
 
     try:
-        plan = _plan_repo.get(plan_id)  # 解析対象の Plan
-        # ----------------------------------------------------
-        # TODO: 実際の解析ロジックに置き換える
-        time.sleep(random.randint(2, 5))
-        result = {"echo_plan": plan}
-        # ----------------------------------------------------
+        # 1) Plan 取得
+        plan_raw = _plan_repo.get(plan_id)
+        if plan_raw is None:
+            raise ValueError(f"plan '{plan_id}' not found")
 
-        do["status"] = DoStatus.DONE
-        do["result"] = result
-        _do_repo.create(do_id, do)
-        logger.info("Do %s finished", do_id)
+        # 2) defaults マージ・market 置換をもう一度適用
+        plan_merged = _loader.load_dict(plan_raw)
+        legacy_dict = _loader.legacy_dict(plan_merged)
+
+        # 3) 既存 Executor 呼び出し
+        logger.info("[Do] start executor for %s", plan_id)
+        result = legacy_run_do(legacy_dict)       # <-- 既存ビジネスロジック
+        logger.info("[Do] finished %s", plan_id)
+
+        # 4) 成功結果保存
+        do_doc.update(
+            status=DoStatus.DONE,
+            result=result,
+        )
+        _do_repo.create(do_id, do_doc)
 
     except Exception as exc:  # noqa: BLE001
-        logger.exception("Do %s failed: %s", do_id, exc)
-        do["status"] = DoStatus.FAILED
-        do["result"] = {"error": str(exc)}
-        _do_repo.create(do_id, do)
-        raise
+        logger.exception("[Do] %s failed: %s", do_id, exc)
+        do_doc.update(
+            status=DoStatus.FAILED,
+            result={"error": str(exc)},
+        )
+        _do_repo.create(do_id, do_doc)
+        # Celery にリトライさせる（最大 max_retries）
+        raise self.retry(exc=exc, countdown=30)  # FIXME: バックオフ時間を設定値化

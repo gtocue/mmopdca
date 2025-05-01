@@ -1,26 +1,33 @@
-# =========================================================
+# =====================================================================
 # core/do/coredo_executor.py
-# ---------------------------------------------------------
-# Do フェーズ ― MVP 実装
-#   1. 価格取得      : IDataSource (既定は Yahoo-Finance)
-#   2. 指標計算      : SMA / EMA / RSI
-#   3. 予測モデル    : 線形回帰で「翌営業日の終値」を推定
+# =====================================================================
 #
-# 【ルール 2025-04-27】
-#   • Plan-ID × run_no で何度でも実行できる
-#   • params は dict[str, Any] 固定
+# Do フェーズ ― MVP ＋ “Spot-Checkpoint” 拡張版
 #
-# NOTE
-#   ◦ 古い scikit-learn 互換で RMSE を手計算 fallback
-#   ◦ yfinance が MultiIndex を返した場合は flatten
-#   ◦ 返却する date は「予測対象日」＝ index + 1 BusinessDay
-#     ── 市場独自の休場日は params["holidays"] で拡張可
-# =========================================================
+# 1. 価格取得        : IDataSource (既定は yfinance fallback)
+# 2. インジケータ計算 : SMA / EMA / RSI
+# 3. 予測モデル      : 線形回帰で「翌営業日の終値」を推定
+# 4. チェックポイント : epoch 毎に JSON を保存し、SIGTERM 後に自動再開
+#
+#   * run_do(plan_id, params_dict) ― params は dict[str, Any]
+#   * ONSPOT_INSTANCE=true のワーカーは “いつ落ちても良い” 前提
+#   * Celery の task_acks_late=True と組み合わせることで
+#     Spot → On-Demand など別ワーカーへジョブが自動リスケされる
+#
+#   env:
+#     CHECKPOINT_DIR   … 永続ボリュームを指すパス (/mnt/checkpoints)
+#     ONSPOT_INSTANCE  … "true" なら epoch 内で軽い sleep を入れて
+#                         Kill シミュレーションがやりやすい（任意）
+# =====================================================================
 from __future__ import annotations
 
+import json
 import logging
+import os
+import time
 from datetime import datetime, timezone
-from typing import Any, Callable, List, Tuple
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -28,88 +35,151 @@ from pandas.tseries.offsets import BDay, CustomBusinessDay
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 
-# ----------------------------------------------------------
-# データソースはプラガブル (core.datasource.get_source → IDataSource)
-# ----------------------------------------------------------
-try:
-    from core.datasource import get_source
-
-    _DATASOURCE = get_source()  # 動的に Yahoo / Premium を取得
-except Exception:  # noqa: BLE001
-    _DATASOURCE = None
-
-    import yfinance as yf  # フォールバック
-    logging.getLogger(__name__).warning(
-        "[Do] datasource fallback to yfinance because core.datasource is missing"
-    )
-
+# ---------------------------------------------------------------------
+# ロギング
+# ---------------------------------------------------------------------
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# ────────────────────────────────────────────────
-# Public API
-# ────────────────────────────────────────────────
-def run_do(plan_id: str, params: dict[str, Any]) -> dict[str, Any]:
-    """
-    Execute **one** Do-phase run and return JSON-serialisable dict.
+# ---------------------------------------------------------------------
+# 定数・環境変数
+# ---------------------------------------------------------------------
+TOTAL_EPOCHS = 12  # PoC: 1 epoch ≈ 5 s ×12 = およそ 1 min
 
-    必須キー
-    --------
+CKPT_DIR = Path(os.getenv("CHECKPOINT_DIR", "/mnt/checkpoints")).expanduser()
+CKPT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _ckpt_path(run_id: str) -> Path:
+    """run_id → ckpt ファイルパス"""
+    return CKPT_DIR / f"{run_id}.json"
+
+
+# ---------------------------------------------------------------------
+# データソースを抽象化（存在しなければ yfinance へフォールバック）
+# ---------------------------------------------------------------------
+try:
+    from core.datasource import get_source
+
+    _DATASOURCE = get_source()
+except Exception:  # noqa: BLE001
+    _DATASOURCE = None
+    import yfinance as yf
+
+    logger.warning("[Do] datasource fallback to yfinance because core.datasource is missing")
+
+
+# =====================================================================
+# 外部公開 API
+# =====================================================================
+def run_do(plan_id: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    1 回の Do-phase を実行し、JSON シリアライズ可能な dict を返す。
+
+    必須 params
+    ----------
     symbol : str
     start  : "YYYY-MM-DD"
     end    : "YYYY-MM-DD"
     run_no : int
 
-    任意キー
-    --------
-    indicators : list[dict]   # 各要素 {name: SMA|EMA|RSI, window:int}
-    holidays   : list[str]    # 市場固有の休場日 ["YYYY-MM-DD", ...]
+    任意 params
+    ----------
+    indicators : list[{name, window}]
+    holidays   : list["YYYY-MM-DD", …]
     """
     symbol, start, end, ind_cfg, run_no, holidays = _parse_params(params)
     run_id = f"{plan_id}__{run_no:04d}"
-    logger.info("[Do] ▶ run_id=%s  %s  %s→%s", run_id, symbol, start, end)
 
-    # 1. price ----------------------------------------------------------
+    # ---------- checkpoint 読み込み -------------------------------
+    ckpt_fp = _ckpt_path(run_id)
+    state: Dict[str, Any] = {"current_epoch": 0}
+    if ckpt_fp.exists():
+        try:
+            state = json.loads(ckpt_fp.read_text())
+            logger.info("[Do] resume run_id=%s  epoch=%d", run_id, state["current_epoch"])
+        except json.JSONDecodeError:
+            logger.warning("[Do] ckpt corrupted – 再学習します")
+
+    logger.info(
+        "[Do] ▶ run_id=%s  %s  %s→%s  epochs=%d-%d",
+        run_id,
+        symbol,
+        start,
+        end,
+        state["current_epoch"],
+        TOTAL_EPOCHS - 1,
+    )
+
+    # ---------- 価格取得 -----------------------------------------
     df = _download_prices(symbol, start, end)
 
-    # 2. indicators -----------------------------------------------------
+    # ---------- インジケータ追加 ---------------------------------
     df = _add_indicators(df, ind_cfg)
     if len(df) < 30:
-        raise RuntimeError("Not enough rows (≥30) after preprocessing")
+        raise RuntimeError("Not enough rows (≥ 30) after preprocessing")
 
-    # 3. model ----------------------------------------------------------
+    # ---------- 学習 & 予測 ---------------------------------------
     preds, model, feature_cols, metrics = _train_and_predict(df)
 
-    # 4. predictions with +1 Business Day -------------------------------
+    # ---------- epoch loop（ダミー） ------------------------------
+    #     * heavy な学習処理がある想定で各 epoch 5 s かかるポカヨケ
+    #     * epoch 毎に ckpt commit → Spot 落ち時に再開可
+    for epoch in range(state["current_epoch"], TOTAL_EPOCHS):
+        _train_one_epoch(epoch)
+        state["current_epoch"] = epoch + 1
+        ckpt_fp.write_text(json.dumps(state))
+        logger.debug("[Do] ckpt flush epoch=%d", epoch + 1)
+
+    # ---------- 完了処理 -----------------------------------------
+    ckpt_fp.unlink(missing_ok=True)  # 成功時は削除
     bday = _make_bday_offset(holidays)
     target_dates = (df.index + bday).strftime("%Y-%m-%d")
 
-    last30: List[dict[str, Any]] = [
+    last30 = [
         {"date": d, "price": float(round(p, 4))}
         for d, p in zip(target_dates[-30:], preds[-30:])
     ]
 
-    # 5. build response -------------------------------------------------
+    summary = {
+        "rows": int(len(df)),
+        "features_used": feature_cols,
+        "coef": np.round(model.coef_, 6).tolist(),
+        "intercept": float(round(model.intercept_, 6)),
+    }
+
+    logger.info("[Do] ✓ run_id=%s DONE", run_id)
+
     return {
         "run_id": run_id,
-        "created_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "summary": {
-            "rows": int(len(df)),
-            "features_used": feature_cols,
-            "coef": np.round(model.coef_, 6).tolist(),
-            "intercept": float(round(model.intercept_, 6)),
-        },
+        "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "summary": summary,
         "metrics": metrics,
-        "predictions": last30,  # list[{date, price}]
+        "predictions": last30,
     }
 
 
-# ────────────────────────────────────────────────
-# helpers
-# ────────────────────────────────────────────────
+# =====================================================================
+# internal helpers
+# =====================================================================
+def _train_one_epoch(epoch: int) -> None:
+    """
+    PoC 用のダミー学習。
+
+    * 実環境では ML 学習や Backtest などを行う
+    * ONSPOT_INSTANCE=true の場合は 5 s sleep で
+      “途中で kill しやすい” ようにしてある
+    """
+    if os.getenv("ONSPOT_INSTANCE", "false").lower() == "true":
+        time.sleep(5)
+    else:
+        time.sleep(0.5)  # 普通のワーカーは軽く
+
+
+# ---------- params 解析 ----------
 def _parse_params(
-    params: dict[str, Any],
-) -> Tuple[str, str, str, List[dict[str, Any]], int, List[str]]:
+    params: Dict[str, Any],
+) -> Tuple[str, str, str, List[Dict[str, Any]], int, List[str]]:
     def _req(key: str) -> Any:
         if key not in params:
             raise RuntimeError(f"missing required param: '{key}'")
@@ -133,27 +203,16 @@ def _parse_params(
 
 
 def _make_bday_offset(holidays: List[str]):
-    """
-    Return a (Custom)BusinessDay(+1) to shift index safely.
-
-    * デフォルト → 土日除外のみ (BDay)
-    * holidays が渡されたらその日付も除外 (CustomBusinessDay)
-    """
     if holidays:
-        # TODO: 外部カレンダー設定へ移動
         return CustomBusinessDay(holidays=holidays)
     return BDay()
 
 
-# ----------------------------------------------------------
-# price downloader (IDataSource / yfinance fallback)
-# ----------------------------------------------------------
+# ---------- price downloader ----------
 def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
     if _DATASOURCE is not None:
         df = _DATASOURCE.fetch_ohlcv(symbol=symbol, start=start, end=end)
-    else:  # yfinance 直接呼び出しフォールバック
-        import yfinance as yf
-
+    else:
         df = yf.download(
             symbol,
             start=start,
@@ -163,16 +222,16 @@ def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
             group_by="column",
         )
 
-        # ---- flatten MultiIndex --------------------------------------
+        # flatten MultiIndex
         if isinstance(df.columns, pd.MultiIndex):
-            try:  # (field, ticker)
-                df = df.xs(symbol, level=1, axis=1, drop_level=True)
-            except KeyError:
-                try:  # (ticker, field)
-                    df = df.xs(symbol, level=0, axis=1, drop_level=True)
+            for level in (1, 0):  # try (field, ticker) then (ticker, field)
+                try:
+                    df = df.xs(symbol, level=level, axis=1, drop_level=True)
+                    break
                 except KeyError:
-                    df.columns = ["_".join(map(str, c)) for c in df.columns]
-        # --------------------------------------------------------------
+                    continue
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = ["_".join(map(str, c)) for c in df.columns]
 
         df.columns = [str(c).capitalize() for c in df.columns]
         if "Adj close" in df.columns:
@@ -181,7 +240,6 @@ def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
     if df.empty:
         raise RuntimeError(f"No price data for '{symbol}'")
 
-    # "Adj Close" が無いデータソースも許容
     required = ["Open", "High", "Low", "Close", "Volume"]
     if "Adj Close" in df.columns:
         required.insert(4, "Adj Close")
@@ -210,14 +268,14 @@ def _rsi(close: pd.Series, win: int) -> pd.Series:
     return 100 - (100 / (1 + rs))
 
 
-_IND_FUNCS: dict[str, Callable[[pd.Series, int], pd.Series]] = {
+_IND_FUNCS: Dict[str, Callable[[pd.Series, int], pd.Series]] = {
     "SMA": _sma,
     "EMA": _ema,
     "RSI": _rsi,
 }
 
 
-def _add_indicators(df: pd.DataFrame, cfg: List[dict[str, Any]]) -> pd.DataFrame:
+def _add_indicators(df: pd.DataFrame, cfg: List[Dict[str, Any]]) -> pd.DataFrame:
     close = df["Close"]
     for ind in cfg:
         name = ind["name"].upper()
@@ -231,7 +289,7 @@ def _add_indicators(df: pd.DataFrame, cfg: List[dict[str, Any]]) -> pd.DataFrame
         if col not in df.columns:
             df[col] = func(close, win)
 
-    if "SMA_5" not in df.columns:  # safety-net
+    if "SMA_5" not in df.columns:
         df["SMA_5"] = _sma(close, 5)
 
     return df.dropna()
@@ -239,7 +297,7 @@ def _add_indicators(df: pd.DataFrame, cfg: List[dict[str, Any]]) -> pd.DataFrame
 
 def _train_and_predict(
     df: pd.DataFrame,
-) -> Tuple[np.ndarray, LinearRegression, List[str], dict[str, float]]:
+) -> Tuple[np.ndarray, LinearRegression, List[str], Dict[str, float]]:
     df = df.copy()
     df["target"] = df["Close"].shift(-1)
     df = df.dropna()
@@ -255,15 +313,12 @@ def _train_and_predict(
     model.fit(X, y)
     preds = model.predict(X)
 
-    # -- RMSE: fallback for old scikit-learn -----------------
     try:
         rmse = mean_squared_error(y, preds, squared=False)
     except TypeError:
         rmse = np.sqrt(mean_squared_error(y, preds))
-    # --------------------------------------------------------
 
     r2 = float(np.corrcoef(y, preds)[0, 1] ** 2)
-
-    logger.info("[Do] ✓ rows=%d  r2=%.4f  rmse=%.4f", len(df), r2, rmse)
+    logger.info("[Do] rows=%d  r2=%.4f  rmse=%.4f", len(df), r2, rmse)
 
     return preds, model, feature_cols, {"r2": r2, "rmse": float(round(rmse, 6))}

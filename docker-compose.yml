@@ -1,17 +1,21 @@
-# ------------------------------------------------------------------
-# docker-compose.yml – すべてのサービスを一括起動
-#   $ docker compose up -d
-# ------------------------------------------------------------------
-version: "3.8" # Compose v2 でも互換性を保つ無難なバージョン
+###############################################################################
+# docker-compose.yml ─ mmopdca ― すべてのサービスを一括起動
+#
+#  ▸ 通常起動 : docker compose up -d
+#  ▸ PoC例   : docker compose up -d --scale worker=3 worker
+#
+# * version: 3.8 は Compose v2 / v1 のどちらでも動作する安全圏
+###############################################################################
+version: "3.8"
 
 services:
-  # -------------------------------------------------------------- #
-  # FastAPI / Uvicorn                                              #
-  # -------------------------------------------------------------- #
+  # ------------------------------------------------------------------------- #
+  # FastAPI / Uvicorn – REST Front
+  # ------------------------------------------------------------------------- #
   api:
     build:
       context: .
-      dockerfile: Dockerfile.main_api # FastAPI 用イメージ
+      dockerfile: Dockerfile.main_api
     container_name: mmopdca_api
     command:
       - uvicorn
@@ -24,27 +28,34 @@ services:
       - "8001:8001"
     depends_on:
       db:
-        condition: service_healthy # ← DB 起動完了を待つ
+        condition: service_healthy
       redis:
         condition: service_started
     restart: unless-stopped
 
-  # -------------------------------------------------------------- #
-  # Celery Worker                                                  #
-  # -------------------------------------------------------------- #
+  # ------------------------------------------------------------------------- #
+  # Celery Worker  ─ 解析ジョブ実体（手動スケール対象）
+  #   ・ONSPOT_INSTANCE=true   … Spot / 途中中断許容ノード
+  #   ・CHECKPOINT_DIR=/mnt/checkpoints  に永続化
+  # ------------------------------------------------------------------------- #
   worker:
     build:
       context: .
-      dockerfile: Dockerfile # Worker/Beat 共通
+      dockerfile: Dockerfile # API と同一イメージを reuse
       target: runtime
-    container_name: mmopdca_worker
     command:
       - celery
       - -A
-      - core.celery_app:celery_app # Celery アプリを明示
+      - core.celery_app:celery_app
       - worker
       - --loglevel=info
-    env_file: .env
+    env_file: .env # 共通 .env を読み込み
+    environment:
+      # 追加で Spot / ckpt 用を上書き可
+      ONSPOT_INSTANCE: "${ONSPOT_INSTANCE:-false}"
+      CHECKPOINT_DIR: /mnt/checkpoints
+    volumes:
+      - checkpoints_data:/mnt/checkpoints # <-- 永続ボリューム
     depends_on:
       db:
         condition: service_healthy
@@ -52,15 +63,14 @@ services:
         condition: service_started
     restart: on-failure
 
-  # -------------------------------------------------------------- #
-  # Celery Beat – スケジューラ                                     #
-  # -------------------------------------------------------------- #
+  # ------------------------------------------------------------------------- #
+  # Celery Beat – 定期スケジューラ
+  # ------------------------------------------------------------------------- #
   beat:
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    container_name: mmopdca_beat
     command:
       - celery
       - -A
@@ -75,9 +85,9 @@ services:
         condition: service_started
     restart: on-failure
 
-  # -------------------------------------------------------------- #
-  # Redis – Celery ブローカー / リザルトバックエンド               #
-  # -------------------------------------------------------------- #
+  # ------------------------------------------------------------------------- #
+  # Redis – Celery Broker / Backend
+  # ------------------------------------------------------------------------- #
   redis:
     image: redis:7-alpine
     container_name: mmopdca_redis
@@ -87,9 +97,9 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
-  # -------------------------------------------------------------- #
-  # PostgreSQL                                                     #
-  # -------------------------------------------------------------- #
+  # ------------------------------------------------------------------------- #
+  # PostgreSQL
+  # ------------------------------------------------------------------------- #
   db:
     image: postgres:16-alpine
     container_name: mmopdca_db
@@ -102,16 +112,15 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      # ← API/Worker が待機するヘルスチェック
-      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 5s
       timeout: 3s
       retries: 5
     restart: unless-stopped
 
-  # -------------------------------------------------------------- #
-  # pgAdmin – dev profile だけで起動                                #
-  # -------------------------------------------------------------- #
+  # ------------------------------------------------------------------------- #
+  # pgAdmin (開発時のみ) – `--profile dev` で起動
+  # ------------------------------------------------------------------------- #
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: mmopdca_pgadmin
@@ -126,10 +135,14 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
-    profiles: [ "dev" ] # `--profile dev` でのみ起動
+    profiles:
+      - dev
 
-# ------------------------------------------------------------------
+###############################################################################
+# Named volumes – すべてのサービスで共有する永続データ
+###############################################################################
 volumes:
   pg_data:
   redis_data:
+  checkpoints_data:
   pgadmin_data:

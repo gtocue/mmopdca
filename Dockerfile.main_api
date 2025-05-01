@@ -1,26 +1,38 @@
-# -------------------------------------------------
-# Dockerfile.main_api  ―  FastAPI(Uvicorn) 用
-# -------------------------------------------------
+# ====================================================================
+# Dockerfile.main_api  –  FastAPI (Uvicorn) + mmopdca “Plan / Do” MVP
+# ====================================================================
 FROM python:3.11-slim AS runtime
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
-# system libs (psycopg が libpq を要求)
+# ────────────── 基本設定 ──────────────
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    # core/dsl/loader.py が参照する既定パス
+    DSL_ROOT=/mnt/data/dsl
+
+# ────────────── システム依存ライブラリ ──────────────
+# psycopg が libpq を要求するため build-essential / libpq-dev を入れる
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# ────────────── Poetry + 依存インストール ──────────────
 RUN pip install --no-cache-dir --upgrade pip poetry
 WORKDIR /app
 
-# lock / metadata だけコピー
+# lock / metadata だけコピーして依存解決
 COPY pyproject.toml poetry.lock ./
-
-# ☆ root パッケージを入れない → README 不要
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --without dev --no-root
 
-# アプリ本体
+# ────────────── アプリケーションソース ──────────────
 COPY . .
 
+# ────────────── DSL ファイルを既定パスへ配置 ──────────
+#   ※ core/dsl/loader.py は DSL_ROOT を探しに行く
+RUN mkdir -p ${DSL_ROOT} \
+    && cp -r core/dsl/defaults  ${DSL_ROOT}/defaults \
+    && cp -r samples            ${DSL_ROOT}/samples
+
+# ────────────── ポート / エントリポイント ────────────
 EXPOSE 8001
 CMD ["uvicorn", "api.main_api:app", "--host", "0.0.0.0", "--port", "8001", "--proxy-headers"]
