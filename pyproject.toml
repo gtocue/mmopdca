@@ -1,12 +1,12 @@
-# =========================================================
+###############################################################################
 # pyproject.toml — mmopdca root
-# =========================================================
-#  PEP-621 metadata
-#  Runtime deps      : [project].dependencies
-#  Dev / CI deps     : [tool.poetry.group.dev.dependencies]
-#  Optional DB deps  : [tool.poetry.group.db.dependencies]
-#  Adapter entry-pts : [project.entry-points."mmopdca_adapters"]
-# ---------------------------------------------------------
+# -----------------------------------------------------------------------------
+# • Runtime 依存   : [project].dependencies
+# • Dev／CI 依存  : [tool.poetry.group.dev.dependencies]
+# • DB 依存       : [tool.poetry.group.db.dependencies]
+# • Adapter登録   : [project.entry-points."mmopdca_adapters"]
+# • Poe tasks     : [tool.poe.tasks]   ← ✅ 1 回だけ
+###############################################################################
 
 [project]
 name            = "mmopdca"
@@ -14,40 +14,46 @@ version         = "0.1.0"
 description     = "Command-DSL-driven forecasting SaaS (MVP)"
 authors         = [{ name = "gtocue", email = "gtocue510@gmail.com" }]
 license         = { text = "MIT" }
-readme          = "README.md"            # ← 無ければ空ファイルで OK
+readme          = "README.md"
 requires-python = ">=3.11,<3.13"
 
-# ---------- Runtime dependencies ----------
+# ------------------------------------------------------------------ #
+# Runtime dependencies
+# ------------------------------------------------------------------ #
 dependencies = [
-    # Web / API
-    "fastapi>=0.115.12,<0.116.0",
-    "uvicorn[standard]>=0.34.2,<0.35.0",
-    "python-multipart>=0.0.20,<0.1.0",
+  # Web / API
+  "fastapi>=0.115.2,<0.116.0",
+  "uvicorn[standard]>=0.34.0,<0.35.0",
+  "python-multipart>=0.0.8,<0.1.0",
 
-    # Core
-    "pydantic>=2.7.2,<3.0.0",
-    "python-dotenv>=1.1.0,<2.0.0",
-    "fastjsonschema>=2.21.1,<3.0.0",      # JSON-Schema validation
+  # Core
+  "pydantic>=2.7.2,<3.0.0",
+  "python-dotenv>=1.1,<2.0",
+  "fastjsonschema>=2.21.0,<3.0",
 
-    # Data / ML
-    "pandas>=2.2.3,<3.0.0",
-    "numpy>=2.2.5,<3.0.0",
-    "scikit-learn>=1.6.1,<2.0.0",
-    "yfinance>=0.2.56,<0.3.0",
-    "plotly>=6.0.1,<7.0.0",
+  # Data / ML
+  "pandas>=2.2,<3.0",
+  "numpy>=2.2,<3.0",
+  "scikit-learn>=1.6,<2.0",
+  "yfinance>=0.2.0,<0.3",
+  "plotly>=6.0,<7.0",
 
-    # Queue / Broker
-    "celery[redis]>=5.3,<6.0.0",
-    "redis>=5.0,<6.0.0"
+  # Queue / Broker
+  "celery[redis]>=5.3,<6.0",
+  "redis>=5.0,<6.0"
 ]
 
-# ---------- Adapter entry-points ----------
+# ------------------------------------------------------------------ #
+# Adapter entry-points
+# ------------------------------------------------------------------ #
 [project.entry-points."mmopdca_adapters"]
 stock_us = "plugins.stock_us.adapter:StockUSAdapter"
 
-# ---------- Poetry settings ----------
+# ------------------------------------------------------------------ #
+# Poetry-specific settings
+# ------------------------------------------------------------------ #
 [tool.poetry]
-package-mode = true                     # true = install as a package
+package-mode = true                      # install 先はトップ直下
 
 [[tool.poetry.packages]]
 include = "common_core"
@@ -58,21 +64,42 @@ include = "core"
 [[tool.poetry.packages]]
 include = "plugins"
 
-# ---------- Dev / CI dependencies ----------
+# ------------------------------------------------------------------ #
+# Dev / CI dependencies
+# ------------------------------------------------------------------ #
 [tool.poetry.group.dev.dependencies]
-pytest  = "^8.3.5"
-black   = "^25.1.0"
-isort   = "^6.0.1"
-mypy    = "^1.15.0"
-alembic = "^1.15.2"
-httpx   = "^0.27.0"                     # FastAPI TestClient backend
+pytest  = "^8.3"
+black   = "^24.4"
+isort   = "^6.0"
+ruff    = "^0.4"
+mypy    = "^1.10"
+alembic = "^1.15"
+httpx   = "^0.27"
 
-# ---------- Optional DB dependencies ----------
+# ------------------------------------------------------------------ #
+# Optional DB dependencies
+# ------------------------------------------------------------------ #
 [tool.poetry.group.db.dependencies]
-psycopg = { version = ">=3.1,<4.0.0", extras = ["binary"] }
-alembic = "^1.15.2"
+psycopg = { version = ">=3.1,<4.0", extras = ["binary"] }
+alembic = "^1.15"
 
-# ---------- Build backend ----------
+# ------------------------------------------------------------------ #
+# Poe the Poet – task runner
+# ------------------------------------------------------------------ #
+[tool.poe.tasks]
+test      = "pytest -q"
+lint      = "ruff ."
+format    = """
+            ruff format .
+            && isort .
+            && black .
+            """
+typecheck = "mypy ."
+migrate   = "alembic upgrade head"
+
+# ------------------------------------------------------------------ #
+# Build backend
+# ------------------------------------------------------------------ #
 [build-system]
-requires      = ["poetry-core>=2.0.0,<3.0.0"]
+requires      = ["poetry-core>=2.0,<3.0"]
 build-backend = "poetry.core.masonry.api"
