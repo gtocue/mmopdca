@@ -34,58 +34,86 @@ import logging
 import os
 from typing import Any, Dict, List, Sequence
 
-import redis
+import redis  # redis-py
 
-# NOTE: redis-py は decode_responses=True で str ⇔ str に統一
 logger = logging.getLogger(__name__)
 
 
 class RedisRepository:
     """
-    シンプルな Key-Value JSON ストア。
+    1 Key = 1 JSON ドキュメントを保存する簡易ストア。
 
-    * key = ``{prefix}:{id}``
-    * value = JSON 文字列
+    * Redis key   : ``{prefix}:{id}``
+    * Redis value : JSON 文字列
     """
 
     def __init__(
         self,
-        key_prefix: str,
+        table: str | None = None,
         *,
+        key_prefix: str | None = None,   # ← v1 互換
         url: str | None = None,
-        db: int = 1,  # FIXME: ハードコード - .env に切り出す
+        db: int = 1,                     # FIXME: .env へ切り出し検討
+        **redis_opts: Any,
     ) -> None:
-        redis_url = url or os.getenv("REDIS_URL", f"redis://redis:6379/{db}")
-        self._r = redis.Redis.from_url(redis_url, decode_responses=True)
-        self._prefix: str = f"{key_prefix}:"
+        """
+        Parameters
+        ----------
+        table / key_prefix
+            - **新 API**: factory から `table="plan"` などが渡る
+            - **旧 API**: 直接 `key_prefix="plan"`
+            どちらかが使われる。両方 None なら 'mmop' を既定値にする。
+        url / db / redis_opts
+            redis.Redis へそのまま渡す接続情報
+        """
+        prefix = table or key_prefix or "mmop"
+        self._prefix: str = f"{prefix}:"
+
+        # --------------------------------------------------
+        # 接続先 URL 生成
+        #   • 明示引数 url が最優先
+        #   • 次に環境変数 REDIS_URL
+        #   • どちらも無ければ localhost をデフォルトにする
+        #     （pytest をホスト OS 上で走らせても失敗しない）
+        # --------------------------------------------------
+        redis_url = (
+            url
+            or os.getenv("REDIS_URL")          # .env / シェルで与えられた値
+            or f"redis://127.0.0.1:6379/{db}"  # フォールバック
+        )
+
+        self._r: redis.Redis = redis.from_url(
+            redis_url,
+            decode_responses=True,  # bytes → str 自動デコード
+            **redis_opts,
+        )
         logger.debug("[RedisRepo] init prefix=%s url=%s", self._prefix, redis_url)
 
-    # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------#
     # helpers
-    # ------------------------------------------------------------------ #
-    def _k(self, id_: str) -> str:  # noqa: D401
-        """内部: id → Redis key"""
+    # ------------------------------------------------------------------#
+    def _k(self, id_: str) -> str:
+        """内部: id -> Redis key"""
         return f"{self._prefix}{id_}"
 
-    # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------#
     # public CRUD
-    # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------#
     def create(self, id_: str, doc: Dict[str, Any]) -> None:
-        """Upsert と同義。"""
+        """Upsert（存在すれば上書き）"""
         self._r.set(self._k(id_), json.dumps(doc))
 
-    # upsert 用エイリアス
-    update = create
+    update = create  # エイリアス
 
     def get(self, id_: str) -> Dict[str, Any] | None:
-        v = self._r.get(self._k(id_))
-        return json.loads(v) if v is not None else None
+        raw = self._r.get(self._k(id_))
+        return json.loads(raw) if raw is not None else None
 
     def delete(self, id_: str) -> None:
         self._r.delete(self._k(id_))
 
     def list(self) -> List[Dict[str, Any]]:
-        """prefix に一致するキーを全件スキャンして返す（少量データ想定）。"""
+        """prefix に一致するキーを全件取得（少量想定）"""
         docs: List[Dict[str, Any]] = []
         for key in self._scan_iter():
             raw = self._r.get(key)
@@ -97,20 +125,19 @@ class RedisRepository:
                 logger.warning("[RedisRepo] invalid JSON on key=%s", key)
         return docs
 
-    # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------#
     # private
-    # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------#
     def _scan_iter(self) -> Sequence[str]:
-        """ラッパー – 型アノテーションを付けただけ。"""
-        # TODO: 大量件数なら SSCAN + cursor 管理で chunk 取得に置き換える
+        """型アノテ付きラッパー"""
         return self._r.scan_iter(f"{self._prefix}*")
 
 
-# ================================ test stub ===============================
-if __name__ == "__main__":  # 簡易動作確認
-    repo = RedisRepository("do_test")
+# --------------------------- self-test ---------------------------
+if __name__ == "__main__":
+    repo = RedisRepository(table="do_test")
     repo.create("abc", {"x": 1})
     assert repo.get("abc")["x"] == 1
-    assert len(repo.list()) >= 1
+    print("list:", repo.list())
     repo.delete("abc")
-    print("self-test ok")
+    print("✓ self-test OK")

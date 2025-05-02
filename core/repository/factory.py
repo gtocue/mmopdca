@@ -17,56 +17,54 @@ from .sqlite_impl import SQLiteRepository
 
 logger = logging.getLogger(__name__)
 
-# ───────── Optional: PostgreSQL ─────────
+# ── Optional back-ends ───────────────────────────────────
 try:
-    from .postgres_impl import PostgresRepository  # type: ignore
+    from .postgres_impl import PostgresRepository           # type: ignore
     _HAS_PG = True
-except ModuleNotFoundError:                        # pragma: no cover
-    PostgresRepository = None                      # type: ignore[assignment]
+except ModuleNotFoundError:
+    PostgresRepository = None                               # type: ignore[assignment]
     _HAS_PG = False
 
-# ───────── Optional: Redis ──────────────
 try:
-    from .redis_impl import RedisRepository        # type: ignore
+    from .redis_impl import RedisRepository                 # type: ignore
     _HAS_REDIS = True
-except ModuleNotFoundError:                        # pragma: no cover
-    RedisRepository = None                         # type: ignore[assignment]
+except ModuleNotFoundError:
+    RedisRepository = None                                  # type: ignore[assignment]
     _HAS_REDIS = False
 
-_SUPPORTED = {"memory", "sqlite"} | (
-    {"postgres"} if _HAS_PG else set()
-) | ({"redis"} if _HAS_REDIS else set())
+_SUPPORTED = {"memory", "sqlite"} \
+    | ({"postgres"} if _HAS_PG else set()) \
+    | ({"redis"}    if _HAS_REDIS else set())
 
 
 def get_repo(table: str = "plan"):
     """
-    Repository インスタンスを返す。
+    Repository を返す（Memory / SQLite / Postgres / Redis）。
 
     Parameters
     ----------
     table : str
-        コレクション / テーブル名（Memory・SQL 系実装のみ使用）
+        コレクション / テーブル名
     """
     backend = os.getenv("DB_BACKEND", "memory").lower()
 
-    # ---- SQLite ----------------------------------------------------
+    # SQLite
     if backend == "sqlite":
         return SQLiteRepository(table=table)
 
-    # ---- PostgreSQL -----------------------------------------------
+    # PostgreSQL
     if backend == "postgres" and _HAS_PG:
         schema = os.getenv("PG_SCHEMA", "public")
         return PostgresRepository(table=table, schema=schema)  # type: ignore[call-arg]
 
-    # ---- Redis -----------------------------------------------------
+    # Redis
     if backend == "redis" and _HAS_REDIS:
-        # RedisRepository(key_prefix=...) というシグネチャを想定
-        return RedisRepository(key_prefix=table)               # type: ignore[call-arg]
+        return RedisRepository(table=table)                    # ← 統一
 
-    # ---- フォールバック -------------------------------------------
+    # フォールバック
     if backend not in _SUPPORTED:
         logger.warning(
-            "[RepoFactory] unknown backend '%s' → MemoryRepository へフォールバック",
+            "[RepoFactory] unknown backend '%s' → MemoryRepository にフォールバック",
             backend,
         )
     return MemoryRepository(table=table)
