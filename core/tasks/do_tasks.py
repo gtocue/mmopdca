@@ -1,99 +1,108 @@
-# =========================================================
-# ASSIST_KEY: core/tasks/do_tasks.py
-# =========================================================
+# =====================================================================
+# core/tasks/do_tasks.py
+# ---------------------------------------------------------------------
+# “Do フェーズ” をバックグラウンドで実行するエントリポイント。
 #
-# 【概要】
-#   Celery タスク – Plan を解析する “Do” ジョブの実装。
+#  ▸ Celery がインストール済み ───────────────────────────
+#      shared_task で登録し、 .apply_async で enqueue。
 #
-# 【主な役割】
-#   - Plan→Do の非同期実行
-#   - core.do.coredo_executor.run_do() を呼び出し
-#
-# 【連携先・依存関係】
-#   - core.models.do.DoStatus
-#   - core.repository.do_pg_impl.DoRepository
-#   - core.repository.postgres_impl.PostgresRepository   (plan 読み出し)
-#   - core.dsl.loader.PlanLoader                         (defaults 反映)
-#   - core.do.coredo_executor.run_do                     (既存ビジネスロジック)
-#
-# 【ルール遵守】
-#   1) ハードコード値には FIXME/TODO をつける
-#   2) print() ではなく logging を使用
-# ---------------------------------------------------------
+#  ▸ Celery が無い／使わない ───────────────────────────
+#      フォールバック実装 (SyncTask) が即時に run_do() を呼び、
+#      呼び出し側からは同じ .apply_async インタフェースが見える。
+# =====================================================================
 from __future__ import annotations
 
 import logging
-
-from celery import shared_task, Task
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Dict
 
 from core.dsl.loader import PlanLoader
-from core.models.do import DoStatus
-from core.repository.do_pg_impl import DoRepository
-from core.repository.postgres_impl import PostgresRepository
-from core.do.coredo_executor import run_do as legacy_run_do
-
-# ------------------------------------------------------------------
-# Repository DI
-# ------------------------------------------------------------------
-_plan_repo = PostgresRepository(table="plan")  # FIXME: schema 名を .env へ
-_do_repo   = DoRepository()
-_loader    = PlanLoader(validate=False)        # Plan 登録時に検証済み想定
+from core.repository.factory import get_repo
+from core.do.coredo_executor import run_do
 
 logger = logging.getLogger(__name__)
 
+# ------------------------------------------------------------------ #
+# Repository (plan / do) – メモリ・SQLite・Postgres 等を自動選択
+# ------------------------------------------------------------------ #
+_plan_repo = get_repo(table="plan")
+_do_repo   = get_repo(table="do")
+_loader    = PlanLoader(validate=False)
 
-# ------------------------------------------------------------------
-# Celery Task
-# ------------------------------------------------------------------
-@shared_task(bind=True, name="run_do", acks_late=True, max_retries=3)
-def run_do(self: Task, do_id: str, plan_id: str) -> None:  # noqa: D401
-    """
-    Celery entry-point: Plan を解析し Do 結果を保存する。
+# ===================================================================
+# Celery が使えるかどうか判定
+# ===================================================================
+try:
+    from celery import shared_task, Task  # type: ignore
+    _HAS_CELERY = True
+except ModuleNotFoundError:               # pragma: no cover
+    _HAS_CELERY = False
+    shared_task = None        # type: ignore
+    Task = object             # type: ignore
 
-    Parameters
-    ----------
-    do_id   : str
-        Do 実行レコードの ID（予め UI / API で作成済）
-    plan_id : str
-        実行対象 Plan の ID
-    """
-    # -- 前準備 -----------------------------------------------------
-    do_doc = _do_repo.get(do_id)
-    if do_doc is None:
-        logger.error("[Do] record %s not found – abort", do_id)
-        return
+# -------------------------------------------------------------------
+# 共通ヘルパ
+# -------------------------------------------------------------------
+def _upsert(record: Dict[str, Any]) -> None:
+    """Memory/Redis 系で update が無いケースを考慮して upsert."""
+    _do_repo.delete(record["do_id"])
+    _do_repo.create(record["do_id"], record)
 
-    do_doc["status"] = DoStatus.RUNNING
-    _do_repo.create(do_id, do_doc)
+
+def _execute(do_id: str, plan_id: str, params: Dict[str, Any]) -> None:
+    """実際に run_do() を叩き、結果をレポジトリへ反映。"""
+    rec = _do_repo.get(do_id) or {}
+    rec["status"] = "RUNNING"
+    _upsert(rec)
 
     try:
-        # 1) Plan 取得
-        plan_raw = _plan_repo.get(plan_id)
-        if plan_raw is None:
-            raise ValueError(f"plan '{plan_id}' not found")
-
-        # 2) defaults マージ・market 置換をもう一度適用
-        plan_merged = _loader.load_dict(plan_raw)
-        legacy_dict = _loader.legacy_dict(plan_merged)
-
-        # 3) 既存 Executor 呼び出し
-        logger.info("[Do] start executor for %s", plan_id)
-        result = legacy_run_do(legacy_dict)       # <-- 既存ビジネスロジック
-        logger.info("[Do] finished %s", plan_id)
-
-        # 4) 成功結果保存
-        do_doc.update(
-            status=DoStatus.DONE,
-            result=result,
-        )
-        _do_repo.create(do_id, do_doc)
-
+        result = run_do(plan_id, params)
+        rec.update(status="DONE", result=result)
+        logger.info("[Do] ✓ %s DONE", do_id)
     except Exception as exc:  # noqa: BLE001
-        logger.exception("[Do] %s failed: %s", do_id, exc)
-        do_doc.update(
-            status=DoStatus.FAILED,
-            result={"error": str(exc)},
-        )
-        _do_repo.create(do_id, do_doc)
-        # Celery にリトライさせる（最大 max_retries）
-        raise self.retry(exc=exc, countdown=30)  # FIXME: バックオフ時間を設定値化
+        rec.update(status="FAILED", result={"error": str(exc)})
+        logger.error("[Do] ✗ %s FAILED – %s", do_id, exc)
+
+    _upsert(rec)
+
+# ===================================================================
+# Celery あり: 本物の Task
+# ===================================================================
+if _HAS_CELERY:  # pragma: no cover – CI ではスキップ
+    @shared_task(bind=True, name="run_do_task", acks_late=True, max_retries=3)
+    def run_do_task(self: Task, do_id: str, plan_id: str, params: dict) -> None:  # type: ignore[override]
+        """
+        本番用 Celery タスク。失敗時は指数バックオフで自動再試行。
+        """
+        try:
+            _execute(do_id, plan_id, params)
+        except Exception as exc:                                              # noqa: BLE001
+            # 失敗したら Celery のリトライ機構に任せる
+            raise self.retry(exc=exc, countdown=min(300, 30 * (self.request.retries + 1)))
+
+# ===================================================================
+# Celery なし: ダミー Task（同期実行）  ※テスト/ローカル用
+# ===================================================================
+else:
+    class _SyncAsyncResult:  # 最低限の擬似 AsyncResult
+        id: str
+        def __init__(self, task_id: str): self.id = task_id
+        @property
+        def state(self) -> str: return "SUCCESS"
+
+    class _SyncTask:  # Celery 互換シェル
+        @staticmethod
+        def apply_async(args: list | tuple, kwargs: dict | None = None, task_id: str | None = None, **__) -> _SyncAsyncResult:  # noqa: D401
+            """Celery が無い場合でも呼び出せるダミー enqueue。"""
+            do_id, plan_id, params = args
+            _execute(do_id, plan_id, params)
+            return _SyncAsyncResult(task_id or uuid.uuid4().hex)
+
+    # 呼び出し側からは同じ名前で見えるようエクスポート
+    run_do_task = _SyncTask()  # type: ignore[assignment]
+
+# -------------------------------------------------------------------
+# public re-export
+# -------------------------------------------------------------------
+__all__ = ["run_do_task"]

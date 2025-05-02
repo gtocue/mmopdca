@@ -1,162 +1,158 @@
 # =========================================================
-# core/repository/postgres_impl.py
+# ASSIST_KEY: 【core/repository/postgres_impl.py】
 # =========================================================
 #
-# PostgreSQL 汎用 JSONB ストア
+# PostgreSQL ― 汎用 JSONB ストア  (psycopg-3 sync)
 # ---------------------------------------------------------
-# * tenant_id + id を複合 PK とし、data を丸ごと JSONB で保存
-# * memory / sqlite / postgres を動的に切り替える factory から
-#   呼び出される **PostgreSQL 専用** Repository 実装
-#
-# 依存
-# ----
-#   pip install "psycopg[binary]"  (psycopg-3 sync 版)
-#
-# 環境変数の優先順位
-# ------------------
-#   1. PG_DSN                              … 完全 DSN
-#   2. PG_* / POSTGRES_*                   … 個別指定
-#      (PG_* が無ければ POSTGRES_* を見る)
-#   3. compose 用デフォルト
-# =========================================================
+# • tenant_id + id を複合 PK、data を JSONB で保存
+# • psycopg 未インストール環境でも import エラーにならない
+# • pytest 実行時は eager=False で “遅延接続” し
+#   実 DB が無くても import／生成だけは通る設計
+# ---------------------------------------------------------
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any, Dict, List, Optional
 
-# ---------------------------------------------------------
-# optional import ― DB を使わない構成でも import error にしない
-# ---------------------------------------------------------
 try:
-    import psycopg                         # psycopg-3 (sync)
-    from psycopg.rows import dict_row
-except ModuleNotFoundError:                # noqa: D401
-    psycopg = None                         # 型ヒントはダミー化
-    dict_row = None
+    import psycopg                                   # type: ignore
+    from psycopg.rows import dict_row                # type: ignore
+except ModuleNotFoundError:                          # pragma: no cover
+    psycopg = None                                   # type: ignore
+    dict_row = None                                  # type: ignore
 
 from .base import BaseRepository
 
-# ---------------------------------------------------------
-# connection helper
-# ---------------------------------------------------------
-_CX: Optional["psycopg.Connection[Any]"] = None
+logger = logging.getLogger(__name__)
 
-
+# --------------------------------------------------------------------- #
+# DSN helper
+# --------------------------------------------------------------------- #
 def _env(primary: str, fallback: str, default: str = "") -> str:
-    """`PG_* → POSTGRES_* → default` の順で環境変数を解決"""
     return os.getenv(primary) or os.getenv(fallback) or default
 
 
-def _connect():
-    """環境変数を解釈し、シングルトン接続を生成／取得する"""
-    if psycopg is None:  # psycopg が import 出来なかった
-        raise RuntimeError(
-            "psycopg がインストールされていません。\n"
-            "  • DB_BACKEND を memory / sqlite に変更するか\n"
-            "  • `poetry install --with db` を実行してください。"
-        )
-
-    # 完全 DSN が与えられている場合
+def _make_dsn() -> dict[str, Any] | str:
     if dsn := os.getenv("PG_DSN"):
-        return psycopg.connect(dsn, autocommit=True)
-
-    # compose 用デフォルト
-    return psycopg.connect(
+        return dsn                              # 完全 DSN
+    return dict(
         host=_env("PG_HOST", "POSTGRES_HOST", "db"),
         port=int(_env("PG_PORT", "POSTGRES_PORT", "5432")),
         dbname=_env("PG_DB", "POSTGRES_DB", "mmopdca"),
         user=_env("PG_USER", "POSTGRES_USER", "mmop_user"),
         password=_env("PG_PASSWORD", "POSTGRES_PASSWORD", "secret"),
-        autocommit=True,
     )
 
 
+# --------------------------------------------------------------------- #
+# connection singleton
+# --------------------------------------------------------------------- #
+_CX: Optional["psycopg.Connection[Any]"] = None
+
+
 def _cx():
-    """lazy singleton connection"""
     global _CX
     if _CX is None or _CX.closed:
-        _CX = _connect()
+        if psycopg is None:       # psycopg 未インストール
+            raise RuntimeError(
+                "psycopg がインストールされていません。 "
+                "DB_BACKEND を memory/sqlite/redis にするか "
+                "`poetry install --with db` を実行してください。"
+            )
+        _CX = psycopg.connect(**_make_dsn(), autocommit=True)  # type: ignore[arg-type]
     return _CX
 
 
-# ---------------------------------------------------------
+# --------------------------------------------------------------------- #
 # Repository implementation
-# ---------------------------------------------------------
+# --------------------------------------------------------------------- #
 class PostgresRepository(BaseRepository):
     """
-    PostgreSQL(JSONB) 実装。
+    PostgreSQL(JSONB) Repository。
 
-    * psycopg が import できない場合 → RuntimeError
-    * <schema>.<table> が無ければ自動生成（CREATE SCHEMA/TABLE）
+    * `eager=False` にすると **DDL/接続を遅延** させられるので
+      pytest で実 DB が無くても import だけは成功。
     """
 
-    def __init__(self, *, table: str, schema: str = "public") -> None:
-        if psycopg is None:
-            raise RuntimeError(
-                "psycopg がインストールされていません。\n"
-                "  • DB_BACKEND を memory / sqlite に変更するか\n"
-                "  • `poetry install --with db` を実行してください。"
-            )
+    tenant_id: str = ""  # （単一テナント前提）
 
-        # BaseRepository へ table / tenant_id を渡す
-        super().__init__(table=table)      # tenant_id はデフォルト '' のまま
+    def __init__(
+        self,
+        *,
+        table: str,
+        schema: str = "public",
+        eager: bool = False,          # ★ デフォルトを遅延へ変更
+    ) -> None:
+        super().__init__(table=table)  # type: ignore[arg-type]
+        self.table = table
+        self.schema = schema
+        self._initialized = False
+        if eager:
+            self._ensure_table()
 
-        self.schema: str = schema
-        self.table: str = table
-
-        # ---------- 初回 DDL ----------
+    # ---------------- internal ----------------
+    def _ensure_table(self) -> None:
+        if self._initialized:
+            return
         ddl = f"""
-        CREATE SCHEMA IF NOT EXISTS "{schema}";
-
-        CREATE TABLE IF NOT EXISTS "{schema}"."{table}" (
-            tenant_id  TEXT      NOT NULL DEFAULT '',
-            id         TEXT      NOT NULL,
-            data       JSONB     NOT NULL,
+        CREATE SCHEMA IF NOT EXISTS "{self.schema}";
+        CREATE TABLE IF NOT EXISTS "{self.schema}"."{self.table}" (
+            tenant_id  TEXT        NOT NULL DEFAULT '',
+            id         TEXT        NOT NULL,
+            data       JSONB       NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             PRIMARY KEY (tenant_id, id)
         );
         """
         with _cx().cursor() as cur:
             cur.execute(ddl)
+        self._initialized = True
 
-    # -----------------------------------------------------
-    # CRUD
-    # -----------------------------------------------------
+    def _lazy(self) -> None:
+        if not self._initialized:
+            self._ensure_table()
+
+    # ---------------- CRUD --------------------
     def create(self, obj_id: str, data: Dict[str, Any]) -> None:
+        self._lazy()
         sql = (
-            f'INSERT INTO "{self.schema}"."{self.table}" '
-            "(tenant_id, id, data) VALUES (%s, %s, %s) "
-            "ON CONFLICT (tenant_id, id) DO UPDATE "
-            "   SET data = EXCLUDED.data"
+            f'INSERT INTO "{self.schema}"."{self.table}" (tenant_id,id,data) '
+            "VALUES (%s,%s,%s) "
+            "ON CONFLICT (tenant_id,id) DO UPDATE SET data = EXCLUDED.data"
         )
         with _cx().cursor() as cur:
             cur.execute(sql, (self.tenant_id, obj_id, json.dumps(data)))
 
+    update = create  # up-sert 同義
+
     def get(self, obj_id: str) -> Dict[str, Any] | None:
+        self._lazy()
         sql = (
             f'SELECT data FROM "{self.schema}"."{self.table}" '
-            "WHERE tenant_id = %s AND id = %s"
+            "WHERE tenant_id=%s AND id=%s"
         )
-        with _cx().cursor(row_factory=dict_row) as cur:
+        with _cx().cursor(row_factory=dict_row) as cur:  # type: ignore[arg-type]
             cur.execute(sql, (self.tenant_id, obj_id))
             row = cur.fetchone()
         return row["data"] if row else None
 
-    def list(self) -> List[Dict[str, Any]]:
-        sql = (
-            f'SELECT data FROM "{self.schema}"."{self.table}" '
-            "WHERE tenant_id = %s "
-            "ORDER BY created_at DESC"
-        )
-        with _cx().cursor(row_factory=dict_row) as cur:
-            cur.execute(sql, (self.tenant_id,))
-            return [r["data"] for r in cur.fetchall()]
-
     def delete(self, obj_id: str) -> None:
+        self._lazy()
         sql = (
             f'DELETE FROM "{self.schema}"."{self.table}" '
-            "WHERE tenant_id = %s AND id = %s"
+            "WHERE tenant_id=%s AND id=%s"
         )
         with _cx().cursor() as cur:
             cur.execute(sql, (self.tenant_id, obj_id))
+
+    def list(self) -> List[Dict[str, Any]]:
+        self._lazy()
+        sql = (
+            f'SELECT data FROM "{self.schema}"."{self.table}" '
+            "WHERE tenant_id=%s ORDER BY created_at DESC"
+        )
+        with _cx().cursor(row_factory=dict_row) as cur:  # type: ignore[arg-type]
+            cur.execute(sql, (self.tenant_id,))
+            return [r["data"] for r in cur.fetchall()]
