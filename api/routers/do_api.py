@@ -22,7 +22,7 @@ from celery.result import AsyncResult
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from core.celery_app import run_do_task          # Celery タスク
+from core.celery_app import run_do_task
 from core.repository.factory import get_repo
 from core.schemas.do_schemas import DoCreateRequest, DoResponse
 from core.schemas.plan_schemas import PlanResponse
@@ -30,20 +30,19 @@ from core.schemas.plan_schemas import PlanResponse
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/do", tags=["do"])
 
-_plan_repo = get_repo(table="plan")
-_do_repo   = get_repo(table="do")
+_plan_repo = get_repo("plan")
+_do_repo = get_repo("do")
 
 # ------------------------------------------------------------------ #
 # helpers
 # ------------------------------------------------------------------ #
 def _merge_params(plan: PlanResponse, req: DoCreateRequest) -> Dict[str, Any]:
-    """Plan とリクエスト Body をマージして Executor 用 param dict を作る。"""
     params: Dict[str, Any] = {
-        "symbol":     req.symbol or plan.symbol,
-        "start":      req.start  or plan.start.isoformat(),
-        "end":        req.end    or plan.end.isoformat(),
+        "symbol": req.symbol or plan.symbol,
+        "start": req.start or plan.start.isoformat(),
+        "end": req.end or plan.end.isoformat(),
         "indicators": req.indicators or [],
-        "run_no":     req.run_no,
+        "run_no": req.run_no,
     }
     if not params["symbol"]:
         universe = getattr(plan, "data", {}).get("universe", [])  # type: ignore[attr-defined]
@@ -54,10 +53,10 @@ def _merge_params(plan: PlanResponse, req: DoCreateRequest) -> Dict[str, Any]:
     return params
 
 
-def _upsert_do(rec: Dict[str, Any]) -> None:
-    """MemoryRepository 等に合わせて簡易 upsert を実施。"""
+def _upsert(rec: Dict[str, Any]) -> None:
     _do_repo.delete(rec["do_id"])
     _do_repo.create(rec["do_id"], rec)
+
 
 # ------------------------------------------------------------------ #
 # POST /do/{plan_id}
@@ -67,42 +66,34 @@ def _upsert_do(rec: Dict[str, Any]) -> None:
     status_code=status.HTTP_202_ACCEPTED,
     summary="Enqueue Do job (Celery)",
 )
-def enqueue_do(
-    plan_id: str,
-    body: Optional[DoCreateRequest] = None,
-) -> JSONResponse:
-    """Do ジョブを Celery へ投入し、即 202 Accepted を返す。"""
-    # 1) Plan 存在チェック
+def enqueue_do(plan_id: str, body: Optional[DoCreateRequest] = None) -> JSONResponse:
     plan_raw = _plan_repo.get(plan_id)
-    if plan_raw is None:
+    if plan_raw is None:  # pragma: no cover
         raise HTTPException(404, detail=f"Plan '{plan_id}' not found")
     plan = PlanResponse(**plan_raw)
 
-    req    = body or DoCreateRequest()
+    req = body or DoCreateRequest()
     run_no = req.run_no or req.seq or 1
     req.run_no = req.seq = run_no
 
-    # 2) Celery publish
     task_id = uuid.uuid4().hex
-    run_do_task.apply_async(
-        args=[plan.id, _merge_params(plan, req)],
-        task_id=task_id,
-    )
+    run_do_task.apply_async(args=[plan.id, _merge_params(plan, req)], task_id=task_id)
 
-    # 3) Do レコード初期化
     do_id = f"do-{task_id[:8]}"
-    rec   = {
-        "do_id":          do_id,
-        "plan_id":        plan_id,
-        "seq":            run_no,
-        "run_tag":        req.run_tag,
-        "status":         "PENDING",
-        "result":         None,
-        "dashboard_url":  None,
-        "celery_task_id": task_id,
-        "created_at":     datetime.now(timezone.utc).isoformat(),
-    }
-    _do_repo.create(do_id, rec)
+    _do_repo.create(
+        do_id,
+        {
+            "do_id": do_id,
+            "plan_id": plan_id,
+            "seq": run_no,
+            "run_tag": req.run_tag,
+            "status": "PENDING",
+            "result": None,
+            "dashboard_url": None,
+            "celery_task_id": task_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
 
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,
@@ -115,33 +106,37 @@ def enqueue_do(
 @router.get("/{do_id}", response_model=DoResponse, summary="Get Do job")
 def get_do(do_id: str) -> DoResponse:
     rec = _do_repo.get(do_id)
-    if rec is None:
+    if rec is None:  # pragma: no cover
         raise HTTPException(404, detail="Do job not found")
 
-    # 既に DONE / FAILED ならそのまま返す
+    # DONE / FAILED ならそのまま返す
     if rec["status"] in {"DONE", "FAILED"}:
         return DoResponse(**rec)
 
     task = AsyncResult(rec["celery_task_id"])
 
-    # Result backend が無効（redis 未接続など）の場合
+    # --- backend 無効（DisabledBackend）なら state に触れず返す ---
     if isinstance(task.backend, DisabledBackend):
-        if task.state in {states.STARTED, states.RETRY} and rec["status"] == "PENDING":
-            rec["status"] = "RUNNING"
-            _upsert_do(rec)
+        if rec["status"] == "PENDING":
+            rec["status"] = "RUNNING"   # 少なくともワーカーへは渡っている前提
+            _upsert(rec)
         return DoResponse(**rec)
 
-    # backend 有効時のみ最終結果を同期反映
-    if task.state == states.SUCCESS:
-        rec.update(status="DONE", result=task.result)
-        _upsert_do(rec)
-    elif task.state == states.FAILURE:
-        rec.update(status="FAILED", result={"error": str(task.result)})
-        _upsert_do(rec)
-    elif task.state in {states.STARTED, states.RETRY}:
-        rec["status"] = "RUNNING"
-        _upsert_do(rec)
+    # --- backend 有効：状態を同期反映 -----------------------------
+    try:
+        state = task.state  # ここで backend.get_task_meta() が呼ばれる
+    except Exception as exc:  # pragma: no cover
+        logger.warning("[Do] backend error: %s", exc)
+        return DoResponse(**rec)        # 触らず返却
 
+    if state == states.SUCCESS:
+        rec.update(status="DONE", result=task.result)
+    elif state == states.FAILURE:
+        rec.update(status="FAILED", result={"error": str(task.result)})
+    elif state in {states.STARTED, states.RETRY}:
+        rec["status"] = "RUNNING"
+
+    _upsert(rec)
     return DoResponse(**rec)
 
 # ------------------------------------------------------------------ #
