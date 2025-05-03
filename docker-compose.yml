@@ -1,23 +1,19 @@
 ###############################################################################
-# docker-compose.yml  –  mmopdca All-in-One Stack
-#   * API  : FastAPI + Uvicorn (ポート 8001)
-#   * Redis: Celery broker / backend
-#   * DB   : PostgreSQL 16-alpine
-#   * Worker / Beat : Celery ランタイム（非 root で起動）
+# docker-compose.yml ― mmopdca + Flower 監視 (PowerShell Edition)
+# ※ Docker Compose v2/v3 では `version:` 属性は不要かつ非推奨です。
 ###############################################################################
-
 services:
-  # --------------------------------------------------------------------------- #
-  # FastAPI / Uvicorn  ― REST Front
-  # --------------------------------------------------------------------------- #
+  # ---------------------------------------------------------------- API / Worker / Beat
   api:
     build:
       context: .
       dockerfile: Dockerfile.main_api
-    container_name: mmopdca_api
-    command: >
-      uvicorn api.main_api:app --host=0.0.0.0 --port=8001 --proxy-headers
+    command: uvicorn api.main_api:app --host 0.0.0.0 --port 8001 --proxy-headers
     env_file: .env
+    environment:
+      # Celery 用 Broker & Result Backend を Redis コンテナへ向ける
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
     ports:
       - "8001:8001"
     depends_on:
@@ -27,42 +23,37 @@ services:
         condition: service_started
     restart: unless-stopped
 
-  # --------------------------------------------------------------------------- #
-  # Celery Worker  ― 解析ジョブ (⼿動 scale 対象)
-  # --------------------------------------------------------------------------- #
   worker:
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    command: >
-      celery -A core.celery_app:celery_app worker --loglevel=info
-    user: "1000:1000" # 🆕 非 root 実行
+    command: celery -A core.celery_app:celery_app worker --loglevel=info
     env_file: .env
     environment:
-      ONSPOT_INSTANCE: "${ONSPOT_INSTANCE:-false}"
-      CHECKPOINT_DIR: /mnt/checkpoints
-    volumes:
-      - checkpoints_data:/mnt/checkpoints
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+    user: "1000:1000"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
+    volumes:
+      - checkpoints_data:/mnt/checkpoints
     restart: on-failure
 
-  # --------------------------------------------------------------------------- #
-  # Celery Beat  ―  定期スケジューラ
-  # --------------------------------------------------------------------------- #
   beat:
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
-    command: >
-      celery -A core.celery_app:celery_app beat --loglevel=info
-    user: "1000:1000" # 🆕 非 root 実行
+    command: celery -A core.celery_app:celery_app beat --loglevel=info
     env_file: .env
+    environment:
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+    user: "1000:1000"
     depends_on:
       db:
         condition: service_healthy
@@ -70,24 +61,17 @@ services:
         condition: service_started
     restart: on-failure
 
-  # --------------------------------------------------------------------------- #
-  # Redis  – Celery broker / result-backend
-  # --------------------------------------------------------------------------- #
+  # ---------------------------------------------------------------- Infra
   redis:
     image: redis:7-alpine
-    container_name: mmopdca_redis
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
 
-  # --------------------------------------------------------------------------- #
-  # PostgreSQL
-  # --------------------------------------------------------------------------- #
   db:
     image: postgres:16-alpine
-    container_name: mmopdca_db
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -103,30 +87,55 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # --------------------------------------------------------------------------- #
-  # pgAdmin  ― 開発時のみ (docker compose --profile dev up -d)
-  # --------------------------------------------------------------------------- #
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: mmopdca_pgadmin
-    profiles: [ dev ]
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+  # ---------------------------------------------------------------- Flower (UI + /metrics)
+  flower:
+    image: mher/flower:1.2
+    command: >
+      celery flower
+        --broker=${CELERY_BROKER_URL:-redis://redis:6379/0}
+        --port=5555
     ports:
-      - "8080:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
+      - "5555:5555"
     depends_on:
-      db:
-        condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
 
-###############################################################################
-# Named volumes  – 永続データ
-###############################################################################
+  # ---------------------------------------------------------------- Prometheus / Grafana (optional)
+  prom:
+    image: prom/prometheus:v2.52.0
+    volumes:
+      - ./prom/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=14d"
+    ports:
+      - "9090:9090"
+    depends_on:
+      flower:
+        condition: service_started
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-oss:10.4.2
+    profiles:
+      - dev
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      prom:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   pg_data:
   redis_data:
   checkpoints_data:
-  pgadmin_data:
+  prom_data:
+  grafana_data:
