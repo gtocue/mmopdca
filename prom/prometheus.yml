@@ -1,8 +1,12 @@
+# ── prom/prometheus.yml ────────────────────────────────────────────
 global:
-  scrape_interval: 15s
+  scrape_interval: 15s         # 収集間隔
+
+rule_files:                    # ← ここを忘れると rule が読まれない
+  - /etc/prometheus/rules_mmopdca.yml
 
 scrape_configs:
-  - job_name: "flower"
-    metrics_path: /metrics          # ← 1.2 では同一ポート
+  - job_name: flower
+    metrics_path: /metrics
     static_configs:
-      - targets: ["flower:5555"]
+      - targets: ["flower:5555"]    # コンテナ名:ポート

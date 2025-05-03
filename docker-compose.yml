@@ -1,8 +1,8 @@
 ###############################################################################
-# mmopdca + Flower 監視 ― PowerShell Edition (ALL-IN-ONE)
+# mmopdca + Flower + Prometheus + Grafana ― All-in-One (Windows/PowerShell)
 ###############################################################################
 services:
-  # ---------------------------------------------------------------- API / Worker / Beat
+  # ────────────────────────────────────────────────────────────── API / Worker / Beat
   api:
     build:
       context: .
@@ -12,7 +12,10 @@ services:
     environment:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      DSL_ROOT: /mnt/data/dsl # ★ Plan/DSL を探すルート
     ports: [ "8001:8001" ]
+    volumes:
+      - ./dsl:/mnt/data/dsl:ro # ★ ここが無いと FileNotFoundError
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
@@ -21,15 +24,18 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile # same image as api
       target: runtime
     command: celery -A core.celery_app:celery_app worker --loglevel=info
     env_file: .env
     environment:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      DSL_ROOT: /mnt/data/dsl # ★
     user: "1000:1000"
-    volumes: [ checkpoints_data:/mnt/checkpoints ]
+    volumes:
+      - checkpoints_data:/mnt/checkpoints
+      - ./dsl:/mnt/data/dsl:ro # ★
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
@@ -45,13 +51,16 @@ services:
     environment:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      DSL_ROOT: /mnt/data/dsl # ★
     user: "1000:1000"
+    volumes:
+      - ./dsl:/mnt/data/dsl:ro # ★
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
     restart: on-failure
 
-  # ---------------------------------------------------------------- Infra
+  # ────────────────────────────────────────────────────────────── Infra
   redis:
     image: redis:7-alpine
     ports: [ "6379:6379" ]
@@ -73,42 +82,40 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ---------------------------------------------------------------- Flower  (UI+Prometheus → :5555)
+  # ────────────────────────────────────────────────────────────── Flower (UI+Metrics)
   flower:
-    image: mher/flower:1.2 # 公式イメージ
+    image: mher/flower:1.2
     environment:
-      CELERY_BROKER_URL: redis://redis:6379/0 # これだけ渡せば OK
-    ports: [ "5555:5555" ] # http://localhost:5555  (UI と /metrics)
+      CELERY_BROKER_URL: redis://redis:6379/0
+    ports: [ "5555:5555" ] # http://localhost:5555
     depends_on:
       redis: { condition: service_started }
     restart: unless-stopped
 
-  # ---------------------------------------------------------------- Prometheus
+  # ────────────────────────────────────────────────────────────── Prometheus
   prom:
     image: prom/prometheus:v2.52.0
-    volumes:
-      - ./prom/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prom_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=14d"
+    volumes:
+      - ./prom/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prom/rules_mmopdca.yml:/etc/prometheus/rules_mmopdca.yml:ro
+      - prom_data:/prometheus
     ports: [ "9090:9090" ]
     depends_on:
       flower: { condition: service_started }
     restart: unless-stopped
 
-  # ---------------------------------------------------------------- Grafana  (プロビジョニング済み)
+  # ────────────────────────────────────────────────────────────── Grafana
   grafana:
     image: grafana/grafana-oss:10.4.2
-    profiles: [ "dev" ]
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
-    ports:
-      - "3000:3000"
+    ports: [ "3000:3000" ]
     volumes:
       - grafana_data:/var/lib/grafana
-      # ★パスは repo 直下の grafana/provisioning を丸ごと読み込む
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       prom: { condition: service_started }

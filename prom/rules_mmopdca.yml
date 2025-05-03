@@ -1,0 +1,28 @@
+groups:
+  - name: mmopdca-flower
+    interval: 15s
+    rules:
+
+    # ── Recording rules ──────────────────────────────────────────
+    - record: mmopdca_task_succeeded_per_min
+      expr:  rate(flower_events_total{type="task-succeeded"}[1m]) * 60
+
+    - record: mmopdca_task_failed_per_min
+      expr:  rate(flower_events_total{type="task-failed"}[1m]) * 60
+
+    - record: mmopdca_task_success_ratio
+      expr: |
+        ( mmopdca_task_succeeded_per_min )
+        /
+        ( mmopdca_task_succeeded_per_min + mmopdca_task_failed_per_min )
+        * 100
+
+    # ── Alert rules ─────────────────────────────────────────────
+    - alert: FlowerWorkersDown
+      expr:  sum(flower_worker_online) < 1
+      for:   1m
+      labels:
+        severity: critical
+      annotations:
+        summary:       "Flower workers are *DOWN*"
+        description:   "No Celery workers report online for more than 1 minute."
