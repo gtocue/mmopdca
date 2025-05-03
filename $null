@@ -1,0 +1,7 @@
+CertUtil: 引数が不明です: -exportPvk
+
+
+CertUtil -?              -- 動詞の一覧 (コマンドの一覧) を表示します
+CertUtil -dump -?        -- "dump" 動詞のヘルプ テキストを表示します
+CertUtil -v -?           -- すべての動詞のヘルプ テキストをすべて表示します
+
