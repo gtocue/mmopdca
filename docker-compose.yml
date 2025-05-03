@@ -1,7 +1,9 @@
 ###############################################################################
-# docker-compose.yml ― mmopdca + Flower 監視 (PowerShell Edition)
-# ※ Docker Compose v2/v3 では `version:` 属性は不要かつ非推奨です。
+# mmopdca + Flower 監視 ― PowerShell Edition
+#   docker compose pull        ← イメージ取得
+#   docker compose up  -d      ← 全サービス起動
 ###############################################################################
+
 services:
   # ---------------------------------------------------------------- API / Worker / Beat
   api:
@@ -11,9 +13,8 @@ services:
     command: uvicorn api.main_api:app --host 0.0.0.0 --port 8001 --proxy-headers
     env_file: .env
     environment:
-      # Celery 用 Broker & Result Backend を Redis コンテナへ向ける
-      CELERY_BROKER_URL: "redis://redis:6379/0"
-      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     ports:
       - "8001:8001"
     depends_on:
@@ -31,16 +32,16 @@ services:
     command: celery -A core.celery_app:celery_app worker --loglevel=info
     env_file: .env
     environment:
-      CELERY_BROKER_URL: "redis://redis:6379/0"
-      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     user: "1000:1000"
+    volumes:
+      - checkpoints_data:/mnt/checkpoints
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
-    volumes:
-      - checkpoints_data:/mnt/checkpoints
     restart: on-failure
 
   beat:
@@ -51,8 +52,8 @@ services:
     command: celery -A core.celery_app:celery_app beat --loglevel=info
     env_file: .env
     environment:
-      CELERY_BROKER_URL: "redis://redis:6379/0"
-      CELERY_RESULT_BACKEND: "redis://redis:6379/0"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     user: "1000:1000"
     depends_on:
       db:
@@ -87,21 +88,18 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ---------------------------------------------------------------- Flower (UI + /metrics)
+  # ---------------------------------------------------------------- Flower (UI 5555 / Prometheus 5556)
   flower:
     image: mher/flower:1.2
-    command:
-      - "celery"
-      - "flower"
-      - "--port=5555"
-      - "--broker=${CELERY_BROKER_URL:-redis://redis:6379/0}"
-      - "--prometheus-port=5555" # ← Prometheus エンドポイントを有効化
-    ports: [ "5555:5555" ]
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0 # これだけ渡せば OK
+    ports:
+      - "5555:5555" # http://localhost:5555  UI + /metrics
     depends_on:
       redis: { condition: service_started }
     restart: unless-stopped
 
-  # ---------------------------------------------------------------- Prometheus / Grafana (optional)
+  # ---------------------------------------------------------------- Prometheus / Grafana
   prom:
     image: prom/prometheus:v2.52.0
     volumes:
@@ -110,17 +108,14 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=14d"
-    ports:
-      - "9090:9090"
+    ports: [ "9090:9090" ]
     depends_on:
-      flower:
-        condition: service_started
+      flower: { condition: service_started }
     restart: unless-stopped
 
   grafana:
     image: grafana/grafana-oss:10.4.2
-    profiles:
-      - dev
+    profiles: [ "dev" ] # 本番では起動しない
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -133,6 +128,7 @@ services:
         condition: service_started
     restart: unless-stopped
 
+# ---------------------------------------------------------------- Volumes
 volumes:
   pg_data:
   redis_data:
