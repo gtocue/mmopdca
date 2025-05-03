@@ -90,15 +90,15 @@ services:
   # ---------------------------------------------------------------- Flower (UI + /metrics)
   flower:
     image: mher/flower:1.2
-    command: >
-      celery flower
-        --broker=${CELERY_BROKER_URL:-redis://redis:6379/0}
-        --port=5555
-    ports:
-      - "5555:5555"
+    command:
+      - "celery"
+      - "flower"
+      - "--port=5555"
+      - "--broker=${CELERY_BROKER_URL:-redis://redis:6379/0}"
+      - "--prometheus-port=5555" # ← Prometheus エンドポイントを有効化
+    ports: [ "5555:5555" ]
     depends_on:
-      redis:
-        condition: service_started
+      redis: { condition: service_started }
     restart: unless-stopped
 
   # ---------------------------------------------------------------- Prometheus / Grafana (optional)
