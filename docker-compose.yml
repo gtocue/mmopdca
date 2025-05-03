@@ -1,9 +1,6 @@
 ###############################################################################
-# mmopdca + Flower 監視 ― PowerShell Edition
-#   docker compose pull        ← イメージ取得
-#   docker compose up  -d      ← 全サービス起動
+# mmopdca + Flower 監視 ― PowerShell Edition (ALL-IN-ONE)
 ###############################################################################
-
 services:
   # ---------------------------------------------------------------- API / Worker / Beat
   api:
@@ -15,13 +12,10 @@ services:
     environment:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
-    ports:
-      - "8001:8001"
+    ports: [ "8001:8001" ]
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
     restart: unless-stopped
 
   worker:
@@ -35,13 +29,10 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     user: "1000:1000"
-    volumes:
-      - checkpoints_data:/mnt/checkpoints
+    volumes: [ checkpoints_data:/mnt/checkpoints ]
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
     restart: on-failure
 
   beat:
@@ -56,19 +47,15 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     user: "1000:1000"
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
     restart: on-failure
 
   # ---------------------------------------------------------------- Infra
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+    ports: [ "6379:6379" ]
+    volumes: [ redis_data:/data ]
     restart: unless-stopped
 
   db:
@@ -77,10 +64,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "5432:5432"
-    volumes:
-      - pg_data:/var/lib/postgresql/data
+    ports: [ "5432:5432" ]
+    volumes: [ pg_data:/var/lib/postgresql/data ]
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 5s
@@ -88,18 +73,17 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ---------------------------------------------------------------- Flower (UI 5555 / Prometheus 5556)
+  # ---------------------------------------------------------------- Flower  (UI+Prometheus → :5555)
   flower:
-    image: mher/flower:1.2
+    image: mher/flower:1.2 # 公式イメージ
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0 # これだけ渡せば OK
-    ports:
-      - "5555:5555" # http://localhost:5555  UI + /metrics
+      CELERY_BROKER_URL: redis://redis:6379/0 # これだけ渡せば OK
+    ports: [ "5555:5555" ] # http://localhost:5555  (UI と /metrics)
     depends_on:
       redis: { condition: service_started }
     restart: unless-stopped
 
-  # ---------------------------------------------------------------- Prometheus / Grafana
+  # ---------------------------------------------------------------- Prometheus
   prom:
     image: prom/prometheus:v2.52.0
     volumes:
@@ -113,9 +97,10 @@ services:
       flower: { condition: service_started }
     restart: unless-stopped
 
+  # ---------------------------------------------------------------- Grafana  (プロビジョニング済み)
   grafana:
     image: grafana/grafana-oss:10.4.2
-    profiles: [ "dev" ] # 本番では起動しない
+    profiles: [ "dev" ]
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -123,12 +108,13 @@ services:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
+      # ★パスは repo 直下の grafana/provisioning を丸ごと読み込む
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
-      prom:
-        condition: service_started
+      prom: { condition: service_started }
     restart: unless-stopped
 
-# ---------------------------------------------------------------- Volumes
+###############################################################################
 volumes:
   pg_data:
   redis_data:

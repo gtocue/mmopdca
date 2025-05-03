@@ -1,0 +1,119 @@
+{
+    "__inputs": [],
+    "__elements": [],
+    "uid": "mmopdca-main",
+    "title": "MMOPDCA – Celery / Flower",
+    "tags": [
+        "celery",
+        "flower",
+        "mmopdca"
+    ],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+        {
+            "id": 1,
+            "type": "stat",
+            "title": "Workers Online",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PROM_MMOPDCA"
+            },
+            "targets": [
+                {
+                    "expr": "sum(flower_worker_online)",
+                    "legendFormat": "online"
+                }
+            ],
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ]
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 0
+            }
+        },
+        {
+            "id": 2,
+            "type": "stat",
+            "title": "Active Tasks",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PROM_MMOPDCA"
+            },
+            "targets": [
+                {
+                    "expr": "sum(flower_worker_number_of_currently_executing_tasks)",
+                    "legendFormat": "active"
+                }
+            ],
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ]
+                }
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 0
+            }
+        },
+        {
+            "id": 3,
+            "type": "timeseries",
+            "title": "Avg Task Runtime (sec)",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PROM_MMOPDCA"
+            },
+            "targets": [
+                {
+                    "expr": "rate(flower_task_runtime_seconds_sum[5m]) / rate(flower_task_runtime_seconds_count[5m])",
+                    "legendFormat": "avg runtime"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 4
+            }
+        },
+        {
+            "id": 4,
+            "type": "timeseries",
+            "title": "Tasks / min",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PROM_MMOPDCA"
+            },
+            "targets": [
+                {
+                    "expr": "rate(flower_task_runtime_seconds_count[1m]) * 60",
+                    "legendFormat": "tasks/min"
+                }
+            ],
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 4
+            }
+        }
+    ]
+}

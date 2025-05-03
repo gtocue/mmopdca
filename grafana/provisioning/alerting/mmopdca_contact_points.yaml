@@ -1,0 +1,9 @@
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: "MMOPDCA Slack"
+    receivers:
+      - uid: "slack-mmopdca"
+        type: slack
+        settings:
+          url: "__SLACK_WEBHOOK_URL__"   # ← 実際の Webhook URL を入れてから有効化
