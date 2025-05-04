@@ -1,25 +1,27 @@
-# -------------------------------------------------
-# Dockerfile          – Celery Worker / Beat 共通
-# -------------------------------------------------
+# ---- build / runtime 共通 ----------------------------------------
 FROM python:3.11-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    DSL_ROOT=/mnt/data/dsl
 
-# ----- install Poetry -----
-RUN pip install --no-cache-dir --upgrade pip poetry
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends dos2unix \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# ---- Poetry + deps ----------------------------------------------
 COPY pyproject.toml poetry.lock ./
+RUN pip install --no-cache-dir --upgrade pip poetry \
+    && poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi --without dev --no-root
+# └───────────────★ ここが決定打
 
-# ----- ここがビルドの核心 -----
-RUN poetry config virtualenvs.create false \
-    && poetry lock \
-    && poetry install --no-interaction --no-ansi \
-    --without dev --no-root \
-    && poetry run pip install "celery[redis]>=5.4.0"
-
-# 残りのソース
+# ---- アプリコード -------------------------------------------------
 COPY . .
 
-# ENTRYPOINT / CMD は docker-compose.yml で上書き
+# init-dsl エントリ
+COPY ops/init-dsl.sh /usr/local/bin/docker-entrypoint-init-dsl.sh
+RUN dos2unix /usr/local/bin/docker-entrypoint-init-dsl.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint-init-dsl.sh

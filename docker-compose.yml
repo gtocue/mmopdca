@@ -1,3 +1,7 @@
+###############################################################################
+# docker-compose.yml  ―  mmopdca 本番相当（外部公開は API と Nginx だけ）
+#   ※ root 権限を使わず、アプリは 1000:1000 で起動
+###############################################################################
 version: "3.9"
 
 services:
@@ -5,64 +9,63 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.main_api
-    env_file: .env
+      dockerfile: Dockerfile.main_api # ← FastAPI + Uvicorn 用
+    env_file: .env # 環境変数はここに集約
     environment:
       DSL_ROOT: /mnt/data/dsl
       CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
       CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
     ports:
-      - "8001:8001"
+      - "8001:8001" # ローカル確認用
     volumes:
-      - dsl_data:/mnt/data/dsl
+      - dsl_data:/mnt/data/dsl # DSL 永続化
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
     restart: unless-stopped
 
-  # ───────────────────────────── Worker
+  # ───────────────────────────── Celery Worker
   worker:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile # runtime ターゲット（共通）
       target: runtime
+    user: "1000:1000"
     env_file: .env
     environment:
       DSL_ROOT: /mnt/data/dsl
       CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
       CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
-    user: "1000:1000"
-    command: [ "celery", "-A", "core.celery_app:celery_app", "worker", "--loglevel=info" ]
+    command: >
+      celery -A core.celery_app:celery_app
+             worker --loglevel=info
     volumes:
-      - checkpoints_data:/mnt/checkpoints
       - dsl_data:/mnt/data/dsl
+      - checkpoints_data:/mnt/checkpoints
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
     restart: on-failure
 
-  # ───────────────────────────── Beat   ← ★ ボリュームを 1 行追加
+  # ───────────────────────────── Celery Beat
   beat:
     build:
       context: .
       dockerfile: Dockerfile
       target: runtime
+    user: "1000:1000"
     env_file: .env
     environment:
       DSL_ROOT: /mnt/data/dsl
       CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
       CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
-    user: "1000:1000"
-    command:
-      - "celery"
-      - "-A"
-      - "core.celery_app:celery_app"
-      - "beat"
-      - "--loglevel=info"
-      - "--schedule=/mnt/checkpoints/celerybeat-schedule"
+    command: >
+      celery -A core.celery_app:celery_app
+             beat --loglevel=info
+             --schedule=/mnt/checkpoints/celerybeat-schedule
     volumes:
       - dsl_data:/mnt/data/dsl
-      - checkpoints_data:/mnt/checkpoints # ← これがないと Permission denied
+      - checkpoints_data:/mnt/checkpoints
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
@@ -71,68 +74,60 @@ services:
   # ───────────────────────────── Redis (内部のみ)
   redis:
     image: redis:7-alpine
-    ports: [] # 外部公開しない
-    volumes:
-      - redis_data:/data
     command:
       - redis-server
-      - "--requirepass"
+      - --requirepass
       - "${REDIS_PASSWORD}"
-      - "--maxmemory"
-      - "256mb"
-      - "--maxmemory-policy"
-      - "allkeys-lru"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes:
+      - redis_data:/data
     restart: unless-stopped
 
   # ───────────────────────────── Postgres (内部のみ)
   db:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports: [] # 外部公開しない
+    env_file: .env
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
       interval: 5s
       timeout: 3s
       retries: 5
     restart: unless-stopped
 
-  # ───────────────────────────── Flower (内部のみ)
+  # ───────────────────────────── Flower（内部 GUI）
   flower:
     image: mher/flower:1.2
     environment:
       CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
-    ports: [] # 外部公開しない
     depends_on:
       redis: { condition: service_started }
     restart: unless-stopped
 
-  # ───────────────────────────── Prometheus (内部のみ)
+  # ───────────────────────────── Prometheus
   prom:
     image: prom/prometheus:v2.52.0
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=14d"
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=14d
     volumes:
       - ./prom/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prom/rules_mmopdca.yml:/etc/prometheus/rules_mmopdca.yml:ro
       - prom_data:/prometheus
-    ports: [] # 外部公開しない
     depends_on:
       flower: { condition: service_started }
     restart: unless-stopped
 
-  # ───────────────────────────── Grafana (内部のみ)
+  # ───────────────────────────── Grafana
   grafana:
     image: grafana/grafana-oss:10.4.2
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
-    ports: [] # 外部公開しない
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -140,26 +135,42 @@ services:
       prom: { condition: service_started }
     restart: unless-stopped
 
+  # ───────────────────────────── Exporters
+  celery-exporter:
+    image: danihodovic/celery-exporter:0.9.1
+    environment:
+      CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
+    depends_on:
+      redis: { condition: service_started }
+    restart: unless-stopped
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.60.0
+    command: [ "--redis.addr=redis://default:${REDIS_PASSWORD}@redis:6379" ]
+    depends_on:
+      redis: { condition: service_started }
+    restart: unless-stopped
+
   # ───────────────────────────── Nginx (edge only)
   nginx:
     image: nginx:1.27-alpine
     container_name: mmopdca-nginx
     ports:
-      - "443:443" # 443 だけ外へ
+      - "443:443"
     volumes:
       - ./ops/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ops/cert.pem:/etc/nginx/cert.pem:ro
       - ./ops/key.pem:/etc/nginx/key.pem:ro
     depends_on:
-      - api
-      - grafana
+      api: { condition: service_started }
+      grafana: { condition: service_started }
     restart: unless-stopped
 
 # ──────────────────────────── 永続ボリューム
 volumes:
   dsl_data:
+  checkpoints_data:
   pg_data:
   redis_data:
   prom_data:
   grafana_data:
-  checkpoints_data:

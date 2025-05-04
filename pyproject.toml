@@ -16,7 +16,7 @@ packages    = [
   { include = "core"        },
   { include = "plugins"     }
 ]
-package-mode = true          # site-packages 直下に展開
+package-mode = false          # site-packages 直下に展開
 
 # ---------------------------------------------------------------------
 # Runtime dependencies

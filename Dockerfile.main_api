@@ -1,41 +1,27 @@
-# ======================================================================
-# Dockerfile.main_api  –  FastAPI (Uvicorn) + mmopdca “Plan / Do” MVP
-# ======================================================================
+# ───────── FastAPI イメージ ─────────
 FROM python:3.11-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DSL_ROOT=/mnt/data/dsl \
-    PATH="$PATH:/root/.local/bin" 
+    PIP_NO_CACHE_DIR=1
 
-# ---- system deps -----------------------------------------------------
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev dos2unix \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential dos2unix && \
+    rm -rf /var/lib/apt/lists/*
 
-# ---- Poetry + requirements ------------------------------------------
-RUN pip install --no-cache-dir --upgrade pip poetry
 WORKDIR /app
 COPY pyproject.toml poetry.lock ./
-RUN poetry lock --no-interaction \
-    && poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --without dev --no-root
 
-# ---- app source & DSL seeds -----------------------------------------
+RUN pip install --upgrade pip poetry && \
+    poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi --without dev
+
 COPY . .
-RUN mkdir -p ${DSL_ROOT} \
-    && cp -r core/dsl/defaults  ${DSL_ROOT}/defaults \
-    && cp -r samples            ${DSL_ROOT}/samples
-
-# ---- init‐dsl helper -------------------------------------------------
 COPY ops/init-dsl.sh /usr/local/bin/docker-entrypoint-init-dsl.sh
-RUN dos2unix /usr/local/bin/docker-entrypoint-init-dsl.sh \
-    && chmod +x  /usr/local/bin/docker-entrypoint-init-dsl.sh
+RUN dos2unix /usr/local/bin/docker-entrypoint-init-dsl.sh && \
+    chmod +x  /usr/local/bin/docker-entrypoint-init-dsl.sh
 
-# ---- EXPOSE / ENTRY --------------------------------------------------
 EXPOSE 8001
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint-init-dsl.sh"]
-
-# ★ ここを “python -m uvicorn” に変更（console-script 不要）
-CMD ["python", "-m", "uvicorn", "api.main_api:app", "--host", "0.0.0.0", "--port", "8001", "--proxy-headers"]
+CMD ["uvicorn", "api.main_api:app", "--host", "0.0.0.0", "--port", "8001", "--proxy-headers"]
