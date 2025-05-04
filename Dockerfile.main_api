@@ -1,38 +1,46 @@
 # ====================================================================
-# Dockerfile.main_api  –  FastAPI (Uvicorn) + mmopdca “Plan / Do” MVP
+# Dockerfile.main_api – FastAPI (Uvicorn) + mmopdca “Plan / Do” MVP
 # ====================================================================
 FROM python:3.11-slim AS runtime
 
-# ────────────── 基本設定 ──────────────
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    # core/dsl/loader.py が参照する既定パス
     DSL_ROOT=/mnt/data/dsl
 
-# ────────────── システム依存ライブラリ ──────────────
-# psycopg が libpq を要求するため build-essential / libpq-dev を入れる
+# ---- OS パッケージ --------------------------------------------------
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libpq-dev \
+    && apt-get install -y --no-install-recommends \
+    build-essential libpq-dev dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
-# ────────────── Poetry + 依存インストール ──────────────
+# ---- Poetry & 依存インストール --------------------------------------
 RUN pip install --no-cache-dir --upgrade pip poetry
 WORKDIR /app
 
-# lock / metadata だけコピーして依存解決
+# 1) 依存定義をコピー
 COPY pyproject.toml poetry.lock ./
+
+# 2) lock を必ず再生成（pyproject.toml との整合性保証）
+RUN poetry lock --no-interaction
+
+# 3) 本番に不要な dev グループを除外して install
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --without dev --no-root
 
-# ────────────── アプリケーションソース ──────────────
+# ---- アプリケーションソース ----------------------------------------
 COPY . .
 
-# ────────────── DSL ファイルを既定パスへ配置 ──────────
-#   ※ core/dsl/loader.py は DSL_ROOT を探しに行く
+# ---- DSL デフォルト / サンプルをイメージに同梱 ----------------------
 RUN mkdir -p ${DSL_ROOT} \
     && cp -r core/dsl/defaults  ${DSL_ROOT}/defaults \
     && cp -r samples            ${DSL_ROOT}/samples
 
-# ────────────── ポート / エントリポイント ────────────
+# ---- DSL 初期化エントリポイント ------------------------------------
+COPY ops/init-dsl.sh /usr/local/bin/docker-entrypoint-init-dsl.sh
+RUN dos2unix /usr/local/bin/docker-entrypoint-init-dsl.sh \
+    && chmod +x  /usr/local/bin/docker-entrypoint-init-dsl.sh
+
+# ---- 起動 -----------------------------------------------------------
 EXPOSE 8001
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-init-dsl.sh"]
 CMD ["uvicorn", "api.main_api:app", "--host", "0.0.0.0", "--port", "8001", "--proxy-headers"]

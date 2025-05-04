@@ -1,13 +1,6 @@
 ###############################################################################
-# pyproject.toml — mmopdca root
-# -----------------------------------------------------------------------------
-# • Runtime 依存   : [project].dependencies
-# • Dev／CI 依存  : [tool.poetry.group.dev.dependencies]
-# • DB 依存       : [tool.poetry.group.db.dependencies]
-# • Adapter登録   : [project.entry-points."mmopdca_adapters"]
-# • Poe tasks     : [tool.poe.tasks]   ← ✅ 1 回だけ
+# pyproject.toml — mmopdca root 〈完全版〉
 ###############################################################################
-
 [project]
 name            = "mmopdca"
 version         = "0.1.0"
@@ -21,24 +14,27 @@ requires-python = ">=3.11,<3.13"
 # Runtime dependencies
 # ------------------------------------------------------------------ #
 dependencies = [
-  # Web / API
+  # ── Web / API ───────────────────────────────────────────────────
   "fastapi>=0.115.2,<0.116.0",
   "uvicorn[standard]>=0.34.0,<0.35.0",
   "python-multipart>=0.0.8,<0.1.0",
 
-  # Core
+  # ── Core / Utility ─────────────────────────────────────────────
   "pydantic>=2.7.2,<3.0.0",
-  "python-dotenv>=1.1,<2.0",
+  "python-dotenv>=1.0,<2.0",
   "fastjsonschema>=2.21.0,<3.0",
+  "cachetools>=5.3,<6.0",          # ← metrics キャッシュ
+  "requests>=2.32,<3.0",           # ← Prometheus API 呼び出し
+  "prometheus-client>=0.20,<1.0",  # ← アプリ側メトリクス用
 
-  # Data / ML
+  # ── Data / ML ──────────────────────────────────────────────────
   "pandas>=2.2,<3.0",
   "numpy>=2.2,<3.0",
   "scikit-learn>=1.6,<2.0",
   "yfinance>=0.2.0,<0.3",
   "plotly>=6.0,<7.0",
 
-  # Queue / Broker
+  # ── Queue / Broker ────────────────────────────────────────────
   "celery[redis]>=5.3,<6.0",
   "redis>=5.0,<6.0"
 ]
@@ -50,50 +46,46 @@ dependencies = [
 stock_us = "plugins.stock_us.adapter:StockUSAdapter"
 
 # ------------------------------------------------------------------ #
-# Poetry-specific settings
+# Poetry settings
 # ------------------------------------------------------------------ #
 [tool.poetry]
-package-mode = true                      # install 先はトップ直下
+package-mode = true
 
-[[tool.poetry.packages]]
+[[tool.poetry.packages]]  # common utilities
 include = "common_core"
 
-[[tool.poetry.packages]]
+[[tool.poetry.packages]]  # domain cores
 include = "core"
 
-[[tool.poetry.packages]]
+[[tool.poetry.packages]]  # built-in plugins
 include = "plugins"
 
 # ------------------------------------------------------------------ #
-# Dev / CI dependencies
+# Dev / CI deps
 # ------------------------------------------------------------------ #
 [tool.poetry.group.dev.dependencies]
-pytest  = "^8.3"
-black   = "^24.4"
-isort   = "^6.0"
-ruff    = "^0.4"
-mypy    = "^1.10"
-alembic = "^1.15"
-httpx   = "^0.27"
+pytest      = "^8.3"
+black       = "^24.4"
+isort       = "^6.0"
+ruff        = "^0.4"
+mypy        = "^1.10"
+alembic     = "^1.15"
+httpx       = "^0.27"
 
 # ------------------------------------------------------------------ #
-# Optional DB dependencies
+# Optional DB deps
 # ------------------------------------------------------------------ #
 [tool.poetry.group.db.dependencies]
 psycopg = { version = ">=3.1,<4.0", extras = ["binary"] }
 alembic = "^1.15"
 
 # ------------------------------------------------------------------ #
-# Poe the Poet – task runner
+# Poe tasks
 # ------------------------------------------------------------------ #
 [tool.poe.tasks]
 test      = "pytest -q"
 lint      = "ruff ."
-format    = """
-            ruff format .
-            && isort .
-            && black .
-            """
+format    = "ruff format . && isort . && black ."
 typecheck = "mypy ."
 migrate   = "alembic upgrade head"
 

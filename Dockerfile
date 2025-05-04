@@ -14,9 +14,9 @@ COPY pyproject.toml poetry.lock ./
 
 # ----- ここがビルドの核心 -----
 RUN poetry config virtualenvs.create false \
-    && poetry lock                          \ 
+    && poetry lock \
     && poetry install --no-interaction --no-ansi \
-    --without dev --no-root            \  
+    --without dev --no-root \
     && poetry run pip install "celery[redis]>=5.4.0"
 
 # 残りのソース
