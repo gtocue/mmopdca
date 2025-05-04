@@ -1,1 +1,31 @@
-################################################################################ ASSIST_KEY: 【ops/init-dsl.sh、E          ↁEファイル先頭ヘッダは忁E��残すこと#   DSL と Checkpoints の両チE��レクトリを確実に作�EしたぁE��で、E#   受け取った引数�E�EMD�E�を実行する�E通エントリポイント、E##   ◁EAPI コンチE��       … CMD ["uvicorn",  "api.main_api:app", ...]#   ◁EWorker / Beat … CMD ["celery",   "-A", "core.celery_app:celery_app", ...]##   Alpine slim 系で発生すめE“uvicorn: not found E問題を回避するため、E#   先頭引数ぁE`uvicorn` の場合�E **python -m uvicorn** へ置き換えて実行する、E################################################################################!/usr/bin/env shset -e# ────────────────────────────────# 0. 変数# ────────────────────────────────DSL_ROOT="${DSL_ROOT:-/mnt/data/dsl}"CKPT_ROOT="/mnt/checkpoints"# ────────────────────────────────# 1. DSL / Checkpoints フォルダ整傁E# ────────────────────────────────echo "[init-dsl] Ensuring DSL directory exists: ${DSL_ROOT}"mkdir -p "${DSL_ROOT}"# ※ dev モードで 1000:1000 を使ぁE��合�Eみ chownchown -R 1000:1000 "${DSL_ROOT}" 2>/dev/null || trueecho "[init-dsl] DSL directory ready."echo "[init-dsl] Ensuring checkpoints directory exists: ${CKPT_ROOT}"mkdir -p "${CKPT_ROOT}"chown -R 1000:1000 "${CKPT_ROOT}" 2>/dev/null || trueecho "[init-dsl] Checkpoints directory ready."# ────────────────────────────────# 2. CMD を実衁E#    uvicorn だぁEpython -m で呼び出ぁE# ────────────────────────────────echo "[init-dsl] Exec $*"case "$1" in  uvicorn)    shift               # 先頭 (uvicorn) を削除    exec python -m uvicorn "$@"    ;;  *)    exec "$@"    ;;esac
+#!/usr/bin/env sh
+set -e
+
+# ──────────────── 0. VARIABLES ────────────────
+DSL_ROOT="${DSL_ROOT:-/mnt/data/dsl}"
+CKPT_ROOT="/mnt/checkpoints"
+
+# ──────────────── 1. PREPARE DIRS ─────────────
+echo "[init-dsl] Ensuring DSL dir  : $DSL_ROOT"
+mkdir -p  "$DSL_ROOT"        && chown -R 1000:1000 "$DSL_ROOT"  || true
+echo "[init-dsl] Ensuring CKPT dir : $CKPT_ROOT"
+mkdir -p  "$CKPT_ROOT"       && chown -R 1000:1000 "$CKPT_ROOT" || true
+echo "[init-dsl] Dirs ready."
+
+# ──────────────── 2. EXEC CMD ─────────────────
+echo "[init-dsl] Exec $*"
+
+# 1st token を python -m に置換するだけで済む
+case "$1" in
+  uvicorn)
+    shift
+    exec python -m uvicorn "$@"
+    ;;
+  celery)
+    shift
+    exec python -m celery "$@"
+    ;;
+  *)
+    exec "$@"
+    ;;
+esac
