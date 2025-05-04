@@ -1,22 +1,34 @@
 {
-    "__inputs": [],
-    "__elements": [],
+    "id": null,
     "uid": "mmopdca-main",
-    "title": "MMOPDCA – Celery / Flower",
+    "title": "MMOPDCA – Core Ops Dashboard",
     "tags": [
-        "celery",
-        "flower",
-        "mmopdca"
+        "mmopdca",
+        "s-tier"
     ],
     "timezone": "browser",
     "schemaVersion": 38,
-    "version": 1,
-    "refresh": "10s",
+    "version": 3,
+    "refresh": "30s",
+    "time": {
+        "from": "now-30m",
+        "to": "now"
+    },
+    "timepicker": {
+        "refresh_intervals": [
+            "5s",
+            "10s",
+            "30s",
+            "1m",
+            "5m",
+            "15m"
+        ]
+    },
     "panels": [
         {
             "id": 1,
             "type": "stat",
-            "title": "Workers Online",
+            "title": "Workers Online (S)",
             "datasource": {
                 "type": "prometheus",
                 "uid": "PROM_MMOPDCA"
@@ -24,95 +36,407 @@
             "targets": [
                 {
                     "expr": "sum(flower_worker_online)",
-                    "legendFormat": "online"
+                    "refId": "A"
                 }
             ],
             "options": {
                 "colorMode": "value",
                 "graphMode": "none",
-                "reduceOptions": {
-                    "calcs": [
-                        "lastNotNull"
-                    ]
-                }
+                "justifyMode": "center"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "none",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "red"
+                            },
+                            {
+                                "color": "green",
+                                "value": 1
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
             },
             "gridPos": {
-                "h": 4,
-                "w": 6,
                 "x": 0,
-                "y": 0
+                "y": 0,
+                "w": 4,
+                "h": 4
             }
         },
         {
             "id": 2,
             "type": "stat",
-            "title": "Active Tasks",
+            "title": "Failure Ratio % (S)",
             "datasource": {
                 "type": "prometheus",
                 "uid": "PROM_MMOPDCA"
             },
             "targets": [
                 {
-                    "expr": "sum(flower_worker_number_of_currently_executing_tasks)",
-                    "legendFormat": "active"
+                    "expr": "100 - mmopdca_task_success_ratio",
+                    "refId": "A"
                 }
             ],
             "options": {
                 "colorMode": "value",
                 "graphMode": "none",
-                "reduceOptions": {
-                    "calcs": [
-                        "lastNotNull"
-                    ]
-                }
+                "justifyMode": "center"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "decimals": 2,
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green"
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 2
+                            },
+                            {
+                                "color": "red",
+                                "value": 5
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
             },
             "gridPos": {
-                "h": 4,
-                "w": 6,
-                "x": 6,
-                "y": 0
+                "x": 4,
+                "y": 0,
+                "w": 4,
+                "h": 4
             }
         },
         {
             "id": 3,
-            "type": "timeseries",
-            "title": "Avg Task Runtime (sec)",
+            "type": "stat",
+            "title": "P95 Runtime (s) (S)",
             "datasource": {
                 "type": "prometheus",
                 "uid": "PROM_MMOPDCA"
             },
             "targets": [
                 {
-                    "expr": "rate(flower_task_runtime_seconds_sum[5m]) / rate(flower_task_runtime_seconds_count[5m])",
-                    "legendFormat": "avg runtime"
+                    "expr": "histogram_quantile(0.95, sum(rate(celery_task_runtime_seconds_bucket[5m])) by (le))",
+                    "refId": "A"
                 }
             ],
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "s",
+                    "decimals": 2,
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green"
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 3
+                            },
+                            {
+                                "color": "red",
+                                "value": 10
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
             "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 4
+                "x": 8,
+                "y": 0,
+                "w": 4,
+                "h": 4
             }
         },
         {
             "id": 4,
-            "type": "timeseries",
-            "title": "Tasks / min",
+            "type": "stat",
+            "title": "Failures / sec (S)",
             "datasource": {
                 "type": "prometheus",
                 "uid": "PROM_MMOPDCA"
             },
             "targets": [
                 {
-                    "expr": "rate(flower_task_runtime_seconds_count[1m]) * 60",
-                    "legendFormat": "tasks/min"
+                    "expr": "sum(rate(celery_task_failure_total[1m]))",
+                    "refId": "A"
+                }
+            ],
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "ops/sec",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green"
+                            },
+                            {
+                                "color": "red",
+                                "value": 1
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "x": 12,
+                "y": 0,
+                "w": 4,
+                "h": 4
+            }
+        },
+        {
+            "id": 5,
+            "type": "stat",
+            "title": "Redis Mem % (S)",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PROM_MMOPDCA"
+            },
+            "targets": [
+                {
+                    "expr": "redis_memory_used_bytes / redis_config_maxmemory_bytes",
+                    "refId": "A"
+                }
+            ],
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green"
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 0.8
+                            },
+                            {
+                                "color": "red",
+                                "value": 0.9
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "x": 16,
+                "y": 0,
+                "w": 4,
+                "h": 4
+            }
+        },
+        {
+            "id": 6,
+            "type": "timeseries",
+            "title": "Tasks succeeded / min (A)",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PROM_MMOPDCA"
+            },
+            "targets": [
+                {
+                    "expr": "mmopdca_task_succeeded_per_min",
+                    "refId": "A"
                 }
             ],
             "gridPos": {
-                "h": 8,
+                "x": 0,
+                "y": 4,
                 "w": 12,
+                "h": 6
+            }
+        },
+        {
+            "id": 7,
+            "type": "timeseries",
+            "title": "Tasks failed / min (A)",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PROM_MMOPDCA"
+            },
+            "targets": [
+                {
+                    "expr": "mmopdca_task_failed_per_min",
+                    "refId": "A"
+                }
+            ],
+            "gridPos": {
                 "x": 12,
-                "y": 4
+                "y": 4,
+                "w": 12,
+                "h": 6
+            }
+        },
+        {
+            "id": 8,
+            "type": "stat",
+            "title": "Active Tasks (A)",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PROM_MMOPDCA"
+            },
+            "targets": [
+                {
+                    "expr": "sum(celery_worker_active)",
+                    "refId": "A"
+                }
+            ],
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "none",
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green"
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 20
+                            },
+                            {
+                                "color": "red",
+                                "value": 50
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "x": 0,
+                "y": 10,
+                "w": 4,
+                "h": 4
+            }
+        },
+        {
+            "id": 9,
+            "type": "stat",
+            "title": "Avg Runtime (s) (A)",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PROM_MMOPDCA"
+            },
+            "targets": [
+                {
+                    "expr": "rate(celery_task_runtime_seconds_sum[5m]) / rate(celery_task_runtime_seconds_count[5m])",
+                    "refId": "A"
+                }
+            ],
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "s",
+                    "decimals": 2,
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green"
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 2
+                            },
+                            {
+                                "color": "red",
+                                "value": 5
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "x": 4,
+                "y": 10,
+                "w": 4,
+                "h": 4
+            }
+        },
+        {
+            "id": 10,
+            "type": "stat",
+            "title": "S3 Artifact Size (B)",
+            "datasource": {
+                "type": "prometheus",
+                "uid": "PROM_MMOPDCA"
+            },
+            "targets": [
+                {
+                    "expr": "mmopdca_artifact_bytes_total / 1024 / 1024 / 1024",
+                    "refId": "A"
+                }
+            ],
+            "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "center"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "decbytes",
+                    "decimals": 1,
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green"
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 50
+                            },
+                            {
+                                "color": "red",
+                                "value": 100
+                            }
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "x": 8,
+                "y": 10,
+                "w": 4,
+                "h": 4
             }
         }
     ]

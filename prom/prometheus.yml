@@ -1,12 +1,39 @@
-# ── prom/prometheus.yml ────────────────────────────────────────────
-global:
-  scrape_interval: 15s         # 収集間隔
+# ======================================================================
+# prom/prometheus.yml  ―  mmopdca 全メトリクス収集定義（完全版）
+# ----------------------------------------------------------------------
+#  ● Flower（Celery イベント）
+#  ● Celery-Exporter（タスク実行時間・Active 数）
+#  ● Redis-Exporter（メモリ／キー数など）
+#  ● Prometheus 自身  ── 動作確認用
+# ======================================================================
 
-rule_files:                    # ← ここを忘れると rule が読まれない
+global:
+  scrape_interval: 15s          # すべてのターゲットを 15 秒間隔で収集
+  evaluation_interval: 15s      # rule_files の評価間隔
+
+rule_files:                     # Recording / Alert ルール
   - /etc/prometheus/rules_mmopdca.yml
 
 scrape_configs:
+  # ───────────────────────── Flower – Celery Events
   - job_name: flower
     metrics_path: /metrics
     static_configs:
-      - targets: ["flower:5555"]    # コンテナ名:ポート
+      - targets: ["flower:5555"]
+
+  # ───────────────────────── Celery Exporter
+  #   ghcr.io/mentalelo/celery-exporter (port 9808)
+  - job_name: celery-exporter
+    static_configs:
+      - targets: ["celery-exporter:9808"]
+
+  # ───────────────────────── Redis Exporter
+  #   oliver006/redis_exporter (port 9121)
+  - job_name: redis-exporter
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  # ───────────────────────── Prometheus 自身
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

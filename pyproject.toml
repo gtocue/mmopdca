@@ -1,87 +1,81 @@
-###############################################################################
-# pyproject.toml — mmopdca root 〈完全版〉
-###############################################################################
-[project]
-name            = "mmopdca"
-version         = "0.1.0"
-description     = "Command-DSL-driven forecasting SaaS (MVP)"
-authors         = [{ name = "gtocue", email = "gtocue510@gmail.com" }]
-license         = { text = "MIT" }
-readme          = "README.md"
-requires-python = ">=3.11,<3.13"
+# =====================================================================
+# pyproject.toml — mmopdca root 〈Poetry-ready 完全版〉
+#   ✱ 依存定義は **[tool.poetry.dependencies]** にまとめること
+#   ✱ PEP-621 の [project] テーブルだけでは Poetry は解釈しません
+# =====================================================================
 
-# ------------------------------------------------------------------ #
-# Runtime dependencies
-# ------------------------------------------------------------------ #
-dependencies = [
-  # ── Web / API ───────────────────────────────────────────────────
-  "fastapi>=0.115.2,<0.116.0",
-  "uvicorn[standard]>=0.34.0,<0.35.0",
-  "python-multipart>=0.0.8,<0.1.0",
-
-  # ── Core / Utility ─────────────────────────────────────────────
-  "pydantic>=2.7.2,<3.0.0",
-  "python-dotenv>=1.0,<2.0",
-  "fastjsonschema>=2.21.0,<3.0",
-  "cachetools>=5.3,<6.0",          # ← metrics キャッシュ
-  "requests>=2.32,<3.0",           # ← Prometheus API 呼び出し
-  "prometheus-client>=0.20,<1.0",  # ← アプリ側メトリクス用
-
-  # ── Data / ML ──────────────────────────────────────────────────
-  "pandas>=2.2,<3.0",
-  "numpy>=2.2,<3.0",
-  "scikit-learn>=1.6,<2.0",
-  "yfinance>=0.2.0,<0.3",
-  "plotly>=6.0,<7.0",
-
-  # ── Queue / Broker ────────────────────────────────────────────
-  "celery[redis]>=5.3,<6.0",
-  "redis>=5.0,<6.0"
+[tool.poetry]                # ← Poetry が読むトップレベル
+name        = "mmopdca"
+version     = "0.1.0"
+description = "Command-DSL-driven forecasting SaaS (MVP)"
+authors     = ["gtocue <gtocue510@gmail.com>"]
+license     = "MIT"
+readme      = "README.md"
+packages    = [
+  { include = "common_core" },
+  { include = "core"        },
+  { include = "plugins"     }
 ]
+package-mode = true          # site-packages 直下に展開
 
-# ------------------------------------------------------------------ #
-# Adapter entry-points
-# ------------------------------------------------------------------ #
-[project.entry-points."mmopdca_adapters"]
-stock_us = "plugins.stock_us.adapter:StockUSAdapter"
+# ---------------------------------------------------------------------
+# Runtime dependencies
+# ---------------------------------------------------------------------
+[tool.poetry.dependencies]
+python               = ">=3.11,<3.13"
 
-# ------------------------------------------------------------------ #
-# Poetry settings
-# ------------------------------------------------------------------ #
-[tool.poetry]
-package-mode = true
+# ── Web / API ───────────────────────────────────────────────────────
+fastapi              = ">=0.111,<0.117"     # 0.116.* は RC。安定帯を維持
+uvicorn              = { version = ">=0.29,<0.32", extras = ["standard"] }
+python-multipart     = "^0.0.8"
 
-[[tool.poetry.packages]]  # common utilities
-include = "common_core"
+# ── Core / Utility ─────────────────────────────────────────────────
+pydantic             = "^2.7.2"
+python-dotenv        = "^1.0"
+fastjsonschema       = "^2.21.0"
+cachetools           = "^5.3"
+requests             = "^2.32"
+prometheus-client    = "^0.20"
 
-[[tool.poetry.packages]]  # domain cores
-include = "core"
+# ── Data / ML ──────────────────────────────────────────────────────
+pandas               = "^2.2"
+numpy                = "^2.2"
+scikit-learn         = "^1.6"
+yfinance             = ">=0.2,<0.3"
+plotly               = "^6.0"
 
-[[tool.poetry.packages]]  # built-in plugins
-include = "plugins"
+# ── Queue / Broker ─────────────────────────────────────────────────
+celery               = { version = "^5.3", extras = ["redis"] }
+redis                = "^5.0"
 
-# ------------------------------------------------------------------ #
-# Dev / CI deps
-# ------------------------------------------------------------------ #
-[tool.poetry.group.dev.dependencies]
-pytest      = "^8.3"
-black       = "^24.4"
-isort       = "^6.0"
-ruff        = "^0.4"
-mypy        = "^1.10"
-alembic     = "^1.15"
-httpx       = "^0.27"
-
-# ------------------------------------------------------------------ #
-# Optional DB deps
-# ------------------------------------------------------------------ #
+# ---------------------------------------------------------------------
+# Optional: DB 依存（名前付きグループ）
+#   docker-compose.yml で Postgres を使う場合のみインストール
+# ---------------------------------------------------------------------
 [tool.poetry.group.db.dependencies]
 psycopg = { version = ">=3.1,<4.0", extras = ["binary"] }
 alembic = "^1.15"
 
-# ------------------------------------------------------------------ #
-# Poe tasks
-# ------------------------------------------------------------------ #
+# ---------------------------------------------------------------------
+# Dev / CI tools
+# ---------------------------------------------------------------------
+[tool.poetry.group.dev.dependencies]
+pytest  = "^8.3"
+black   = "^24.4"
+isort   = "^6.0"
+ruff    = "^0.4"
+mypy    = "^1.10"
+httpx   = "^0.27"
+
+# ---------------------------------------------------------------------
+# Plugin (adapter) エントリポイント
+# ---------------------------------------------------------------------
+[tool.poetry.plugins."mmopdca_adapters"]
+stock_us = "plugins.stock_us.adapter:StockUSAdapter"
+
+# ---------------------------------------------------------------------
+# Poe the Poet — task runner
+# ---------------------------------------------------------------------
 [tool.poe.tasks]
 test      = "pytest -q"
 lint      = "ruff ."
@@ -89,9 +83,9 @@ format    = "ruff format . && isort . && black ."
 typecheck = "mypy ."
 migrate   = "alembic upgrade head"
 
-# ------------------------------------------------------------------ #
+# ---------------------------------------------------------------------
 # Build backend
-# ------------------------------------------------------------------ #
+# ---------------------------------------------------------------------
 [build-system]
 requires      = ["poetry-core>=2.0,<3.0"]
 build-backend = "poetry.core.masonry.api"

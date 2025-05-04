@@ -1,4 +1,4 @@
-﻿from importlib import metadata
+from importlib import metadata
 from typing import Dict, Type
 
 from common_core.adapters.base import BaseAdapter

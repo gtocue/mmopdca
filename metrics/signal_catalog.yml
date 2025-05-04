@@ -1,0 +1,116 @@
+# =========================================================
+# ASSIST_KEY: 【metrics/signal_catalog.yml】
+# =========================================================
+#
+# 【概要】
+#   S 級 / A 級 メトリクス 14 種を一元定義。
+#   ・UI も Alertmanager も *この YAML だけ* を読み込みます。
+#
+# 【記述ルール】
+#   key:                         メトリクスの内部識別子 (UI/API 共通)
+#     expr: |                   PromQL (改行 OK)
+#     unit: <grafana-unit>       percent / seconds / ops/s など
+#     slo: <number|null>        成功率なら下限%, レイテンシなら上限秒
+#     class: S | A              優先度 (S=絶対、A=かなり)
+#
+#   ※B 級は後日追加。追記するだけで UI に自動反映。
+# ---------------------------------------------------------
+
+# ───────────────────────────── Celery / Flower ──────────
+# S 級
+task_success_rate:
+  expr: |
+    100 * rate(celery_task_succeeded_total[1m]) /
+    clamp_min(rate(celery_task_succeeded_total[1m]) +
+              rate(celery_task_failure_total[1m]), 1)
+  unit: percent
+  slo: 99              # 下限 99 %
+  class: S
+
+task_failed_per_min:
+  expr: rate(celery_task_failure_total[1m]) * 60
+  unit: ops/min
+  slo: 0               # 0 が理想
+  class: S
+
+online_workers:
+  expr: sum(flower_worker_online)
+  unit: count
+  slo: 1               # 最低 1 台
+  class: S
+
+celery_queue_length:
+  expr: sum(celery_queue_length)
+  unit: count
+  slo: 1000            # TODO: 要調整 – 上限キュー長
+  class: S
+
+# A 級
+task_runtime_p95:
+  expr: |
+    histogram_quantile(0.95,
+      rate(celery_task_runtime_seconds_bucket[5m]))
+  unit: seconds
+  slo: 2               # 2 秒以内
+  class: A
+
+# ───────────────────────────── API / Nginx ─────────────
+http_request_duration_p95:
+  expr: |
+    histogram_quantile(0.95,
+      rate(http_request_duration_seconds_bucket[5m]))
+  unit: seconds
+  slo: 0.5             # 500 ms
+  class: S
+
+http_5xx_rate:
+  expr: rate(http_requests_total{status=~"5.."}[1m])
+  unit: ops/s
+  slo: 0
+  class: S
+
+http_rps:
+  expr: rate(http_requests_total[1m])
+  unit: ops/s
+  slo: null
+  class: A
+
+# ───────────────────────────── Redis ───────────────────
+redis_memory_utilization:
+  expr: redis_memory_used_bytes / redis_config_maxmemory_bytes
+  unit: percent
+  slo: 0.9             # 90 % 超で警告
+  class: A
+
+redis_connected_clients:
+  expr: redis_connected_clients
+  unit: count
+  slo: null
+  class: A
+
+# ───────────────────────────── Postgres ────────────────
+postgres_active_connections:
+  expr: pg_stat_database_numbackends{datname!~"template.*"}
+  unit: count
+  slo: null
+  class: A
+
+# ───────────────────────────── Node / Host ────────────
+node_cpu_usage:
+  expr: 100 - avg(irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100
+  unit: percent
+  slo: 85              # 85 % 超で要スケール
+  class: S
+
+node_memory_usage:
+  expr: |
+    100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))
+  unit: percent
+  slo: 90              # 90 % 超で要スケール
+  class: S
+
+node_disk_io_wait:
+  expr: avg(irate(node_disk_io_time_seconds_total[5m]))
+  unit: seconds
+  slo: null
+  class: A
