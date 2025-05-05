@@ -1,24 +1,34 @@
 ###############################################################################
-# docker-compose.yml  ―  mmopdca 本番相当（外部公開は API と Nginx だけ）
-#   ※ root 権限を使わず、アプリは 1000:1000 で起動
+# docker-compose.yml ― mmopdca “本番相当” 定義（2025-05-05  FINAL）
+#
+# ❶ .env に必ず置く変数
+#       REDIS_PASSWORD      = WB/9qvLd9ES71o4ynPBmBA==
+#       REDIS_PASSWORD_ENC  = WB%2F9qvLd9ES71o4ynPBmBA%3D%3D   # URL-エンコード
 ###############################################################################
 version: "3.9"
 
+# ── 共通 Environment 定義（YAML アンカー）
+x-common-env: &default_env
+  DSL_ROOT: /mnt/data/dsl
+  CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
+  CELERY_RESULT_BACKEND: redis://default:${REDIS_PASSWORD}@redis:6379/0
+
+###############################################################################
 services:
-  # ───────────────────────────── API
+  #############################################################################
+
+  # ───────────────────────────── API (FastAPI + Uvicorn)
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.main_api # ← FastAPI + Uvicorn 用
-    env_file: .env # 環境変数はここに集約
-    environment:
-      DSL_ROOT: /mnt/data/dsl
-      CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
-      CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
-    ports:
-      - "8001:8001" # ローカル確認用
-    volumes:
-      - dsl_data:/mnt/data/dsl # DSL 永続化
+    build: { context: ".", dockerfile: Dockerfile.main_api }
+    user: "1000:1000"
+    env_file: .env
+    environment: *default_env
+    entrypoint: [ "/usr/local/bin/docker-entrypoint-init-dsl.sh" ]
+    command: >
+      python -m uvicorn api.main_api:app
+             --host 0.0.0.0 --port 8001 --proxy-headers
+    volumes: [ dsl_data:/mnt/data/dsl ]
+    ports: [ "8001:8001" ]
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
@@ -26,16 +36,11 @@ services:
 
   # ───────────────────────────── Celery Worker
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile # runtime ターゲット（共通）
-      target: runtime
+    build: { context: ".", dockerfile: Dockerfile, target: runtime }
     user: "1000:1000"
     env_file: .env
-    environment:
-      DSL_ROOT: /mnt/data/dsl
-      CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
-      CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
+    environment: *default_env
+    entrypoint: [ "/usr/local/bin/docker-entrypoint-init-dsl.sh" ]
     command: >
       celery -A core.celery_app:celery_app
              worker --loglevel=info
@@ -49,16 +54,11 @@ services:
 
   # ───────────────────────────── Celery Beat
   beat:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runtime
+    build: { context: ".", dockerfile: Dockerfile, target: runtime }
     user: "1000:1000"
     env_file: .env
-    environment:
-      DSL_ROOT: /mnt/data/dsl
-      CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
-      CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
+    environment: *default_env
+    entrypoint: [ "/usr/local/bin/docker-entrypoint-init-dsl.sh" ]
     command: >
       celery -A core.celery_app:celery_app
              beat --loglevel=info
@@ -71,27 +71,20 @@ services:
       redis: { condition: service_started }
     restart: on-failure
 
-  # ───────────────────────────── Redis (内部のみ)
+  # ───────────────────────────── Redis
   redis:
     image: redis:7-alpine
-    command:
-      - redis-server
-      - --requirepass
-      - "${REDIS_PASSWORD}"
-      - --maxmemory
-      - 256mb
-      - --maxmemory-policy
-      - allkeys-lru
-    volumes:
-      - redis_data:/data
+    command: >
+      redis-server --requirepass ${REDIS_PASSWORD}
+                   --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes: [ redis_data:/data ]
     restart: unless-stopped
 
-  # ───────────────────────────── Postgres (内部のみ)
+  # ───────────────────────────── PostgreSQL
   db:
     image: postgres:16-alpine
     env_file: .env
-    volumes:
-      - pg_data:/var/lib/postgresql/data
+    volumes: [ pg_data:/var/lib/postgresql/data ]
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
       interval: 5s
@@ -99,9 +92,10 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # ───────────────────────────── Flower（内部 GUI）
+  # ───────────────────────────── Flower
   flower:
     image: mher/flower:1.2
+    env_file: .env
     environment:
       CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
     depends_on:
@@ -135,38 +129,48 @@ services:
       prom: { condition: service_started }
     restart: unless-stopped
 
-  # ───────────────────────────── Exporters
+  # ───────────────────────────── Celery Exporter  (→ :9808/metrics)
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
-    environment:
-      CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
+    env_file: .env
+    # entrypoint はデフォルトのまま（= celery-exporter）
+    command:
+      - --broker-url=redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0
+      - --port=9808
+      - --log-level=info
     depends_on:
       redis: { condition: service_started }
+    ports: [ "9808:9808" ]
     restart: unless-stopped
 
+  # ───────────────────────────── Redis Exporter
   redis-exporter:
     image: oliver006/redis_exporter:v1.60.0
-    command: [ "--redis.addr=redis://default:${REDIS_PASSWORD}@redis:6379" ]
+    env_file: .env
+    command:
+      - --redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379
+    ports: [ "9121:9121" ]
     depends_on:
       redis: { condition: service_started }
     restart: unless-stopped
 
-  # ───────────────────────────── Nginx (edge only)
+  # ───────────────────────────── Nginx  (Edge / 443 only)
   nginx:
     image: nginx:1.27-alpine
     container_name: mmopdca-nginx
-    ports:
-      - "443:443"
+    ports: [ "443:443" ]
     volumes:
       - ./ops/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ops/cert.pem:/etc/nginx/cert.pem:ro
       - ./ops/key.pem:/etc/nginx/key.pem:ro
     depends_on:
       api: { condition: service_started }
-      grafana: { condition: service_started }
+      grafana:{ condition: service_started }
     restart: unless-stopped
 
-# ──────────────────────────── 永続ボリューム
+###############################################################################
+# 永続ボリューム
+###############################################################################
 volumes:
   dsl_data:
   checkpoints_data:

@@ -1,0 +1,7 @@
+# docker/compose.grafana.yml
+version: "3.9"
+
+services:
+  grafana:
+    ports:
+      - "3000:3000"

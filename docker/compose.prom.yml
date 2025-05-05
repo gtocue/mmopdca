@@ -1,0 +1,9 @@
+# docker/compose.prom.yml
+#
+# ── Prometheus のポートを恒常的に外へ出したい場合だけ使う。
+version: "3.9"
+
+services:
+  prom:
+    ports:
+      - "9090:9090"

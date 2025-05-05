@@ -1,0 +1,7 @@
+# docker/compose.exporter.celery.yml
+version: "3.9"
+
+services:
+  celery-exporter:
+    ports:
+      - "9808:9808"

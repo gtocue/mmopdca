@@ -16,12 +16,11 @@ COPY pyproject.toml poetry.lock ./
 RUN pip install --no-cache-dir --upgrade pip poetry \
     && poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --without dev --no-root
-# └───────────────★ ここが決定打
 
 # ---- アプリコード -------------------------------------------------
 COPY . .
 
-# init-dsl エントリ
+# init-dsl エントリ（API と同じスクリプトを使い回し）
 COPY ops/init-dsl.sh /usr/local/bin/docker-entrypoint-init-dsl.sh
 RUN dos2unix /usr/local/bin/docker-entrypoint-init-dsl.sh \
     && chmod +x /usr/local/bin/docker-entrypoint-init-dsl.sh

@@ -1,0 +1,8 @@
+# docker/compose.dash.orch.yml
+version: "3.9"
+services:
+  orch:
+    <<: *dash_template
+    environment:
+      <<: *default_env
+      SERVICE_NAME: orch

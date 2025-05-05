@@ -14,6 +14,7 @@
 # 【連携先・依存関係】
 #   - core.datasource.get_source()      … 任意データソース
 #   - core.celery_app.run_do_task       … Celery シャーディング
+#   - core.do.checkpoint               … save / load / duplicate-guard
 #
 # 【ルール遵守】
 #   1) Close_main / Open_main を直接操作しない
@@ -23,12 +24,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import numpy as np
@@ -37,34 +36,34 @@ from pandas.tseries.offsets import BDay, CustomBusinessDay
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 
+from core.do import checkpoint as ckpt  # ★ checkpoint ユーティリティを統合
+
 # ───────────────────────────── logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
+    logger.addHandler(_h)
+logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
 
 # ───────────────────────────── env & const
 TOTAL_EPOCHS = int(os.getenv("DO_TOTAL_SHARDS", "12"))  # Celery と共有
-CKPT_DIR = Path(os.getenv("CHECKPOINT_DIR", "/mnt/checkpoints")).expanduser()
-CKPT_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def _ckpt(run_id: str) -> Path:
-    return CKPT_DIR / f"{run_id}.json"
-
 
 # ───────────────────────────── datasource
 try:
     from core.datasource import get_source  # type: ignore
+
     _DS = get_source()
 except Exception:  # noqa: BLE001
     _DS = None
     import yfinance as yf  # type: ignore
-    logger.warning("[Do] datasource fallback to yfinance")
 
+    logger.warning("[Do] datasource fallback to yfinance")
 
 # ======================================================================
 # public API
 # ======================================================================
-def run_do(                       # noqa: D401
+def run_do(  # noqa: D401
     plan_id: str,
     params: Dict[str, Any],
     *,
@@ -80,21 +79,26 @@ def run_do(                       # noqa: D401
     sym, start, end, ind_cfg, run_no, holidays = _parse_params(params)
     run_id = f"{plan_id}__{run_no:04d}"
 
-    # ───── ckpt load
-    state = {"current_epoch": 0}
-    fp = _ckpt(run_id)
-    if fp.exists():
-        try:
-            state = json.loads(fp.read_text())
-        except json.JSONDecodeError:
-            logger.warning("[Do] ckpt broken – resetting")
+    # ───── duplicate guard
+    if ckpt.is_done(run_id, epoch_idx):
+        logger.info("[Do] duplicate detected – %s epoch %d already done", run_id, epoch_idx)
+        return {"run_id": run_id, "epoch": epoch_idx, "status": "SKIPPED_DUPLICATE"}
 
-    logger.info("[Do] run %s epoch %d/%d", run_id, epoch_idx, epoch_cnt)
+    # ───── ckpt load (resume support)
+    state = ckpt.load_latest_ckpt(run_id, epoch_idx) or {"current_epoch": 0}
+
+    logger.info(
+        "[Do] run %s epoch %d/%d (resume=%s)",
+        run_id,
+        epoch_idx,
+        epoch_cnt,
+        state["current_epoch"],
+    )
 
     # ───── epoch simulate & ckpt flush
     _train_one_epoch(epoch_idx)
     state["current_epoch"] = epoch_idx + 1
-    fp.write_text(json.dumps(state))
+    ckpt.save_ckpt(run_id, epoch_idx, state)
 
     # ───── if last shard → full pipeline & return
     if epoch_idx + 1 == epoch_cnt:
@@ -102,12 +106,15 @@ def run_do(                       # noqa: D401
         df = _add_indicators(df, ind_cfg)
         preds, model, fcols, metrics = _train_and_predict(df)
 
-        fp.unlink(missing_ok=True)  # 完了したら ckpt 削除
+        ckpt.mark_done(run_id, epoch_idx)  # duplicate-guard sentinel
 
         # 直近 30
         bday = _make_bday_offset(holidays)
         dates = (df.index + bday).strftime("%Y-%m-%d")[-30:]
-        last30 = [{"date": d, "price": float(round(p, 4))} for d, p in zip(dates, preds[-30:])]
+        last30 = [
+            {"date": d, "price": float(round(p, 4))}
+            for d, p in zip(dates, preds[-30:])
+        ]
 
         summary = {
             "rows": int(len(df)),
@@ -128,9 +135,14 @@ def run_do(                       # noqa: D401
 
 
 # ======================================================================
-# internal helpers  (以下は MVP 版と同等。要旨のみ変更なし)
+# internal helpers  (以下は MVP 版と同等)
 # ======================================================================
 def _train_one_epoch(epoch: int) -> None:
+    """
+    疑似的な学習時間を sleep で再現。
+
+    Spot インスタンス時は SIGTERM 猶予を考慮し長めに sleep。
+    """
     if os.getenv("ONSPOT_INSTANCE", "false").lower() == "true":
         time.sleep(5)
     else:
@@ -162,7 +174,14 @@ def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
     if _DS is not None:
         df = _DS.fetch_ohlcv(symbol=symbol, start=start, end=end)
     else:
-        df = yf.download(symbol, start=start, end=end, progress=False, auto_adjust=False, group_by="column")  # type: ignore
+        df = yf.download(  # type: ignore
+            symbol,
+            start=start,
+            end=end,
+            progress=False,
+            auto_adjust=False,
+            group_by="column",
+        )
 
     if df.empty:
         raise RuntimeError("no price data")
@@ -170,11 +189,13 @@ def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = ["_".join(map(str, c)) for c in df.columns]
     df.columns = [str(c).capitalize() for c in df.columns]
-    req = ["Open", "High", "Low", "Close", "Volume"]
+    req: Sequence[str] = ["Open", "High", "Low", "Close", "Volume"]
     if "Adj close" in df.columns:
         df = df.rename(columns={"Adj close": "Adj Close"})
+        req = list(req)
         req.insert(4, "Adj Close")
-    if miss := [c for c in req if c not in df.columns]:
+    miss = [c for c in req if c not in df.columns]
+    if miss:
         raise RuntimeError(f"missing columns {miss}")
     return df[req].dropna(subset=["Close"]).copy()
 
@@ -195,7 +216,11 @@ def _rsi(s: pd.Series, w: int) -> pd.Series:  # noqa: D401
     return 100 - (100 / (1 + rs))
 
 
-_IND_FUNCS: Dict[str, Callable[[pd.Series, int], pd.Series]] = {"SMA": _sma, "EMA": _ema, "RSI": _rsi}
+_IND_FUNCS: Dict[str, Callable[[pd.Series, int], pd.Series]] = {
+    "SMA": _sma,
+    "EMA": _ema,
+    "RSI": _rsi,
+}
 
 
 def _add_indicators(df: pd.DataFrame, cfg: List[Dict[str, Any]]) -> pd.DataFrame:

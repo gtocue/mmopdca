@@ -1,0 +1,13 @@
+# docker/compose.ports.yml
+#
+# ── “どのポートを外に開けるか” だけを定義する最小ファイル
+#    触る必要があるのは基本ここだけ。
+version: "3.9"
+
+services:
+  api: { ports: [ "8001:8001" ] }
+  grafana: { ports: [ "3000:3000" ] }
+  prom: { ports: [ "9090:9090" ] }
+  flower: { ports: [ "5555:5555" ] }
+  celery-exporter: { ports: [ "9808:9808" ] }
+  redis-exporter: { ports: [ "9121:9121" ] }

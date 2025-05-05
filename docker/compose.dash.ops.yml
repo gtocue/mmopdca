@@ -1,0 +1,8 @@
+# docker/compose.dash.ops.yml
+version: "3.9"
+services:
+  ops:
+    <<: *dash_template
+    environment:
+      <<: *default_env
+      SERVICE_NAME: ops

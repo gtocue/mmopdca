@@ -1,0 +1,8 @@
+# docker/compose.dash.master.yml
+version: "3.9"
+services:
+  master:
+    <<: *dash_template
+    environment:
+      <<: *default_env
+      SERVICE_NAME: master

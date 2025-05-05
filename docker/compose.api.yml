@@ -1,0 +1,7 @@
+# docker/compose.api.yml   (開発用オーバーライド例)
+version: "3.9"
+
+services:
+  api:
+    environment:
+      LOG_LEVEL: DEBUG

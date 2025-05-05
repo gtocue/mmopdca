@@ -61,23 +61,22 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
-
-  # ─────────────────────────── Exporters（変更なし）
+  # ─────────────────────────── Exporters ★★★  ← ここが services 配下
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
     environment:
-      CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0 # ← 名称を修正
+    ports: [ "9808:9808" ]
     depends_on:
       redis: { condition: service_started }
-    ports: [ "9808:9808" ]
     restart: unless-stopped
 
   redis-exporter:
     image: oliver006/redis_exporter:v1.60.0
     command: [ "--redis.addr=redis://default:${REDIS_PASSWORD}@redis:6379" ]
+    ports: [ "9121:9121" ]
     depends_on:
       redis: { condition: service_started }
-    ports: [ "9121:9121" ]
     restart: unless-stopped
 
 volumes:

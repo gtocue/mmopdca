@@ -6,22 +6,27 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DSL_ROOT=/mnt/data/dsl \
     PIP_NO_CACHE_DIR=1
 
+# build-essential はネイティブモジュール用、dos2unix は init スクリプトの改行対策
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential dos2unix && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY pyproject.toml poetry.lock ./
 
+# 依存解決は poetry で
+COPY pyproject.toml poetry.lock ./
 RUN pip install --upgrade pip poetry && \
     poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi --without dev
 
+# アプリ本体と init スクリプト
 COPY . .
 COPY ops/init-dsl.sh /usr/local/bin/docker-entrypoint-init-dsl.sh
+
 RUN dos2unix /usr/local/bin/docker-entrypoint-init-dsl.sh && \
-    chmod +x  /usr/local/bin/docker-entrypoint-init-dsl.sh
+    chmod +x /usr/local/bin/docker-entrypoint-init-dsl.sh
 
 EXPOSE 8001
+
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint-init-dsl.sh"]
 CMD ["uvicorn", "api.main_api:app", "--host", "0.0.0.0", "--port", "8001", "--proxy-headers"]

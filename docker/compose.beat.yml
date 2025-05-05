@@ -1,0 +1,4 @@
+# compose.beat.yml
+version: "3.9"
+services:
+  beat: # カスタム設定例をコメントで残すだけ

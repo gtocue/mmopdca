@@ -10,20 +10,21 @@ RUN apt-get update \
     build-essential libpq-dev dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
-# Poetry+依存解決
+# Poetry＋依存解決（本体は later stage で COPY される想定）
 RUN pip install --no-cache-dir --upgrade pip poetry
+
 WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --without dev --no-root
 
-# アプリ本体＆DSLサンプルをイメージに配置
+# DSL サンプルや defaults はイメージに含めておく
 COPY . .
 RUN mkdir -p ${DSL_ROOT} \
     && cp -r core/dsl/defaults  ${DSL_ROOT}/defaults \
     && cp -r samples            ${DSL_ROOT}/samples
 
-# init-dsl スクリプトを組み込み
+# init-dsl スクリプトを埋め込む（パスは docker-compose で ENTRYPOINT 指定すれば可）
 COPY ops/init-dsl.sh /usr/local/bin/init-dsl.sh
 RUN dos2unix /usr/local/bin/init-dsl.sh \
     && chmod +x /usr/local/bin/init-dsl.sh

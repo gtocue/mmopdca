@@ -1,0 +1,12 @@
+# docker/compose.worker.yml
+#
+# ── Worker のスケール値だけを宣言するレイヤ。
+#    ※ docker compose (Swarm でない) では deploy.replicas は無視されるので
+#       実コンテナ数を変えたい場合は `docker compose up --scale worker=3 …`
+#       もしくは Swarm/K8s に移行した時だけ有効になる、と心得てください。
+version: "3.9"
+
+services:
+  worker:
+    deploy:
+      replicas: 3
