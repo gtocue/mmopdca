@@ -1,9 +1,0 @@
-# docker/compose.override-ports.yml
-#
-# ── 個別に “このサービスだけポートを開きたい” 場面用。
-#    例：ステージング環境で Grafana だけ確認したい、など。
-version: "3.9"
-
-services:
-  grafana: { ports: [ "3000:3000" ] }
-  # ほかに開けたいものがあれば追記
