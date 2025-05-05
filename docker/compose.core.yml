@@ -27,6 +27,7 @@ services:
              --host 0.0.0.0 --port 8001 --proxy-headers
     volumes:
       - dsl_data:/mnt/data/dsl
+      - checkpoints_data:/mnt/checkpoints # ★ 追加！
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
@@ -156,31 +157,29 @@ services:
     depends_on:
       prom: { condition: service_started }
     restart: unless-stopped
-
   ##########################################################################
   # Exporters（ポートは別 compose で管理）
   ##########################################################################
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
     env_file: [ ../.env ]
-    command:
-      - --broker-url=redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0
-      - --port=9808
-    depends_on:
-      redis: { condition: service_started }
+    environment:
+      # ---------- ここがポイント ----------
+      CELERY_BROKER_URL: "" # ← 無効化
+      BROKER_URL: "" # ← 念のため空
+      CE_BROKER_URL: redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0
+      CE_PORT: 9808
     restart: unless-stopped
 
   redis-exporter:
     image: oliver006/redis_exporter:v1.60.0
     env_file: [ ../.env ]
     command:
-      - --redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379
+      - "--redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379"
     depends_on:
       redis: { condition: service_started }
     restart: unless-stopped
 
-###############################################################################
-# 永続ボリューム
 ###############################################################################
 volumes:
   dsl_data:
