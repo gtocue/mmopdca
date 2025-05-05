@@ -1,5 +1,4 @@
 # docker/compose.db.yml
-version: "3.9"
 
 services:
   # ─────────────────────────── Redis

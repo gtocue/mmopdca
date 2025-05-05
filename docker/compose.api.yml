@@ -1,5 +1,4 @@
-# docker/compose.api.yml   (開発用オーバーライド例)
-version: "3.9"
+# docker/compose.api.yml   (開発用オーバ�Eライド侁E
 
 services:
   api:

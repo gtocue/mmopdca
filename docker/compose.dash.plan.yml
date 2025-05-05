@@ -1,5 +1,4 @@
 # docker/compose.dash.plan.yml
-version: "3.9"
 services:
   plan:
     <<: *dash_template

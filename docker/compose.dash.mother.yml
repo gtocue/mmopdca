@@ -1,5 +1,4 @@
 # docker/compose.dash.mother.yml
-version: "3.9"
 services:
   mother:
     <<: *dash_template

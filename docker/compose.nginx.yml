@@ -1,11 +1,10 @@
 # docker/compose.nginx.yml
-version: "3.9"
 
 services:
   nginx:
-    # ── Edge 公開時だけ 443 を開ける
+    # ── Edge 公開時だぁE443 を開ける
     ports:
       - "443:443"
-    # 追加 vhost / static などは↓を参考に
+    # 追加 vhost / static などは↓を参老E��
     # volumes:
     #   - ./ops/extra-site.conf:/etc/nginx/conf.d/extra-site.conf:ro

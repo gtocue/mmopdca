@@ -1,10 +1,9 @@
 # docker/compose.redis.yml
 #
-# ── Redis のみを個別 override したくなった時用の “空テンプレ”。
-version: "3.9"
+# ── Redis のみを個別 override したくなった時用の “空チE��プレ”、E
 
 services:
   redis:
-    # 例：ボリュームや maxmemory を環境ごとに変える等
+    # 例：�EリュームめEmaxmemory を環墁E��とに変える筁E
     # command: >
     #   redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 512mb

@@ -1,4 +1,3 @@
-version: "3.9"
 
 services:
   # ── Core ───────────────────────────────────────────────────────
@@ -9,4 +8,4 @@ services:
   celery-exporter: { ports: [ "9808:9808" ] }
   redis-exporter: { ports: [ "9121:9121" ] }
   # Dash 系 (mother / master / orch / ops / plan / do / check / act)
-  # ⇒ すべて **不要** のためエントリを削除
+  # ⇁Eすべて **不要E* のためエントリを削除

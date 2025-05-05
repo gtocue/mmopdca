@@ -1,10 +1,9 @@
 # docker/compose.core.yml
-version: "3.9"
 
 ###############################################################################
-# すべてのサービスで .env を読み込み、ここで必要な環境変数だけ直書きします
-#   ・共通アンカーは完全に廃止
-#   ・ports は別ファイル（compose.ports.yml 等）で開閉を管理
+# すべてのサービスで .env を読み込み、ここで忁E��な環墁E��数だけ直書きしまぁE
+#   ・共通アンカーは完�Eに廁E��
+#   ・ports は別ファイル�E�Eompose.ports.yml 等）で開閉を管琁E
 ###############################################################################
 
 services:
@@ -27,7 +26,7 @@ services:
              --host 0.0.0.0 --port 8001 --proxy-headers
     volumes:
       - dsl_data:/mnt/data/dsl
-      - checkpoints_data:/mnt/checkpoints # ★ 追加！
+      - checkpoints_data:/mnt/checkpoints # ☁E追加�E�E
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
@@ -158,15 +157,15 @@ services:
       prom: { condition: service_started }
     restart: unless-stopped
   ##########################################################################
-  # Exporters（ポートは別 compose で管理）
+  # Exporters�E��Eート�E別 compose で管琁E��E
   ##########################################################################
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
     env_file: [ ../.env ]
     environment:
-      # ---------- ここがポイント ----------
-      CELERY_BROKER_URL: "" # ← 無効化
-      BROKER_URL: "" # ← 念のため空
+      # ---------- ここが�EインチE----------
+      CELERY_BROKER_URL: "" # ↁE無効匁E
+      BROKER_URL: "" # ↁE念のため空
       CE_BROKER_URL: redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0
       CE_PORT: 9808
     restart: unless-stopped
