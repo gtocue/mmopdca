@@ -1,8 +1,14 @@
-﻿# docker/compose.dash.master.yml
+# docker/compose.dash.master.yml ―― Dash “master” サービス定義
+x-default_env: &default_env
+  DSL_ROOT: ${DSL_ROOT}
+
+x-dash_template: &dash_template
+  image: dash-base:latest
+  restart: unless-stopped
+
 services:
   master:
     <<: *dash_template
     environment:
       <<: *default_env
       SERVICE_NAME: master
-

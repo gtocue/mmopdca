@@ -1,8 +1,14 @@
-﻿# docker/compose.dash.ops.yml  笏笏 Dash 窶徙ps窶・繧ｵ繝ｼ繝薙せ髮帛ｽ｢
+# docker/compose.dash.ops.yml  ―― Dash “ops” サービス定義
+x-default_env: &default_env
+  DSL_ROOT: ${DSL_ROOT}
+
+x-dash_template: &dash_template
+  image: dash-base:latest
+  restart: unless-stopped
+
 services:
   ops:
     <<: *dash_template
     environment:
       <<: *default_env
       SERVICE_NAME: ops
-

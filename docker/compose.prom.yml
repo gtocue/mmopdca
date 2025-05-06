@@ -1,6 +1,5 @@
-﻿# docker/compose.prom.yml  笏笏 Prometheus 繧貞腰菴薙〒蜈ｬ髢九＠縺溘＞縺ｨ縺咲畑
+# docker/compose.prom.yml  ── Prometheus を単体で公開したいとき用
 services:
   prom:
     ports:
       - "9090:9090"
-

@@ -1,5 +1,5 @@
 {
-    // 1️⃣ YAML/JSON でスキーマ補完を効かせる
+    // 1. YAML/JSON でスキーマ補完を効かせる
     "yaml.schemas": {
         "./core/schemas/dsl/plan_v1.json": "docs/samples/plan_sample.yaml",
         "./core/schemas/dsl/do_v1.json": "docs/samples/do_sample.yaml"
@@ -20,9 +20,20 @@
             "url": "./core/schemas/dsl/do_v1.json"
         }
     ],
-    // 2️⃣ 余計なフォーマッタ衝突を防ぐ例（任意）
+    // 2. 余計なフォーマット衝突を防ぐ例（任意）
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
         "source.organizeImports": "never"
-    }
+    },
+    // ←ここまでが既存設定
+    // ここからターミナル設定をマージ
+    "terminal.integrated.profiles.windows": {
+        "PowerShell 7": {
+            "path": [
+                "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+            ],
+            "args": []
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "PowerShell 7"
 }

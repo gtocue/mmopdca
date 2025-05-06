@@ -1,7 +1,7 @@
-﻿# compose.beat.yml  窶・override for Celery Beat only
+# compose.beat.yml  – override for Celery Beat only
 services:
   beat:
-    # 萓具ｼ壹せ繧ｱ繧ｸ繝･繝ｼ繝ｫ繝輔ぃ繧､繝ｫ繧貞挨繝代せ縺ｫ縺励◆縺・ｴ蜷・
+    # 例：スケジュールファイルを別パスにしたい場合
     # command:
     #   - celery
     #   - -A
@@ -10,5 +10,4 @@ services:
     #   - --loglevel=info
     #   - --schedule=/mnt/checkpoints/alt-celerybeat-schedule
     #
-    # 蠢・ｦ√↓縺ｪ繧九∪縺ｧ遨ｺ縺ｮ縺ｾ縺ｾ縺ｧ讒九＞縺ｾ縺帙ｓ
-
+    # 必要になるまで空のままで構いません

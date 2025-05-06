@@ -1,6 +1,5 @@
-﻿# docker/compose.override-ports.yml  笏笏 窶懊％縺ｮ繧ｵ繝ｼ繝薙せ縺縺代・繝ｼ繝医ｒ髢九￠繧銀・髢狗匱逕ｨ override
+# docker/compose.override-ports.yml  ── “このサービスだけポートを開ける” 開発用 override
 services:
   grafana:
     ports:
       - "3000:3000"
-

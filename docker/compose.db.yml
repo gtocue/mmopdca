@@ -1,6 +1,6 @@
-﻿# docker/compose.db.yml
+# docker/compose.db.yml
 services:
-  # Redis 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
+  # Redis ──────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     command: >
@@ -10,7 +10,7 @@ services:
       - redis_data:/data
     restart: unless-stopped
 
-  # PostgreSQL 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
+  # PostgreSQL ────────────────────────────────────────
   db:
     image: postgres:16-alpine
     env_file: [ ../.env ]
@@ -22,4 +22,3 @@ services:
       timeout: 3s
       retries: 5
     restart: unless-stopped
-

@@ -1,8 +1,11 @@
-﻿# docker/compose.dash.master.yml
+# docker/compose.dash.mother.yml
 services:
-  master:
+  mother:
     <<: *dash_template
     environment:
       <<: *default_env
-      SERVICE_NAME: master
+      SERVICE_NAME: mother
+
+
+
 
