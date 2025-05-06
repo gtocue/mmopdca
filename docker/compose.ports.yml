@@ -1,23 +1,11 @@
-# docker/compose.ports.yml
-#
-# ── “外部に公開し得るポート” 一覧。実際に開けるかどうかは
-#    `docker-compose.override.yml` などで制御する想定。
+version: "3.9"
+
 services:
-  # Core
   api: { ports: [ "8001:8001" ] }
+  flower: { ports: [ "5555:5555" ] }
   grafana: { ports: [ "3000:3000" ] }
   prom: { ports: [ "9090:9090" ] }
-  flower: { ports: [ "5555:5555" ] }
-  celery-exporter: { ports: [ "9808:9808" ] }
+  redis: { ports: [ "6379:6379" ] }
   redis-exporter: { ports: [ "9121:9121" ] }
-  # Dash 系（＊現在未使用・コメントアウト）
-  # mother: { ports: [ "7400:7400" ] }
-  # master: { ports: [ "7401:7401" ] }
-  # orch:   { ports: [ "7402:7402" ] }
-  # ops:    { ports: [ "7403:7403" ] }
-  # plan:   { ports: [ "7404:7404" ] }
-  # do:     { ports: [ "7405:7405" ] }
-  # check:  { ports: [ "7406:7406" ] }
-  # act:    { ports: [ "7407:7407" ] }
-
-
+  celery-exporter: { ports: [ "9808:9808" ] }
+  db: { ports: [ "5432:5432" ] }

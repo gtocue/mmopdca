@@ -1,17 +1,13 @@
-version: '3.9'
 services:
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
-    env_file:
-      - ../.env
+    env_file: [ ../.env ]
     environment:
-      # .env の値をそのまま使う
-      CE_BROKER_URL: "\"
-      CE_BACKEND_URL: "\"
-    # デフォルトの entrypoint (cli.py) に任せるので command は空化
-    command: []
-    ports:
-      - "9808:9808"
-    depends_on:
-      - redis
-
+      CE_BROKER_URL: "redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0"
+      CE_PORT: "9808"
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:9808/metrics" ]
+      interval: 5s
+      timeout: 3s
+      retries: 12

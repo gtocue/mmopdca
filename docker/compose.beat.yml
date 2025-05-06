@@ -1,12 +1,12 @@
+# docker/compose.beat.yml
+version: "3.9"
+
 services:
   beat:
-    # Celery Beat を直接起動するコマンドに変更
+    # Celery Beat を直接起動するコマンドだけをオーバーライド
     command:
       - celery
       - -A
       - core.celery_app:celery_app
       - beat
       - --loglevel=info
-    # …（以下は既存の entrypoint, environment, volumes 等そのまま）
-
-

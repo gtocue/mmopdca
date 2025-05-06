@@ -1,13 +1,16 @@
-################################################################################# 全サービスで .env を読み込み、必要分だけ直書き
+# docker/compose.core.yml
+#################################################################################
+# 全サービスで .env を読み込み、必要分だけ直書き
 #   ・共通アンカーは廃止
 #   ・外部ポートは docker/compose.ports.yml で管理
-###############################################################################
+#################################################################################
+
+version: "3.9"
 
 services:
-
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   # FastAPI
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   api:
     build:
       context: ..
@@ -16,12 +19,12 @@ services:
     env_file: [ ../.env ]
     environment:
       DSL_ROOT: ${DSL_ROOT}
-      CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
       CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
     entrypoint: [ /usr/local/bin/docker-entrypoint-init-dsl.sh ]
     command: >
       python -m uvicorn api.main_api:app
-             --host 0.0.0.0 --port 8001 --proxy-headers
+        --host 0.0.0.0 --port 8001 --proxy-headers
     volumes:
       - dsl_data:/mnt/data/dsl
       - checkpoints_data:/mnt/checkpoints
@@ -30,9 +33,9 @@ services:
       redis: { condition: service_started }
     restart: unless-stopped
 
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   # Celery Worker
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   worker:
     build:
       context: ..
@@ -42,7 +45,7 @@ services:
     env_file: [ ../.env ]
     environment:
       DSL_ROOT: ${DSL_ROOT}
-      CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
       CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
     entrypoint: [ /usr/local/bin/docker-entrypoint-init-dsl.sh ]
     command: >
@@ -55,9 +58,9 @@ services:
       redis: { condition: service_started }
     restart: on-failure
 
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   # Celery Beat
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   beat:
     build:
       context: ..
@@ -67,13 +70,13 @@ services:
     env_file: [ ../.env ]
     environment:
       DSL_ROOT: ${DSL_ROOT}
-      CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
       CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
     entrypoint: [ /usr/local/bin/docker-entrypoint-init-dsl.sh ]
     command: >
       celery -A core.celery_app:celery_app
-             beat --loglevel=info
-             --schedule=/mnt/checkpoints/celerybeat-schedule
+        beat --loglevel=info
+        --schedule=/mnt/checkpoints/celerybeat-schedule
     volumes:
       - dsl_data:/mnt/data/dsl
       - checkpoints_data:/mnt/checkpoints
@@ -82,23 +85,22 @@ services:
       redis: { condition: service_started }
     restart: on-failure
 
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   # Flower
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   flower:
     image: mher/flower:1.2
     env_file: [ ../.env ]
     environment:
-      DSL_ROOT: ${DSL_ROOT}
-      CELERY_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
       CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
     depends_on:
       redis: { condition: service_started }
     restart: unless-stopped
 
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   # Prometheus
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   prom:
     image: prom/prometheus:v2.52.0
     command:
@@ -112,9 +114,9 @@ services:
       flower: { condition: service_started }
     restart: unless-stopped
 
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   # Grafana
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   grafana:
     image: grafana/grafana-oss:10.4.2
     env_file: [ ../.env ]
@@ -128,9 +130,9 @@ services:
       prom: { condition: service_started }
     restart: unless-stopped
 
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   # Exporters
-  ##############################################################################
+  # ---------------------------------------------------------------------------
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
     env_file: [ ../.env ]
@@ -143,14 +145,11 @@ services:
     image: oliver006/redis_exporter:v1.60.0
     env_file: [ ../.env ]
     command:
-      - --redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379
+      - "--redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379"
     depends_on:
       redis: { condition: service_started }
     restart: unless-stopped
 
-##############################################################################
-# 永続ボリューム
-##############################################################################
 volumes:
   dsl_data:
   checkpoints_data:
@@ -158,5 +157,3 @@ volumes:
   pg_data:
   prom_data:
   grafana_data:
-
-
