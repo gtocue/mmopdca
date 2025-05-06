@@ -1,1 +1,2 @@
-﻿﻿# docker/compose.exporter.redis.ymlservices:  # redis-exporter:  #   image: oliver006/redis_exporter:v1.60.0  #   command: [ "--redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379" ]  #   restart: unless-stopped
+﻿# docker/compose.exporter.redis.ymlservices:  # redis-exporter:  #   image: oliver006/redis_exporter:v1.60.0  #   command: [ "--redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379" ]  #   restart: unless-stopped
+
