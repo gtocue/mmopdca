@@ -1,1 +1,8 @@
-*.sh text eol=lf
+# ── 既存 ──────────────────────────
+*.sh     text eol=lf                           # シェルスクリプトは LF 固定
+
+# ── 追加 ──────────────────────────
+*.yml    text eol=lf working-tree-encoding=UTF-8 # YAML は LF + UTF-8 (BOM なし)
+*.yaml   text eol=lf working-tree-encoding=UTF-8 # 念のため .yaml 拡張子も
+
+*.env    text eol=lf                           # .env も LF に統一
