@@ -1,4 +1,4 @@
-version : "1.0"
+﻿version : "1.0"
 symbol  : "MSFT"
 period:
   start : "2024-01-01"
@@ -6,4 +6,5 @@ period:
 indicators:
   - {name: SMA, window: 5}
   - {name: EMA, window: 20}
-# notes: "四半期決算イレギュラー対応"
+# notes: "蝗帛濠譛滓ｱｺ邂励う繝ｬ繧ｮ繝･繝ｩ繝ｼ蟇ｾ蠢・
+

@@ -1,5 +1,6 @@
-# docker/compose.grafana.yml  ── Grafana だけポート公開
+﻿# docker/compose.grafana.yml  笏笏 Grafana 縺縺代・繝ｼ繝亥・髢・
 services:
   grafana:
     ports:
       - "3000:3000"
+

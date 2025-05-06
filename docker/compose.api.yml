@@ -1,6 +1,7 @@
-# docker/compose.api.yml  – open only API’s additional settings
+﻿# docker/compose.api.yml  窶・open only API窶冱 additional settings
 services:
   api:
     environment:
-      # ⬇ ここを変えれば log level を切り替え可能
+      # 筮・縺薙％繧貞､峨∴繧後・ log level 繧貞・繧頑崛縺亥庄閭ｽ
       LOG_LEVEL: DEBUG
+

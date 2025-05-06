@@ -1,4 +1,4 @@
-# docker/compose.exporter.redis.yml  ── Redis-exporter を個別に公開
+﻿# docker/compose.exporter.redis.yml  笏笏 Redis-exporter 繧貞句挨縺ｫ蜈ｬ髢・
 services:
   redis-exporter:
     image: oliver006/redis_exporter:v1.60.0
@@ -7,3 +7,4 @@ services:
     restart: unless-stopped
     ports:
       - "9121:9121"
+

@@ -1,4 +1,4 @@
-# docker/compose.dash.plan.yml  ── Dash “plan” サービス雛形
+﻿# docker/compose.dash.plan.yml  笏笏 Dash 窶徘lan窶・繧ｵ繝ｼ繝薙せ髮帛ｽ｢
 x-default_env: &default_env
   DSL_ROOT: ${DSL_ROOT}
 
@@ -12,3 +12,4 @@ services:
     environment:
       <<: *default_env
       SERVICE_NAME: plan
+

@@ -1,8 +1,9 @@
-# docker/compose.nginx.yml  ── エッジで HTTPS(443) のみを晒す最小構成
+﻿# docker/compose.nginx.yml  笏笏 繧ｨ繝・ず縺ｧ HTTPS(443) 縺ｮ縺ｿ繧呈剪縺呎怙蟆乗ｧ区・
 services:
   nginx:
     ports:
       - "443:443"
-    # 追加の vhost / 静的サイトをマウントしたい場合は以下を有効化
+    # 霑ｽ蜉縺ｮ vhost / 髱咏噪繧ｵ繧､繝医ｒ繝槭え繝ｳ繝医＠縺溘＞蝣ｴ蜷医・莉･荳九ｒ譛牙柑蛹・
     # volumes:
     #   - ./ops/extra-site.conf:/etc/nginx/conf.d/extra-site.conf:ro
+

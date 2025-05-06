@@ -1,4 +1,4 @@
-apiVersion: 1
+﻿apiVersion: 1
 contactPoints:
   - orgId: 1
     name: "MMOPDCA Slack"
@@ -6,4 +6,5 @@ contactPoints:
       - uid: "slack-mmopdca"
         type: slack
         settings:
-          url: "__SLACK_WEBHOOK_URL__"   # ← 実際の Webhook URL を入れてから有効化
+          url: "__SLACK_WEBHOOK_URL__"   # 竊・螳滄圀縺ｮ Webhook URL 繧貞・繧後※縺九ｉ譛牙柑蛹・
+

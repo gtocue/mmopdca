@@ -1,4 +1,4 @@
-plan_id:   msft-demo-2024
+﻿plan_id:   msft-demo-2024
 owner:     alice@example.com
 
 data:
@@ -15,3 +15,4 @@ indicators:
   moving_averages:
     SMA: {window: 20}
     EMA: {window: 50}
+

@@ -1,4 +1,4 @@
-apiVersion: 1
+﻿apiVersion: 1
 datasources:
   - name: MMOPDCA-Prometheus
     uid: PROM_MMOPDCA
@@ -6,4 +6,5 @@ datasources:
     access: proxy
     url: http://prom:9090
     isDefault: true
-    editable: false         # 誤編集防止
+    editable: false         # 隱､邱ｨ髮・亟豁｢
+

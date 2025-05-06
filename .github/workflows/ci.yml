@@ -1,4 +1,4 @@
-# .github/workflows/ci.yml
+﻿# .github/workflows/ci.yml
 name: CI - compose up & healthcheck
 
 on:
@@ -10,12 +10,12 @@ jobs:
   compose-up-test:
     runs-on: ubuntu-latest
 
-    # ❶ Docker/Compose を使うため特権モード
+    # 笶ｶ Docker/Compose 繧剃ｽｿ縺・◆繧∫音讓ｩ繝｢繝ｼ繝・
     permissions:
       contents: read
     steps:
       #-------------------------------------------------------------------#
-      # 0. 事前セットアップ
+      # 0. 莠句燕繧ｻ繝・ヨ繧｢繝・・
       #-------------------------------------------------------------------#
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
         run: docker compose version
 
       #-------------------------------------------------------------------#
-      # 1. .env を生成 （REDIS_PASSWORD はダミーで OK）
+      # 1. .env 繧堤函謌・・・EDIS_PASSWORD 縺ｯ繝繝溘・縺ｧ OK・・
       #-------------------------------------------------------------------#
       - name: Create .env for CI
         run: |
@@ -43,7 +43,7 @@ jobs:
           EOF
 
       #-------------------------------------------------------------------#
-      # 2. Compose up （core + db + ports）
+      # 2. Compose up ・・ore + db + ports・・
       #-------------------------------------------------------------------#
       - name: Compose up -d
         run: |
@@ -54,23 +54,23 @@ jobs:
             up -d --build
 
       #-------------------------------------------------------------------#
-      # 3. ヘルスチェック（8001 / 9090 / 9121 / 9808）
-      #    30 秒以内に 200 が返らなければ失敗
+      # 3. 繝倥Ν繧ｹ繝√ぉ繝・け・・001 / 9090 / 9121 / 9808・・
+      #    30 遘剃ｻ･蜀・↓ 200 縺瑚ｿ斐ｉ縺ｪ縺代ｌ縺ｰ螟ｱ謨・
       #-------------------------------------------------------------------#
       - name: Wait for services
         run: |
           endpoints=("8001/docs" "9090" "9121/metrics" "9808/metrics")
           for ep in "${endpoints[@]}"; do
-            echo "🔎 Health-check http://localhost:${ep}"
+            echo "博 Health-check http://localhost:${ep}"
             for i in {1..30}; do
               status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:${ep} || true)
               if [ "$status" = "200" ]; then
-                echo "✅ $ep → 200 OK"
+                echo "笨・$ep 竊・200 OK"
                 break
               fi
               sleep 2
               if [ "$i" = "30" ]; then
-                echo "❌ $ep did not return 200 within timeout"
+                echo "笶・$ep did not return 200 within timeout"
                 docker compose logs --tail=50
                 exit 1
               fi
@@ -78,7 +78,7 @@ jobs:
           done
 
       #-------------------------------------------------------------------#
-      # 4. 後片付け
+      # 4. 蠕檎援莉倥￠
       #-------------------------------------------------------------------#
       - name: Compose down
         if: always()
@@ -88,3 +88,4 @@ jobs:
             -f docker/compose.db.yml   \
             -f docker/compose.ports.yml \
             down -v --remove-orphans
+

@@ -1,5 +1,6 @@
-# docker/compose.exporter.celery.yml  ── Celery-exporter を個別に公開
+﻿# docker/compose.exporter.celery.yml  笏笏 Celery-exporter 繧貞句挨縺ｫ蜈ｬ髢・
 services:
   celery-exporter:
     ports:
       - "9808:9808"
+

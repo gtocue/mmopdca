@@ -1,7 +1,7 @@
-# docker/compose.ports.yml
+﻿# docker/compose.ports.yml
 #
-# ── “外部に公開し得るポート” 一覧。実際に開けるかどうかは
-#    `docker-compose.override.yml` などで制御する想定。
+# 笏笏 窶懷､夜Κ縺ｫ蜈ｬ髢九＠蠕励ｋ繝昴・繝遺・荳隕ｧ縲ょｮ滄圀縺ｫ髢九￠繧九°縺ｩ縺・°縺ｯ
+#    `docker-compose.override.yml` 縺ｪ縺ｩ縺ｧ蛻ｶ蠕｡縺吶ｋ諠ｳ螳壹・
 services:
   # Core
   api: { ports: [ "8001:8001" ] }
@@ -10,7 +10,7 @@ services:
   flower: { ports: [ "5555:5555" ] }
   celery-exporter: { ports: [ "9808:9808" ] }
   redis-exporter: { ports: [ "9121:9121" ] }
-  # Dash 系（＊現在未使用・コメントアウト）
+  # Dash 邉ｻ・茨ｼ顔樟蝨ｨ譛ｪ菴ｿ逕ｨ繝ｻ繧ｳ繝｡繝ｳ繝医い繧ｦ繝茨ｼ・
   # mother: { ports: [ "7400:7400" ] }
   # master: { ports: [ "7401:7401" ] }
   # orch:   { ports: [ "7402:7402" ] }
@@ -19,3 +19,4 @@ services:
   # do:     { ports: [ "7405:7405" ] }
   # check:  { ports: [ "7406:7406" ] }
   # act:    { ports: [ "7407:7407" ] }
+

@@ -1,40 +1,40 @@
+﻿###############################################################################
+# docker/compose.ci.yml  窶・ GitHub Actions・修I 逕ｨ Compose 繧ｹ繧ｿ繝・け螳夂ｾｩ
 ###############################################################################
-# docker/compose.ci.yml  ―  GitHub Actions／CI 用 Compose スタック定義
-###############################################################################
-#  ◆ ASSIST_KEY: このファイルは【docker/compose.ci.yml】に配置します
+#  笳・ASSIST_KEY: 縺薙・繝輔ぃ繧､繝ｫ縺ｯ縲薪ocker/compose.ci.yml縲代↓驟咲ｽｮ縺励∪縺・
 # ---------------------------------------------------------------------------
-# 【ユニット名】          compose-ci-stack
-# 【主な機能・責務】      ─ GitHub Actions 上で “最小限の統合テスト環境” を構築  
-#                        ─ API・Worker・Beat が Web/Redis/Postgres に接続できるか
-#                        ─ Prometheus / Exporters が 200 OK を返すか
+# 縲舌Θ繝九ャ繝亥錐縲・         compose-ci-stack
+# 縲蝉ｸｻ縺ｪ讖溯・繝ｻ雋ｬ蜍吶・     笏 GitHub Actions 荳翫〒 窶懈怙蟆城剞縺ｮ邨ｱ蜷医ユ繧ｹ繝育腸蠅・・繧呈ｧ狗ｯ・ 
+#                        笏 API繝ｻWorker繝ｻBeat 縺・Web/Redis/Postgres 縺ｫ謗･邯壹〒縺阪ｋ縺・
+#                        笏 Prometheus / Exporters 縺・200 OK 繧定ｿ斐☆縺・
 #
-# 【主な役割】
-#   - FastAPI (api) の起動確認（port 8001 /docs で 200）
-#   - Celery worker & beat のブート確認
-#   - Redis / Postgres のコンテナ起動 & ヘルスチェック
-#   - Prometheus + redis-exporter + celery-exporter のメトリクス疎通
+# 縲蝉ｸｻ縺ｪ蠖ｹ蜑ｲ縲・
+#   - FastAPI (api) 縺ｮ襍ｷ蜍慕｢ｺ隱搾ｼ・ort 8001 /docs 縺ｧ 200・・
+#   - Celery worker & beat 縺ｮ繝悶・繝育｢ｺ隱・
+#   - Redis / Postgres 縺ｮ繧ｳ繝ｳ繝・リ襍ｷ蜍・& 繝倥Ν繧ｹ繝√ぉ繝・け
+#   - Prometheus + redis-exporter + celery-exporter 縺ｮ繝｡繝医Μ繧ｯ繧ｹ逍朱・
 #
-# 【連携先・依存関係】
-#   - docker/compose.core.yml（開発本番共通）
-#   - docker/compose.db.yml   （永続 DB / Redis）
-#   - .github/workflows/ci.yml（CI ワークフロー本体）
+# 縲宣｣謳ｺ蜈医・萓晏ｭ倬未菫ゅ・
+#   - docker/compose.core.yml・磯幕逋ｺ譛ｬ逡ｪ蜈ｱ騾夲ｼ・
+#   - docker/compose.db.yml   ・域ｰｸ邯・DB / Redis・・
+#   - .github/workflows/ci.yml・・I 繝ｯ繝ｼ繧ｯ繝輔Ο繝ｼ譛ｬ菴難ｼ・
 #
-# 【ルール遵守メモ】
-#   1) **version:** は省略し、Compose v3+ 自動判定
-#   2) CI では永続 Volume を持たず、速度優先で tmpfs を使用
-#   3) メトリクス Exporter は CE_BROKER_URL のみ使用
-#   4) 追加機能のみ実装・既存サービスを壊さない
+# 縲舌Ν繝ｼ繝ｫ驕ｵ螳医Γ繝｢縲・
+#   1) **version:** 縺ｯ逵∫払縺励，ompose v3+ 閾ｪ蜍募愛螳・
+#   2) CI 縺ｧ縺ｯ豌ｸ邯・Volume 繧呈戟縺溘★縲・溷ｺｦ蜆ｪ蜈医〒 tmpfs 繧剃ｽｿ逕ｨ
+#   3) 繝｡繝医Μ繧ｯ繧ｹ Exporter 縺ｯ CE_BROKER_URL 縺ｮ縺ｿ菴ｿ逕ｨ
+#   4) 霑ｽ蜉讖溯・縺ｮ縺ｿ螳溯｣・・譌｢蟄倥し繝ｼ繝薙せ繧貞｣翫＆縺ｪ縺・
 #
 # ---------------------------------------------------------------------------
 # NOTE:
-#   - GitHub Actions ランナーは root で動くためパーミッション調整は省略
-#   - ボリュームを tmpfs 化 → restore-cache で高速化する案も検討余地 (#46)
+#   - GitHub Actions 繝ｩ繝ｳ繝翫・縺ｯ root 縺ｧ蜍輔￥縺溘ａ繝代・繝溘ャ繧ｷ繝ｧ繝ｳ隱ｿ謨ｴ縺ｯ逵∫払
+#   - 繝懊Μ繝･繝ｼ繝繧・tmpfs 蛹・竊・restore-cache 縺ｧ鬮倬溷喧縺吶ｋ譯医ｂ讀懆ｨ惹ｽ吝慍 (#46)
 ###############################################################################
 
 services:
 
   ##########################################################################
-  # FastAPI (Unit テスト／Smoke テストの対象)
+  # FastAPI (Unit 繝・せ繝茨ｼ輯moke 繝・せ繝医・蟇ｾ雎｡)
   ##########################################################################
   api:
     build:
@@ -52,7 +52,7 @@ services:
       db:     { condition: service_healthy }
       redis:  { condition: service_started }
     ports:   [ "8001:8001" ]
-    # tmpfs マウントで I/O を高速化（CI は永続要らず）
+    # tmpfs 繝槭え繝ｳ繝医〒 I/O 繧帝ｫ倬溷喧・・I 縺ｯ豌ｸ邯夊ｦ√ｉ縺夲ｼ・
     tmpfs:
       - /mnt/data/dsl
       - /mnt/checkpoints
@@ -115,7 +115,7 @@ services:
       retries: 10
 
   ##########################################################################
-  # PostgreSQL（マイグレ未テストでも起動確認だけ）
+  # PostgreSQL・医・繧､繧ｰ繝ｬ譛ｪ繝・せ繝医〒繧りｵｷ蜍慕｢ｺ隱阪□縺托ｼ・
   ##########################################################################
   db:
     image: postgres:16-alpine
@@ -162,7 +162,7 @@ services:
       - --web.enable-lifecycle
       - --storage.tsdb.retention.time=24h
     volumes:
-      # 最小ルールセットのみ同梱
+      # 譛蟆上Ν繝ｼ繝ｫ繧ｻ繝・ヨ縺ｮ縺ｿ蜷梧｢ｱ
       - ../prom/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:
       redis-exporter:   { condition: service_started }
@@ -175,5 +175,6 @@ services:
       retries: 12
 
 ###############################################################################
-# CI 向けなので永続ボリュームは定義しない（GitHub ランナーは毎回クリーン）
+# CI 蜷代￠縺ｪ縺ｮ縺ｧ豌ｸ邯壹・繝ｪ繝･繝ｼ繝縺ｯ螳夂ｾｩ縺励↑縺・ｼ・itHub 繝ｩ繝ｳ繝翫・縺ｯ豈主屓繧ｯ繝ｪ繝ｼ繝ｳ・・
 ###############################################################################
+

@@ -1,5 +1,6 @@
-# docker/compose.worker.yml  ── Worker を Swarm/Compose でスケールさせたいとき用
+﻿# docker/compose.worker.yml  笏笏 Worker 繧・Swarm/Compose 縺ｧ繧ｹ繧ｱ繝ｼ繝ｫ縺輔○縺溘＞縺ｨ縺咲畑
 services:
   worker:
     deploy:
-      replicas: 3 # 例: 3 コンテナ並列
+      replicas: 3 # 萓・ 3 繧ｳ繝ｳ繝・リ荳ｦ蛻・
+

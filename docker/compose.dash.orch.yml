@@ -1,7 +1,8 @@
-# docker/compose.dash.orch.yml  ── Dash “orch” サービス雛形
+﻿# docker/compose.dash.orch.yml  笏笏 Dash 窶徙rch窶・繧ｵ繝ｼ繝薙せ髮帛ｽ｢
 services:
   orch:
     <<: *dash_template
     environment:
       <<: *default_env
       SERVICE_NAME: orch
+

@@ -1,63 +1,52 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # =========================================================
-# ASSIST_KEY: 【ops/preemptible-wrapper.sh】
-# =========================================================
+# ASSIST_KEY: 縲塵ps/preemptible-wrapper.sh縲・# =========================================================
 #
-# 【概要】
-#   Spot／Preemptible VM で SIGTERM を受け取ったとき、
-#   “安全にチェックポイントを保存してから” 子プロセスを終了させる
-#   ジョブ実行ラッパー。
+# 縲先ｦりｦ√・#   Spot・襲reemptible VM 縺ｧ SIGTERM 繧貞女縺大叙縺｣縺溘→縺阪・#   窶懷ｮ牙・縺ｫ繝√ぉ繝・け繝昴う繝ｳ繝医ｒ菫晏ｭ倥＠縺ｦ縺九ｉ窶・蟄舌・繝ｭ繧ｻ繧ｹ繧堤ｵゆｺ・＆縺帙ｋ
+#   繧ｸ繝ｧ繝門ｮ溯｡後Λ繝・ヱ繝ｼ縲・#
+# 縲蝉ｸｻ縺ｪ蠖ｹ蜑ｲ縲・#   1. ENTRYPOINT 竊・譛ｬ繧ｹ繧ｯ繝ｪ繝励ヨ縺ｫ蟾ｮ縺玲崛縺医∝ｮ溯｡後さ繝槭Φ繝峨・蠑墓焚縺ｧ貂｡縺・#   2. SIGTERM / SIGINT 繧偵ヵ繝・け縺励※
+#        繝ｻcelery worker/beat 縺ｪ繧・ graceful:shutdown 繧帝√ｋ
+#        繝ｻ莉ｻ諢上さ繝槭Φ繝峨↑繧・ pkill -TERM child
+#   3. 繝√ぉ繝・け繝昴う繝ｳ繝井ｿ晏ｭ倥・繝ｦ繝ｼ繧ｶ繝ｼ繝輔ャ繧ｯ繧・CALL_CP_HOOK 縺ｧ蟾ｮ縺苓ｾｼ縺ｿ蜿ｯ閭ｽ
 #
-# 【主な役割】
-#   1. ENTRYPOINT → 本スクリプトに差し替え、実行コマンドは引数で渡す
-#   2. SIGTERM / SIGINT をフックして
-#        ・celery worker/beat なら  graceful:shutdown を送る
-#        ・任意コマンドなら  pkill -TERM child
-#   3. チェックポイント保存のユーザーフックを CALL_CP_HOOK で差し込み可能
+# 縲宣｣謳ｺ蜈医・萓晏ｭ倬未菫ゅ・#   - core/do/checkpoint.py   窶ｦ ckpt 繝・ぅ繝ｬ繧ｯ繝医Μ莉墓ｧ倥ｒ蜈ｱ譛・#   - Celery                 窶ｦ term竊蜘arm shutdown 縺ｧ t-ack (= re-queue)
 #
-# 【連携先・依存関係】
-#   - core/do/checkpoint.py   … ckpt ディレクトリ仕様を共有
-#   - Celery                 … term→warm shutdown で t-ack (= re-queue)
-#
-# 【ルール】
-#   * POSIX sh 互換（busybox, dash でも動く）
-#   * child PID を監視し、exit code をそのまま親へ伝搬
+# 縲舌Ν繝ｼ繝ｫ縲・#   * POSIX sh 莠呈鋤・・usybox, dash 縺ｧ繧ょ虚縺擾ｼ・#   * child PID 繧堤屮隕悶＠縲‘xit code 繧偵◎縺ｮ縺ｾ縺ｾ隕ｪ縺ｸ莨晄成
 # ---------------------------------------------------------
 
 set -euo pipefail
 
-# ───────────────────────────── user-configurable hook
+# 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 user-configurable hook
 CALL_CP_HOOK="${CALL_CP_HOOK:-}"
 
-# ───────────────────────────── trap handler
+# 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 trap handler
 _term() {
-  echo "[wrapper] caught SIGTERM – start graceful shutdown"
+  echo "[wrapper] caught SIGTERM 窶・start graceful shutdown"
 
-  # 任意チェックポイント保存フック
+  # 莉ｻ諢上メ繧ｧ繝・け繝昴う繝ｳ繝井ｿ晏ｭ倥ヵ繝・け
   if [ -n "${CALL_CP_HOOK}" ] && command -v "${CALL_CP_HOOK%% *}" >/dev/null 2>&1; then
     echo "[wrapper] execute checkpoint hook: ${CALL_CP_HOOK}"
     # shellcheck disable=SC2086
     ${CALL_CP_HOOK} || echo "[wrapper] checkpoint hook failed (ignore)"
   fi
 
-  # Celery worker/beat の場合は control コマンドで優雅に停止
+  # Celery worker/beat 縺ｮ蝣ｴ蜷医・ control 繧ｳ繝槭Φ繝峨〒蜆ｪ髮・↓蛛懈ｭ｢
   if [[ "${CMD[0]}" == "celery" ]]; then
-    echo "[wrapper] send celery control: shutdown → child ${CHILD_PID}"
+    echo "[wrapper] send celery control: shutdown 竊・child ${CHILD_PID}"
     kill -TERM "${CHILD_PID}"
   else
-    echo "[wrapper] forward TERM → child ${CHILD_PID}"
+    echo "[wrapper] forward TERM 竊・child ${CHILD_PID}"
     kill -TERM "${CHILD_PID}"
   fi
 }
 
-# ───────────────────────────── main
+# 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 main
 if [ "$#" -lt 1 ]; then
   echo "Usage: $0 <command> [args...]" >&2
   exit 2
 fi
 
-# 引数を配列に格納
-CMD=("$@")
+# 蠑墓焚繧帝・蛻励↓譬ｼ邏・CMD=("$@")
 
 echo "[wrapper] exec: ${CMD[*]}"
 # shellcheck disable=SC2294
@@ -66,8 +55,9 @@ CHILD_PID=$!
 
 trap _term TERM INT
 
-# child 終了を待ち、同じ exit code を返す
+# child 邨ゆｺ・ｒ蠕・■縲∝酔縺・exit code 繧定ｿ斐☆
 wait "${CHILD_PID}"
 EXIT_CODE=$?
 echo "[wrapper] child exited with code ${EXIT_CODE}"
 exit "${EXIT_CODE}"
+

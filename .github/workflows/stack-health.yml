@@ -1,25 +1,25 @@
-# .github/workflows/stack-health.yml
+﻿# .github/workflows/stack-health.yml
 name: CI - Docker Stack Health
 
 on:
   push:
-    branches: [ main, develop ]   # ← 好みで変更
+    branches: [ main, develop ]   # 竊・螂ｽ縺ｿ縺ｧ螟画峩
   pull_request:
 
 jobs:
   compose-health:
     runs-on: ubuntu-latest
 
-    # GitHub Actions が rootless Docker を使えるように準備
+    # GitHub Actions 縺・rootless Docker 繧剃ｽｿ縺医ｋ繧医≧縺ｫ貅門ｙ
     steps:
-      # 0) コード取得
+      # 0) 繧ｳ繝ｼ繝牙叙蠕・
       - uses: actions/checkout@v4
 
-      # 1) 最新 Docker CLI + compose‐plugin をセットアップ
+      # 1) 譛譁ｰ Docker CLI + compose窶壬lugin 繧偵そ繝・ヨ繧｢繝・・
       - name: Set up Docker
         uses: docker/setup-buildx-action@v3
 
-      # 2) .env を生成（パスワードやトークンは Secrets から注入）
+      # 2) .env 繧堤函謌撰ｼ医ヱ繧ｹ繝ｯ繝ｼ繝峨ｄ繝医・繧ｯ繝ｳ縺ｯ Secrets 縺九ｉ豕ｨ蜈･・・
       - name: Create .env for CI
         run: |
           cat > .env <<'EOF'
@@ -32,9 +32,9 @@ jobs:
           LOG_LEVEL=INFO
           TZ=UTC
           EOF
-          sed -n '1,10p' .env   # ← デバッグ用に中身の先頭だけ出力
+          sed -n '1,10p' .env   # 竊・繝・ヰ繝・げ逕ｨ縺ｫ荳ｭ霄ｫ縺ｮ蜈磯ｭ縺縺大・蜉・
 
-      # 3) Stack を起動（ビルド込）
+      # 3) Stack 繧定ｵｷ蜍包ｼ医ン繝ｫ繝芽ｾｼ・・
       - name: docker compose up
         run: |
           docker compose                          \
@@ -45,30 +45,30 @@ jobs:
             up -d --build
           docker compose ps
 
-      # 4) ───────── Healthy チェック ─────────
+      # 4) 笏笏笏笏笏笏笏笏笏 Healthy 繝√ぉ繝・け 笏笏笏笏笏笏笏笏笏
       - name: Wait until all endpoints respond 200
         run: |
           set -e
           check() { curl -fsSL "http://localhost:$1$2" -o /dev/null; }
-          echo "⏳ waiting for ports…"
+          echo "竢ｳ waiting for ports窶ｦ"
           for i in {1..30}; do
             if  check 8001 /docs         \
             &&  check 9090 /             \
             &&  check 9121 /metrics      \
             &&  check 9808 /metrics; then
-              echo "✅ all ports are up"
+              echo "笨・all ports are up"
               exit 0
             fi
             sleep 4
           done
-          echo "❌ some ports never became healthy"; docker compose logs --tail=50
+          echo "笶・some ports never became healthy"; docker compose logs --tail=50
           exit 1
 
-      # 5) Optional: 簡易テストを流す（Pytest など）
+      # 5) Optional: 邁｡譏薙ユ繧ｹ繝医ｒ豬√☆・・ytest 縺ｪ縺ｩ・・
       # - name: Run unit tests
       #   run: pytest
 
-      # 6) Stack 片付け
+      # 6) Stack 迚・ｻ倥￠
       - name: docker compose down
         if: always()
         run: |
@@ -78,3 +78,4 @@ jobs:
             -f docker/compose.db.yml              \
             -f docker/compose.ports.yml           \
             down -v --remove-orphans
+
