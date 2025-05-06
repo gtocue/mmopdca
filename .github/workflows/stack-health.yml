@@ -1,0 +1,80 @@
+# .github/workflows/stack-health.yml
+name: CI - Docker Stack Health
+
+on:
+  push:
+    branches: [ main, develop ]   # ← 好みで変更
+  pull_request:
+
+jobs:
+  compose-health:
+    runs-on: ubuntu-latest
+
+    # GitHub Actions が rootless Docker を使えるように準備
+    steps:
+      # 0) コード取得
+      - uses: actions/checkout@v4
+
+      # 1) 最新 Docker CLI + compose‐plugin をセットアップ
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      # 2) .env を生成（パスワードやトークンは Secrets から注入）
+      - name: Create .env for CI
+        run: |
+          cat > .env <<'EOF'
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD_RAW }}
+          REDIS_PASSWORD_ENC=${{ secrets.REDIS_PASSWORD_URL }}
+          POSTGRES_DB=mmopdca
+          POSTGRES_USER=mmop_user
+          POSTGRES_PASSWORD=${{ secrets.PG_PASSWORD }}
+          DSL_ROOT=/mnt/data/dsl
+          LOG_LEVEL=INFO
+          TZ=UTC
+          EOF
+          sed -n '1,10p' .env   # ← デバッグ用に中身の先頭だけ出力
+
+      # 3) Stack を起動（ビルド込）
+      - name: docker compose up
+        run: |
+          docker compose                          \
+            --env-file .env                       \
+            -f docker/compose.core.yml            \
+            -f docker/compose.db.yml              \
+            -f docker/compose.ports.yml           \
+            up -d --build
+          docker compose ps
+
+      # 4) ───────── Healthy チェック ─────────
+      - name: Wait until all endpoints respond 200
+        run: |
+          set -e
+          check() { curl -fsSL "http://localhost:$1$2" -o /dev/null; }
+          echo "⏳ waiting for ports…"
+          for i in {1..30}; do
+            if  check 8001 /docs         \
+            &&  check 9090 /             \
+            &&  check 9121 /metrics      \
+            &&  check 9808 /metrics; then
+              echo "✅ all ports are up"
+              exit 0
+            fi
+            sleep 4
+          done
+          echo "❌ some ports never became healthy"; docker compose logs --tail=50
+          exit 1
+
+      # 5) Optional: 簡易テストを流す（Pytest など）
+      # - name: Run unit tests
+      #   run: pytest
+
+      # 6) Stack 片付け
+      - name: docker compose down
+        if: always()
+        run: |
+          docker compose                          \
+            --env-file .env                       \
+            -f docker/compose.core.yml            \
+            -f docker/compose.db.yml              \
+            -f docker/compose.ports.yml           \
+            down -v --remove-orphans

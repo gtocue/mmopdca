@@ -1,2 +1,8 @@
-﻿# docker/compose.nginx.ymlservices:  nginx:    # 髫ｨ貂可髫ｨ貂可 Edge 髯ｷ闌ｨ・ｽ・ｬ鬯ｮ・｢陋ｹ・ｺ陷・ｽｾ驍ｵ・ｺ繝ｻ・ｰ驍ｵ・ｺ郢晢ｽｻ443 驛｢・ｧ陝ｶ譎擾ｽｹ諷包ｽｸ・ｺ闔会ｽ｣繝ｻ繝ｻ    ports:      - "443:443"    # 鬮ｴ謇假ｽｽ・ｽ髯ｷ莨夲ｽ｣・ｰ vhost / static 驍ｵ・ｺ繝ｻ・ｪ驍ｵ・ｺ繝ｻ・ｩ驍ｵ・ｺ繝ｻ・ｯ驕ｶ鬘倅ｾｭ繝ｻ螳壽╂郢ｧ迺ｰﾂ郢晢ｽｻ遶翫・    # volumes:    #   - ./ops/extra-site.conf:/etc/nginx/conf.d/extra-site.conf:ro
-
+# docker/compose.nginx.yml  ── エッジで HTTPS(443) のみを晒す最小構成
+services:
+  nginx:
+    ports:
+      - "443:443"
+    # 追加の vhost / 静的サイトをマウントしたい場合は以下を有効化
+    # volumes:
+    #   - ./ops/extra-site.conf:/etc/nginx/conf.d/extra-site.conf:ro

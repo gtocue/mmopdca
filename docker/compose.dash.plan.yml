@@ -1,2 +1,14 @@
-﻿# docker/compose.dash.plan.ymlservices:  plan:    <<: *dash_template    environment:      <<: *default_env      SERVICE_NAME: plan
+# docker/compose.dash.plan.yml  ── Dash “plan” サービス雛形
+x-default_env: &default_env
+  DSL_ROOT: ${DSL_ROOT}
 
+x-dash_template: &dash_template
+  image: dash-base:latest
+  restart: unless-stopped
+
+services:
+  plan:
+    <<: *dash_template
+    environment:
+      <<: *default_env
+      SERVICE_NAME: plan

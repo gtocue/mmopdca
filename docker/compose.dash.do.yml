@@ -1,2 +1,7 @@
-﻿# docker/compose.dash.do.ymlservices:  do:    <<: *dash_template    environment:      <<: *default_env      SERVICE_NAME: do
-
+# docker/compose.dash.do.yml
+services:
+  do:
+    <<: *dash_template
+    environment:
+      <<: *default_env
+      SERVICE_NAME: do

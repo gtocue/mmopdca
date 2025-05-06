@@ -1,2 +1,5 @@
-﻿# docker/compose.flower.ymlservices:  flower:    ports:      - "5555:5555"
-
+# docker/compose.flower.yml  ── Flower だけポート公開
+services:
+  flower:
+    ports:
+      - "5555:5555"

@@ -1,3 +1,21 @@
-﻿# 遯ｶ陬慊繝ｻ遯ｶ諛ｷ・､螟慚夂ｸｺ・ｫ陷茨ｽｬ鬮｢荵晢ｼ陟募干・狗ｹ晄亢繝ｻ郢晞⊆ﾂ繝ｻ闕ｳﾂ髫包ｽｧ邵ｲ繧・ｽｮ貊・怙邵ｺ・ｫ鬮｢荵晢ｿ郢ｧ荵敖ｰ邵ｺ・ｩ邵ｺ繝ｻﾂｰ邵ｺ・ｯ override 邵ｺ・ｧ陋ｻ・ｶ陟包ｽ｡邵ｲ繝ｻservices:  # Core  api: { ports: [ "8001:8001" ] }  grafana: { ports: [ "3000:3000" ] }  prom: { ports: [ "9090:9090" ] }  flower: { ports: [ "5555:5555" ] }  celery-exporter: { ports: [ "9808:9808" ] }  redis-exporter: { ports: [ "9121:9121" ] }  # Dash 驍会ｽｻ繝ｻ蝓滓ざ闖ｴ・ｿ騾包ｽｨ邵ｺ・ｮ邵ｺ貅假ｽ∫ｹ昴・繝ｵ郢ｧ・ｩ郢晢ｽｫ郢晏現縲堤ｸｺ・ｯ郢ｧ・ｳ郢晢ｽ｡郢晢ｽｳ郢晏現縺・ｹｧ・ｦ郢晁肩・ｼ繝ｻ  # mother: { ports: [ "7400:7400" ] }  # master: { ports: [ "7401:7401" ] }  # orch:   { ports: [ "7402:7402" ] }  # ops:    { ports: [ "7403:7403" ] }  # plan:   { ports: [ "7404:7404" ] }  # do:     { ports: [ "7405:7405" ] }  # check:  { ports: [ "7406:7406" ] }  # act:    { ports: [ "7407:7407" ] }
-
-
+# docker/compose.ports.yml
+#
+# ── “外部に公開し得るポート” 一覧。実際に開けるかどうかは
+#    `docker-compose.override.yml` などで制御する想定。
+services:
+  # Core
+  api: { ports: [ "8001:8001" ] }
+  grafana: { ports: [ "3000:3000" ] }
+  prom: { ports: [ "9090:9090" ] }
+  flower: { ports: [ "5555:5555" ] }
+  celery-exporter: { ports: [ "9808:9808" ] }
+  redis-exporter: { ports: [ "9121:9121" ] }
+  # Dash 系（＊現在未使用・コメントアウト）
+  # mother: { ports: [ "7400:7400" ] }
+  # master: { ports: [ "7401:7401" ] }
+  # orch:   { ports: [ "7402:7402" ] }
+  # ops:    { ports: [ "7403:7403" ] }
+  # plan:   { ports: [ "7404:7404" ] }
+  # do:     { ports: [ "7405:7405" ] }
+  # check:  { ports: [ "7406:7406" ] }
+  # act:    { ports: [ "7407:7407" ] }

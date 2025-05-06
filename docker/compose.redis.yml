@@ -1,2 +1,7 @@
-﻿# docker/compose.redis.yml## 髫ｨ貂可髫ｨ貂可 Redis 驍ｵ・ｺ繝ｻ・ｮ驍ｵ・ｺ繝ｻ・ｿ驛｢・ｧ髮区･ｪﾂ陷ｿ・･隰厄ｽｨ override 驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ・ｸ・ｺ闕ｳ蟯ｩ繝ｻ驍ｵ・ｺ繝ｻ・｣驍ｵ・ｺ雋顔§繝ｻ鬨ｾ蛹・ｽｽ・ｨ驍ｵ・ｺ繝ｻ・ｮ 驕ｯ・ｶ隲帙・・ｽ・ｩ繝ｻ・ｺ驛｢譏ｴ繝ｻ・趣ｽｦ驛｢譎丞ｹｲ・取ｨ抵ｽｪ・ｶ隴擾ｽｴ・つ郢晢ｽｻservices:  redis:    # 髣懃§繝ｻ繝ｻ・ｼ陞｢・ｹ郢晢ｽｻ驛｢譎｢・ｽ・ｪ驛｢譎｢・ｽ・･驛｢譎｢・ｽ・ｼ驛｢譎｢・｣・ｰ驛｢・ｧ郢晢ｽｻmaxmemory 驛｢・ｧ陜｣・､髢ｻ・ｸ髯溘・繝ｻ繝ｻ繝ｻ・ｸ・ｺ繝ｻ・ｨ驍ｵ・ｺ繝ｻ・ｫ髯樊ｺｷ・ｳ・ｨ遶擾ｽｴ驛｢・ｧ霑｢證ｦ・ｽ・ｭ郢晢ｽｻ    # command: >    #   redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 512mb
-
+# docker/compose.redis.yml  ── Redis のカスタム設定を追加したいとき用
+services:
+  redis:
+    # 下記のように上書きしたい行をアンコメントして利用
+    # command: >
+    #   redis-server --requirepass ${REDIS_PASSWORD}
+    #                --maxmemory 512mb --maxmemory-policy allkeys-lru

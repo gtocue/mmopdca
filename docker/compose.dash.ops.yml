@@ -1,2 +1,7 @@
-﻿# docker/compose.dash.ops.ymlservices:  ops:    <<: *dash_template    environment:      <<: *default_env      SERVICE_NAME: ops
-
+# docker/compose.dash.ops.yml  ── Dash “ops” サービス雛形
+services:
+  ops:
+    <<: *dash_template
+    environment:
+      <<: *default_env
+      SERVICE_NAME: ops

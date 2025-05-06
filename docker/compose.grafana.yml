@@ -1,2 +1,5 @@
-﻿# docker/compose.grafana.ymlservices:  grafana:    ports:      - "3000:3000"
-
+# docker/compose.grafana.yml  ── Grafana だけポート公開
+services:
+  grafana:
+    ports:
+      - "3000:3000"

@@ -1,2 +1,7 @@
-﻿# docker/compose.dash.check.ymlservices:  check:    <<: *dash_template    environment:      <<: *default_env      SERVICE_NAME: check
-
+# docker/compose.dash.check.yml
+services:
+  check:
+    <<: *dash_template
+    environment:
+      <<: *default_env
+      SERVICE_NAME: check
