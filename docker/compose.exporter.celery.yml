@@ -1,5 +1,17 @@
-# docker/compose.exporter.celery.yml  ── Celery-exporter を個別に公開
+version: '3.9'
 services:
   celery-exporter:
+    image: danihodovic/celery-exporter:0.9.1
+    env_file:
+      - ../.env
+    environment:
+      # .env の値をそのまま使う
+      CE_BROKER_URL: "\"
+      CE_BACKEND_URL: "\"
+    # デフォルトの entrypoint (cli.py) に任せるので command は空化
+    command: []
     ports:
       - "9808:9808"
+    depends_on:
+      - redis
+

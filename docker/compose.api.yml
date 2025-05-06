@@ -4,3 +4,5 @@ services:
     environment:
       # ⬇ ここを変えれば log level を切り替え可能
       LOG_LEVEL: DEBUG
+
+

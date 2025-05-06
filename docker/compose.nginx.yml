@@ -6,3 +6,5 @@ services:
     # 追加の vhost / 静的サイトをマウントしたい場合は以下を有効化
     # volumes:
     #   - ./ops/extra-site.conf:/etc/nginx/conf.d/extra-site.conf:ro
+
+

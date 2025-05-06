@@ -1,5 +1,5 @@
 {
-    // 1. YAML/JSON でスキーマ補完を効かせる
+    // ────────── 既存設定 ──────────
     "yaml.schemas": {
         "./core/schemas/dsl/plan_v1.json": "docs/samples/plan_sample.yaml",
         "./core/schemas/dsl/do_v1.json": "docs/samples/do_sample.yaml"
@@ -20,13 +20,10 @@
             "url": "./core/schemas/dsl/do_v1.json"
         }
     ],
-    // 2. 余計なフォーマット衝突を防ぐ例（任意）
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
         "source.organizeImports": "never"
     },
-    // ←ここまでが既存設定
-    // ここからターミナル設定をマージ
     "terminal.integrated.profiles.windows": {
         "PowerShell 7": {
             "path": [
@@ -35,5 +32,31 @@
             "args": []
         }
     },
-    "terminal.integrated.defaultProfile.windows": "PowerShell 7"
+    "terminal.integrated.defaultProfile.windows": "PowerShell 7",
+    // ────────── 追加設定 ──────────
+    // 1) ファイル保存時のエンコーディングを常に UTF-8 (BOM なし) に
+    "files.encoding": "utf8",
+    // 2) 改行コードは LF のみに固定
+    "files.eol": "\n",
+    // 3) ファイル種別ごとにも上書き指定
+    "[yaml]": {
+        "files.encoding": "utf8",
+        "files.eol": "\n"
+    },
+    "[yml]": {
+        "files.encoding": "utf8",
+        "files.eol": "\n"
+    },
+    "[json]": {
+        "files.encoding": "utf8",
+        "files.eol": "\n"
+    },
+    "[env]": {
+        "files.encoding": "utf8",
+        "files.eol": "\n"
+    },
+    "[sh]": {
+        "files.encoding": "utf8",
+        "files.eol": "\n"
+    }
 }

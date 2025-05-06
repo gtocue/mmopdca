@@ -1,25 +1,24 @@
-﻿# .github/workflows/stack-health.yml
+# .github/workflows/stack-health.yml
 name: CI - Docker Stack Health
 
 on:
   push:
-    branches: [ main, develop ]   # 竊・螂ｽ縺ｿ縺ｧ螟画峩
+    branches: [ main, develop ]   # プッシュ対象ブランチ
   pull_request:
 
 jobs:
   compose-health:
     runs-on: ubuntu-latest
 
-    # GitHub Actions 縺・rootless Docker 繧剃ｽｿ縺医ｋ繧医≧縺ｫ貅門ｙ
     steps:
-      # 0) 繧ｳ繝ｼ繝牙叙蠕・
+      # 0) リポジトリをチェックアウト
       - uses: actions/checkout@v4
 
-      # 1) 譛譁ｰ Docker CLI + compose窶壬lugin 繧偵そ繝・ヨ繧｢繝・・
-      - name: Set up Docker
+      # 1) Docker Buildx をセットアップ
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 2) .env 繧堤函謌撰ｼ医ヱ繧ｹ繝ｯ繝ｼ繝峨ｄ繝医・繧ｯ繝ｳ縺ｯ Secrets 縺九ｉ豕ｨ蜈･・・
+      # 2) .env ファイルを Secrets から生成
       - name: Create .env for CI
         run: |
           cat > .env <<'EOF'
@@ -32,50 +31,48 @@ jobs:
           LOG_LEVEL=INFO
           TZ=UTC
           EOF
-          sed -n '1,10p' .env   # 竊・繝・ヰ繝・げ逕ｨ縺ｫ荳ｭ霄ｫ縺ｮ蜈磯ｭ縺縺大・蜉・
+          # 先頭 10 行だけ表示して「隠しておきたい値」が出ていないか確認
+          sed -n '1,10p' .env
 
-      # 3) Stack 繧定ｵｷ蜍包ｼ医ン繝ｫ繝芽ｾｼ・・
-      - name: docker compose up
+      # 3) Docker Stack を起動
+      - name: Docker Compose up
         run: |
-          docker compose                          \
-            --env-file .env                       \
-            -f docker/compose.core.yml            \
-            -f docker/compose.db.yml              \
-            -f docker/compose.ports.yml           \
+          docker compose \
+            --env-file .env \
+            -f docker/compose.core.yml \
+            -f docker/compose.db.yml \
+            -f docker/compose.ports.yml \
             up -d --build
           docker compose ps
 
-      # 4) 笏笏笏笏笏笏笏笏笏 Healthy 繝√ぉ繝・け 笏笏笏笏笏笏笏笏笏
+      # 4) 各エンドポイントが HTTP 200 を返すまで待機
       - name: Wait until all endpoints respond 200
         run: |
           set -e
           check() { curl -fsSL "http://localhost:$1$2" -o /dev/null; }
-          echo "竢ｳ waiting for ports窶ｦ"
+          echo "⏳ Waiting for services..."
           for i in {1..30}; do
-            if  check 8001 /docs         \
-            &&  check 9090 /             \
-            &&  check 9121 /metrics      \
-            &&  check 9808 /metrics; then
-              echo "笨・all ports are up"
+            if check 8001 /docs && check 9090 / && check 9121 /metrics && check 9808 /metrics; then
+              echo "✅ All endpoints are healthy"
               exit 0
             fi
             sleep 4
           done
-          echo "笶・some ports never became healthy"; docker compose logs --tail=50
+          echo "❌ Some endpoints never became healthy"
+          docker compose logs --tail=50
           exit 1
 
-      # 5) Optional: 邁｡譏薙ユ繧ｹ繝医ｒ豬√☆・・ytest 縺ｪ縺ｩ・・
+      # 5) オプション：ユニットテストを実行したい場合
       # - name: Run unit tests
       #   run: pytest
 
-      # 6) Stack 迚・ｻ倥￠
-      - name: docker compose down
+      # 6) 最後にクリーンアップ
+      - name: Docker Compose down
         if: always()
         run: |
-          docker compose                          \
-            --env-file .env                       \
-            -f docker/compose.core.yml            \
-            -f docker/compose.db.yml              \
-            -f docker/compose.ports.yml           \
+          docker compose \
+            --env-file .env \
+            -f docker/compose.core.yml \
+            -f docker/compose.db.yml \
+            -f docker/compose.ports.yml \
             down -v --remove-orphans
-

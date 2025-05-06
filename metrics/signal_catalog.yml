@@ -1,66 +1,81 @@
-﻿# =========================================================
-# ASSIST_KEY: 縲仁etrics/signal_catalog.yml縲・
+# =========================================================
+# ASSIST_KEY: metrics/signal_catalog.yml
 # =========================================================
 #
-# 縲先ｦりｦ√・
-#   S 邏・/ A 邏・繝｡繝医Μ繧ｯ繧ｹ 14 遞ｮ繧剃ｸ蜈・ｮ夂ｾｩ縲・
-#   繝ｻUI 繧・Alertmanager 繧・*縺薙・ YAML 縺縺・ 繧定ｪｭ縺ｿ霎ｼ縺ｿ縺ｾ縺吶・
+# メトリクス／シグナル カタログ設定ファイル
 #
-# 縲占ｨ倩ｿｰ繝ｫ繝ｼ繝ｫ縲・
-#   key:                         繝｡繝医Μ繧ｯ繧ｹ縺ｮ蜀・Κ隴伜挨蟄・(UI/API 蜈ｱ騾・
-#     expr: |                   PromQL (謾ｹ陦・OK)
-#     unit: <grafana-unit>       percent / seconds / ops/s 縺ｪ縺ｩ
-#     slo: <number|null>        謌仙粥邇・↑繧我ｸ矩剞%, 繝ｬ繧､繝・Φ繧ｷ縺ｪ繧我ｸ企剞遘・
-#     class: S | A              蜆ｪ蜈亥ｺｦ (S=邨ｶ蟇ｾ縲、=縺九↑繧・
+# SLO（サービスレベル目標）を定義する各種メトリクスのシグナルをまとめています。
+# Alertmanager やダッシュボード（Grafana）で参照するための YAML フォーマットです。
 #
-#   窶ｻB 邏壹・蠕梧律霑ｽ蜉縲りｿｽ險倥☆繧九□縺代〒 UI 縺ｫ閾ｪ蜍募渚譏縲・
+# シグナル定義フォーマット:
+#   <key>:
+#     expr: |        # PromQL 式
+#     unit:          # 単位 (percent / seconds / ops/s / count など)
+#     slo:           # SLO 目標値 (数値 or null)
+#     class:         # クラス (S=Critical, A=Important)
+#
 # ---------------------------------------------------------
 
-# 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 Celery / Flower 笏笏笏笏笏笏笏笏笏笏
-# S 邏・
+# --------------------------------------------------------
+# Celery / Flower 関連メトリクス (クラス: SLO＝Critical)
+# --------------------------------------------------------
+
 task_success_rate:
   expr: |
     100 * rate(celery_task_succeeded_total[1m]) /
-    clamp_min(rate(celery_task_succeeded_total[1m]) +
-              rate(celery_task_failure_total[1m]), 1)
+    clamp_min(
+      rate(celery_task_succeeded_total[1m]) +
+      rate(celery_task_failure_total[1m]),
+      1
+    )
   unit: percent
-  slo: 99              # 荳矩剞 99 %
+  slo: 99
   class: S
 
 task_failed_per_min:
   expr: rate(celery_task_failure_total[1m]) * 60
   unit: ops/min
-  slo: 0               # 0 縺檎炊諠ｳ
+  slo: 0
   class: S
 
 online_workers:
   expr: sum(flower_worker_online)
   unit: count
-  slo: 1               # 譛菴・1 蜿ｰ
+  slo: 1
   class: S
 
 celery_queue_length:
   expr: sum(celery_queue_length)
   unit: count
-  slo: 1000            # TODO: 隕∬ｪｿ謨ｴ 窶・荳企剞繧ｭ繝･繝ｼ髟ｷ
+  slo: 1000
   class: S
 
-# A 邏・
+# --------------------------------------------------------
+# Celery / Flower 関連メトリクス (クラス: A＝Important)
+# --------------------------------------------------------
+
 task_runtime_p95:
   expr: |
-    histogram_quantile(0.95,
-      rate(celery_task_runtime_seconds_bucket[5m]))
+    histogram_quantile(
+      0.95,
+      rate(celery_task_runtime_seconds_bucket[5m])
+    )
   unit: seconds
-  slo: 2               # 2 遘剃ｻ･蜀・
+  slo: 2
   class: A
 
-# 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 API / Nginx 笏笏笏笏笏笏笏笏笏笏笏笏笏
+# --------------------------------------------------------
+# HTTP/API / Nginx 関連メトリクス
+# --------------------------------------------------------
+
 http_request_duration_p95:
   expr: |
-    histogram_quantile(0.95,
-      rate(http_request_duration_seconds_bucket[5m]))
+    histogram_quantile(
+      0.95,
+      rate(http_request_duration_seconds_bucket[5m])
+    )
   unit: seconds
-  slo: 0.5             # 500 ms
+  slo: 0.5
   class: S
 
 http_5xx_rate:
@@ -75,11 +90,14 @@ http_rps:
   slo: null
   class: A
 
-# 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 Redis 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
+# --------------------------------------------------------
+# Redis 関連メトリクス
+# --------------------------------------------------------
+
 redis_memory_utilization:
   expr: redis_memory_used_bytes / redis_config_maxmemory_bytes
   unit: percent
-  slo: 0.9             # 90 % 雜・〒隴ｦ蜻・
+  slo: 0.9
   class: A
 
 redis_connected_clients:
@@ -88,25 +106,33 @@ redis_connected_clients:
   slo: null
   class: A
 
-# 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 Postgres 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏
+# --------------------------------------------------------
+# PostgreSQL 関連メトリクス
+# --------------------------------------------------------
+
 postgres_active_connections:
   expr: pg_stat_database_numbackends{datname!~"template.*"}
   unit: count
   slo: null
   class: A
 
-# 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 Node / Host 笏笏笏笏笏笏笏笏笏笏笏笏
+# --------------------------------------------------------
+# Node / Host 関連メトリクス
+# --------------------------------------------------------
+
 node_cpu_usage:
   expr: 100 - avg(irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100
   unit: percent
-  slo: 85              # 85 % 雜・〒隕√せ繧ｱ繝ｼ繝ｫ
+  slo: 85
   class: S
 
 node_memory_usage:
   expr: |
-    100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))
+    100 * (
+      1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+    )
   unit: percent
-  slo: 90              # 90 % 雜・〒隕√せ繧ｱ繝ｼ繝ｫ
+  slo: 90
   class: S
 
 node_disk_io_wait:
@@ -114,4 +140,3 @@ node_disk_io_wait:
   unit: seconds
   slo: null
   class: A
-

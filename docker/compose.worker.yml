@@ -1,5 +1,12 @@
-# docker/compose.worker.yml  ── Worker を Swarm/Compose でスケールさせたいとき用
 services:
   worker:
-    deploy:
-      replicas: 3 # 例: 3 コンテナ並列
+    # Celery Worker を直接起動するコマンドに変更
+    command:
+      - celery
+      - -A
+      - core.celery_app:celery_app
+      - worker
+      - --loglevel=info
+    # …（以下は既存の deploy, entrypoint, environment 等そのまま）
+
+

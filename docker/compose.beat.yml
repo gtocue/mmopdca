@@ -1,13 +1,12 @@
-# compose.beat.yml  – override for Celery Beat only
 services:
   beat:
-    # 例：スケジュールファイルを別パスにしたい場合
-    # command:
-    #   - celery
-    #   - -A
-    #   - core.celery_app:celery_app
-    #   - beat
-    #   - --loglevel=info
-    #   - --schedule=/mnt/checkpoints/alt-celerybeat-schedule
-    #
-    # 必要になるまで空のままで構いません
+    # Celery Beat を直接起動するコマンドに変更
+    command:
+      - celery
+      - -A
+      - core.celery_app:celery_app
+      - beat
+      - --loglevel=info
+    # …（以下は既存の entrypoint, environment, volumes 等そのまま）
+
+

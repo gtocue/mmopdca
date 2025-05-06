@@ -1,40 +1,34 @@
-﻿# ======================================================================
-# prom/prometheus.yml  窶・ mmopdca 蜈ｨ繝｡繝医Μ繧ｯ繧ｹ蜿朱寔螳夂ｾｩ・亥ｮ悟・迚茨ｼ・
-# ----------------------------------------------------------------------
-#  笳・Flower・・elery 繧､繝吶Φ繝茨ｼ・
-#  笳・Celery-Exporter・医ち繧ｹ繧ｯ螳溯｡梧凾髢薙・Active 謨ｰ・・
-#  笳・Redis-Exporter・医Γ繝｢繝ｪ・上く繝ｼ謨ｰ縺ｪ縺ｩ・・
-#  笳・Prometheus 閾ｪ霄ｫ  笏笏 蜍穂ｽ懃｢ｺ隱咲畑
+# ======================================================================
+# prom/prometheus.yml — mmopdca Prometheus 設定ファイル
 # ======================================================================
 
 global:
-  scrape_interval: 15s          # 縺吶∋縺ｦ縺ｮ繧ｿ繝ｼ繧ｲ繝・ヨ繧・15 遘帝俣髫斐〒蜿朱寔
-  evaluation_interval: 15s      # rule_files 縺ｮ隧穂ｾ｡髢馴囈
+  # 全体スクレイプ間隔・ルール評価間隔
+  scrape_interval:     15s
+  evaluation_interval: 15s
 
-rule_files:                     # Recording / Alert 繝ｫ繝ｼ繝ｫ
+# Recording / Alert ルール定義ファイル
+rule_files:
   - /etc/prometheus/rules_mmopdca.yml
 
 scrape_configs:
-  # 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 Flower 窶・Celery Events
+  # Flower メトリクス
   - job_name: flower
     metrics_path: /metrics
     static_configs:
       - targets: ["flower:5555"]
 
-  # 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 Celery Exporter
-  #   ghcr.io/mentalelo/celery-exporter (port 9808)
+  # Celery Exporter
   - job_name: celery-exporter
     static_configs:
       - targets: ["celery-exporter:9808"]
 
-  # 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 Redis Exporter
-  #   oliver006/redis_exporter (port 9121)
+  # Redis Exporter
   - job_name: redis-exporter
     static_configs:
       - targets: ["redis-exporter:9121"]
 
-  # 笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏笏 Prometheus 閾ｪ霄ｫ
+  # Prometheus 自身のメトリクス
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
-
