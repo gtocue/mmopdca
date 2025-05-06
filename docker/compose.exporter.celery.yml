@@ -1,6 +1,1 @@
-﻿# docker/compose.exporter.celery.yml
-
-services:
-  celery-exporter:
-    ports:
-      - "9808:9808"
+﻿﻿# docker/compose.exporter.celery.ymlservices:  celery-exporter:    ports:      - "9808:9808"
