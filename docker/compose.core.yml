@@ -1,9 +1,6 @@
-# docker/compose.core.yml
-
-###############################################################################
-# すべてのサービスで .env を読み込み、ここで忁E��な環墁E��数だけ直書きしまぁE
-#   ・共通アンカーは完�Eに廁E��
-#   ・ports は別ファイル�E�Eompose.ports.yml 等）で開閉を管琁E
+﻿###############################################################################
+# 縺吶∋縺ｦ縺ｮ繧ｵ繝ｼ繝薙せ縺ｧ .env 繧定ｪｭ縺ｿ霎ｼ縺ｿ縲∝ｿ・ｦ√↑螟画焚縺縺・environment 縺ｫ逶ｴ譖ｸ縺・
+# ports 縺ｮ蜈ｬ髢・髱槫・髢九・ compose.ports.yml 縺ｧ邂｡逅・
 ###############################################################################
 
 services:
@@ -26,7 +23,7 @@ services:
              --host 0.0.0.0 --port 8001 --proxy-headers
     volumes:
       - dsl_data:/mnt/data/dsl
-      - checkpoints_data:/mnt/checkpoints # ☁E追加�E�E
+      - checkpoints_data:/mnt/checkpoints
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
@@ -85,31 +82,9 @@ services:
     restart: on-failure
 
   ##########################################################################
-  # Redis
+  # Redis (竊・compose.db.yml)
+  # PostgreSQL (竊・compose.db.yml)
   ##########################################################################
-  redis:
-    image: redis:7-alpine
-    command: >
-      redis-server --requirepass ${REDIS_PASSWORD}
-                   --maxmemory 256mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-
-  ##########################################################################
-  # PostgreSQL
-  ##########################################################################
-  db:
-    image: postgres:16-alpine
-    env_file: [ ../.env ]
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    restart: unless-stopped
 
   ##########################################################################
   # Flower
@@ -156,25 +131,25 @@ services:
     depends_on:
       prom: { condition: service_started }
     restart: unless-stopped
+
   ##########################################################################
-  # Exporters�E��Eート�E別 compose で管琁E��E
+  # Exporters
   ##########################################################################
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
     env_file: [ ../.env ]
-    environment:
-      # ---------- ここが�EインチE----------
-      CELERY_BROKER_URL: "" # ↁE無効匁E
-      BROKER_URL: "" # ↁE念のため空
-      CE_BROKER_URL: redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0
-      CE_PORT: 9808
+    command:
+      - --broker-url=redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0
+      - --port=9808
+    depends_on:
+      redis: { condition: service_started }
     restart: unless-stopped
 
   redis-exporter:
     image: oliver006/redis_exporter:v1.60.0
     env_file: [ ../.env ]
     command:
-      - "--redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379"
+      - --redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379
     depends_on:
       redis: { condition: service_started }
     restart: unless-stopped

@@ -1,10 +1,12 @@
-# docker/compose.nginx.yml
+﻿# docker/compose.nginx.yml
 
 services:
   nginx:
-    # ── Edge 公開時だぁE443 を開ける
+    # 隨渉隨渉 Edge 陷茨ｽｬ鬮｢蛹ｺ蜃ｾ邵ｺ・ｰ邵ｺ繝ｻ443 郢ｧ蟶晏ｹ慕ｸｺ莉｣・・
     ports:
       - "443:443"
-    # 追加 vhost / static などは↓を参老E��
+    # 髴托ｽｽ陷会｣ｰ vhost / static 邵ｺ・ｪ邵ｺ・ｩ邵ｺ・ｯ遶願侭・定愾繧環繝ｻ竊・
     # volumes:
     #   - ./ops/extra-site.conf:/etc/nginx/conf.d/extra-site.conf:ro
+
+

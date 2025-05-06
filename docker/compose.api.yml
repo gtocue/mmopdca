@@ -1,4 +1,4 @@
-# docker/compose.api.yml   (開発用オーバ�Eライド侁E
+﻿# docker/compose.api.yml   (鬮｢迢怜験騾包ｽｨ郢ｧ・ｪ郢晢ｽｼ郢晁・繝ｻ郢晢ｽｩ郢ｧ・､郢晄・・ｾ繝ｻ
 
 services:
   api:

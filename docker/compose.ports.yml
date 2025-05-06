@@ -1,11 +1,18 @@
-
+﻿# 窶補・窶懷､夜Κ縺ｫ蜈ｬ髢九＠蠕励ｋ繝昴・繝遺・荳隕ｧ縲ょｮ滄圀縺ｫ髢九￠繧九°縺ｩ縺・°縺ｯ override 縺ｧ蛻ｶ蠕｡縲・
 services:
-  # ── Core ───────────────────────────────────────────────────────
+  # Core
   api: { ports: [ "8001:8001" ] }
   grafana: { ports: [ "3000:3000" ] }
   prom: { ports: [ "9090:9090" ] }
   flower: { ports: [ "5555:5555" ] }
   celery-exporter: { ports: [ "9808:9808" ] }
   redis-exporter: { ports: [ "9121:9121" ] }
-  # Dash 系 (mother / master / orch / ops / plan / do / check / act)
-  # ⇁Eすべて **不要E* のためエントリを削除
+  # Dash 邉ｻ・域悴菴ｿ逕ｨ縺ｮ縺溘ａ繝・ヵ繧ｩ繝ｫ繝医〒縺ｯ繧ｳ繝｡繝ｳ繝医い繧ｦ繝茨ｼ・
+  # mother: { ports: [ "7400:7400" ] }
+  # master: { ports: [ "7401:7401" ] }
+  # orch:   { ports: [ "7402:7402" ] }
+  # ops:    { ports: [ "7403:7403" ] }
+  # plan:   { ports: [ "7404:7404" ] }
+  # do:     { ports: [ "7405:7405" ] }
+  # check:  { ports: [ "7406:7406" ] }
+  # act:    { ports: [ "7407:7407" ] }

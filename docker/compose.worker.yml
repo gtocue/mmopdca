@@ -1,9 +1,9 @@
-# docker/compose.worker.yml
+﻿# docker/compose.worker.yml
 #
-# ── Worker のスケール値だけを宣言するレイヤ、E
-#    ※ docker compose (Swarm でなぁE では deploy.replicas は無視されるので
-#       実コンチE��数を変えたい場合�E `docker compose up --scale worker=3 …`
-#       もしく�E Swarm/K8s に移行した時だけ有効になる、と忁E��てください、E
+# 隨渉隨渉 Worker 邵ｺ・ｮ郢ｧ・ｹ郢ｧ・ｱ郢晢ｽｼ郢晢ｽｫ陋滂ｽ､邵ｺ・ｰ邵ｺ莉｣・定楜・｣髫ｪﾂ邵ｺ蜷ｶ・狗ｹ晢ｽｬ郢ｧ・､郢晢ｽ､邵ｲ繝ｻ
+#    遯ｶ・ｻ docker compose (Swarm 邵ｺ・ｧ邵ｺ・ｪ邵ｺ繝ｻ 邵ｺ・ｧ邵ｺ・ｯ deploy.replicas 邵ｺ・ｯ霎滂ｽ｡髫墓じ・・ｹｧ蠕鯉ｽ狗ｸｺ・ｮ邵ｺ・ｧ
+#       陞ｳ貅倥＆郢晢ｽｳ郢昴・繝ｪ隰ｨ・ｰ郢ｧ雋橸ｽ､蟲ｨ竏ｴ邵ｺ貅假ｼ櫁撻・ｴ陷ｷ蛹ｻ繝ｻ `docker compose up --scale worker=3 遯ｶ・ｦ`
+#       郢ｧ繧・ｼ邵ｺ荳翫・ Swarm/K8s 邵ｺ・ｫ驕假ｽｻ髯ｦ蠕鯉ｼ邵ｺ貊灘・邵ｺ・ｰ邵ｺ隨ｬ諤剰怏・ｹ邵ｺ・ｫ邵ｺ・ｪ郢ｧ荵敖竏壺・陟｢繝ｻ・ｾ蜉ｱ窶ｻ邵ｺ荳岩味邵ｺ霈費ｼ樒ｸｲ繝ｻ
 
 services:
   worker:

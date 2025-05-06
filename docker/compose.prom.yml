@@ -1,6 +1,6 @@
-# docker/compose.prom.yml
+﻿# docker/compose.prom.yml
 #
-# ── Prometheus のポ�Eトを恒常皁E��外へ出したぁE��合だけ使ぁE��E
+# 隨渉隨渉 Prometheus 邵ｺ・ｮ郢晄亢繝ｻ郢晏現・定ｫｱ雋橸ｽｸ・ｸ騾ｧ繝ｻ竊楢棔謔ｶ竏郁怎・ｺ邵ｺ蜉ｱ笳・ｸｺ繝ｻ・ｰ・ｴ陷ｷ蛹ｻ笆｡邵ｺ蜿ｰ・ｽ・ｿ邵ｺ繝ｻﾂ繝ｻ
 
 services:
   prom:

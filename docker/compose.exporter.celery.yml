@@ -1,4 +1,4 @@
-# docker/compose.exporter.celery.yml
+﻿# docker/compose.exporter.celery.yml
 
 services:
   celery-exporter:

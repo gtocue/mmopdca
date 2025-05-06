@@ -1,0 +1,121 @@
+# .github/workflows/ci.yml
+#
+# GitHub Actions ― コンテナ群が “起動して 200 OK を返す” までを
+# 自動テストする最小 CI。push / PR で実行される。
+#
+# ❶ .env をワークフロー内で生成（テスト用の簡易パスワード）
+# ❷ docker-compose (core + db + ports) を ―build 付きで起動
+# ❸ 4 つのヘルスエンドポイントに 200 が返るまでリトライ
+# ❹ 成功すればワークフローは green
+#
+# ※ “assistant key” に沿い、コメントはすべて日本語／80 桁以内
+# ---------------------------------------------------------------------
+
+name: CI (Docker Compose)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  compose-ci:
+    runs-on: ubuntu-latest
+
+    steps:
+    # ──────────────────────────────
+    # 1) ソースを取得
+    # ──────────────────────────────
+    - name: 📥 Checkout
+      uses: actions/checkout@v4
+
+    # ──────────────────────────────
+    # 2) 最小構成の .env を動的生成
+    # ──────────────────────────────
+    - name: 🛠️ Generate minimal .env (for CI)
+      run: |
+        cat <<'EOF' > .env
+        # ---------- Redis ----------
+        REDIS_PASSWORD=testpass123
+        REDIS_PASSWORD_ENC=$(python - <<'PY'
+        import urllib.parse, os, sys
+        print(urllib.parse.quote(os.getenv("REDIS_PASSWORD", "testpass123")))
+        PY
+        )
+        # ---------- PostgreSQL ----------
+        POSTGRES_DB=mmopdca
+        POSTGRES_USER=mmop_user
+        POSTGRES_PASSWORD=mmop_pw
+        # ---------- Paths ----------
+        DSL_ROOT=/mnt/data/dsl
+        # ---------- Misc ----------
+        LOG_LEVEL=INFO
+        TZ=UTC
+        EOF
+
+        echo '🔑  .env generated:'
+        cat .env
+
+    # ──────────────────────────────
+    # 3) Buildx (レイヤキャッシュ用)
+    # ──────────────────────────────
+    - name: 🐳 Set-up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    # ──────────────────────────────
+    # 4) Compose up (ビルド＋デタッチ)
+    # ──────────────────────────────
+    - name: 🚀 Compose up (build & detached)
+      run: |
+        docker compose \
+          --env-file .env \
+          -f docker/compose.core.yml \
+          -f docker/compose.db.yml \
+          -f docker/compose.ports.yml \
+          up -d --build
+
+    # ──────────────────────────────
+    # 5) 主要ポートが 200 を返すまで待機
+    # ──────────────────────────────
+    - name: ⏳ Wait until all ports return HTTP 200
+      run: |
+        set -e
+        ports=(8001 3000 9090 9121 9808)
+        paths=("/docs" "/" "/metrics" "/metrics" "/metrics")
+        max_retry=30
+
+        for i in "${!ports[@]}"; do
+          p=${ports[$i]}
+          path=${paths[$i]}
+          try=0
+          until curl -fsS "http://localhost:${p}${path}" -o /dev/null; do
+            if [ $try -ge $max_retry ]; then
+              echo "❌  Port ${p}${path} failed to return 200 in time" >&2
+              docker compose down -v --remove-orphans
+              exit 1
+            fi
+            echo "⏳  Waiting for http://localhost:${p}${path} (try $try)"
+            try=$((try+1))
+            sleep 3
+          done
+          echo "✅  http://localhost:${p}${path} is up"
+        done
+
+    # ──────────────────────────────
+    # 6) (任意) ここで pytest など実行
+    # ──────────────────────────────
+    # - name: 🧪 Run tests
+    #   run: pytest -q tests/
+
+    # ──────────────────────────────
+    # 7) 後片付け
+    # ──────────────────────────────
+    - name: 🧹 Compose down (always)
+      if: always()
+      run: |
+        docker compose \
+          --env-file .env \
+          -f docker/compose.core.yml \
+          -f docker/compose.db.yml \
+          -f docker/compose.ports.yml \
+          down -v --remove-orphans
