@@ -3,27 +3,26 @@
 # =========================================================
 #
 # 【概要】
-#   CheckRouter ― Do 結果を評価してメトリクスを保存する
+#   CheckRouter – Do の Parquet を評価し、メトリクスを永続化
 #
 # ---------------------------------------------------------
-
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Path, status
 
-from core.schemas.check_schemas import CheckResult        # pydantic スキーマ
+from core.check.check_executor import CheckExecutor
 from core.repository.factory import get_repo
+from core.schemas.check_schemas import CheckResult
+from core.schemas.do_schemas import DoStatus
 
 router = APIRouter(prefix="/check", tags=["check"])
 
-# Do / Check 用リポジトリ
-_do_repo    = get_repo("do")       # status, result が入っている
-_check_repo = get_repo("check")    # ここに評価結果を保存
-
+_do_repo = get_repo("do")
+_check_repo = get_repo("check")
 
 # ──────────────────────────────────────────────
 # POST /check/{do_id}
@@ -36,29 +35,28 @@ _check_repo = get_repo("check")    # ここに評価結果を保存
 def create_check(
     do_id: str = Path(..., description="対象 Do ID"),
 ) -> CheckResult:
-    # 1) Do 結果をロード
+    # 1) Do レコード確認
     do_rec = _do_repo.get(do_id)
     if do_rec is None:
         raise HTTPException(404, "Do not found")
-    if do_rec["status"] != "DONE":
+    if do_rec["status"] != DoStatus.DONE:
         raise HTTPException(400, "Do not finished yet")
 
-    # 2) ごく簡易な評価ロジック（r2 > 0.8 合格）
-    r2 = do_rec["result"]["metrics"]["r2"]
-    threshold = 0.8
-    passed = r2 >= threshold
+    plan_id = do_rec["plan_id"]
+    run_id = do_rec["do_id"].split("__")[-1] if "__" in do_rec["do_id"] else do_rec["do_id"]
 
-    check = CheckResult(
-        id=f"check-{uuid.uuid4().hex[:8]}",
-        do_id=do_id,
-        created_at=datetime.utcnow(),
-        report={"r2": r2, "threshold": threshold, "pass": passed},
-    )
+    # 2) CheckExecutor 実行
+    try:
+        result = CheckExecutor.run(plan_id, run_id)
+    except Exception as exc:
+        raise HTTPException(500, f"CheckExecutor error: {exc}") from exc
 
-    # 3) 保存
-    _check_repo.create(check.id, check.model_dump(mode="json"))
-    return check
+    # 3) 永続化
+    rec = result.model_dump(mode="json")
+    rec["created_at"] = datetime.now(timezone.utc).isoformat()
+    _check_repo.create(result.id, rec)
 
+    return result
 
 # ──────────────────────────────────────────────
 # GET /check/{check_id}
@@ -69,7 +67,6 @@ def get_check(check_id: str) -> CheckResult:
     if rec is None:
         raise HTTPException(404, "CheckResult not found")
     return CheckResult(**rec)
-
 
 # ──────────────────────────────────────────────
 # GET /check/

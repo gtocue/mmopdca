@@ -1,5 +1,5 @@
 # =========================================================
-# ASSIST_KEY: このファイルは【core/schemas/check_schemas.py】に位置するユニットです
+# ASSIST_KEY: 【core/schemas/check_schemas.py】に位置するユニットです
 # =========================================================
 #
 # 【概要】
@@ -13,34 +13,40 @@
 #   - api/routers/check_api.py           … 生成 & 永続化
 #   - core/repository/*                  … 任意バックエンド
 #
-# 【ルール遵守】 … (共通ガイドライン参照)
 # ---------------------------------------------------------
-
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Union
+from typing import Any, Dict, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class CheckReport(BaseModel):
     """
-    r2・threshold・pass/failed など可変キーを許容する緩いモデル
+    可変キーを許容する緩いメトリクスモデル。
+    デフォルト項目として r2 / threshold / passed を持ち、
+    追加指標 (rmse, mape など) は extra="allow" で拡張可能。
     """
+
     r2: float = Field(..., ge=-1.0, le=1.0, description="決定係数")
     threshold: float = Field(..., ge=-1.0, le=1.0, description="合格ライン")
     passed: bool = Field(..., description="閾値をクリアしたら True")
-    # NOTE: 今後 rmse, mape など追加する場合はここに列挙 or Extra="allow"
+
+    model_config = ConfigDict(extra="allow")  # ★ 追加指標を許容
 
 
 class CheckResult(BaseModel):
     """
     /check エンドポイントのレスポンス & ストレージフォーマット
     """
+
     id: str = Field(..., description="check-xxxx 形式の一意 ID")
     do_id: str = Field(..., description="評価対象の Do ID")
     created_at: datetime = Field(..., description="UTC ISO8601")
+
+    # report は厳密モデル(CheckReport)でも任意 Dict でも可
     report: Dict[str, Union[int, float, str, bool]] | CheckReport = Field(
-        ..., description="メトリクス JSON"
+        ...,
+        description="メトリクス JSON",
     )

@@ -15,6 +15,7 @@
 #   - core.datasource.get_source()      … 任意データソース
 #   - core.celery_app.run_do_task       … Celery シャーディング
 #   - core.do.checkpoint               … save / load / duplicate-guard
+#   - core.common.io_utils             … Parquet 保存ユーティリティ
 #
 # 【ルール遵守】
 #   1) Close_main / Open_main を直接操作しない
@@ -36,7 +37,9 @@ from pandas.tseries.offsets import BDay, CustomBusinessDay
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 
-from core.do import checkpoint as ckpt  # ★ checkpoint ユーティリティを統合
+from core.do import checkpoint as ckpt  # ★ checkpoint ユーティリティ
+from core.common.io_utils import save_predictions  # ★ Parquet 保存
+from core.constants import ensure_directories  # ディレクトリ作成ヘルパー
 
 # ───────────────────────────── logger
 logger = logging.getLogger(__name__)
@@ -60,9 +63,9 @@ except Exception:  # noqa: BLE001
 
     logger.warning("[Do] datasource fallback to yfinance")
 
-# ======================================================================
+# =========================================================
 # public API
-# ======================================================================
+# =========================================================
 def run_do(  # noqa: D401
     plan_id: str,
     params: Dict[str, Any],
@@ -76,6 +79,8 @@ def run_do(  # noqa: D401
     * 最終 shard だけ詳細結果 (summary/predictions) を返す
     * 中間 shard は軽量な進捗オブジェクトのみ
     """
+    ensure_directories()  # artifacts/・pdca_data/ を必ず作成
+
     sym, start, end, ind_cfg, run_no, holidays = _parse_params(params)
     run_id = f"{plan_id}__{run_no:04d}"
 
@@ -116,6 +121,9 @@ def run_do(  # noqa: D401
             for d, p in zip(dates, preds[-30:])
         ]
 
+        # ───── Parquet 保存 (prediction artifact)
+        artifact_uri = _save_prediction_artifact(df, preds, plan_id, run_id)
+
         summary = {
             "rows": int(len(df)),
             "features_used": fcols,
@@ -128,15 +136,16 @@ def run_do(  # noqa: D401
             "summary": summary,
             "metrics": metrics,
             "predictions": last30,
+            "artifact_uri": artifact_uri,  # ★ ← DoResponse 用
         }
 
     # ───── intermediate shard
     return {"run_id": run_id, "epoch": epoch_idx + 1, "status": "IN_PROGRESS"}
 
 
-# ======================================================================
+# =========================================================
 # internal helpers  (以下は MVP 版と同等)
-# ======================================================================
+# =========================================================
 def _train_one_epoch(epoch: int) -> None:
     """
     疑似的な学習時間を sleep で再現。
@@ -252,3 +261,30 @@ def _train_and_predict(
     r2 = float(np.corrcoef(y, preds)[0, 1] ** 2)
     logger.info("[Do] rows=%d r2=%.4f rmse=%.4f", len(df), r2, rmse)
     return preds, model, feats, {"r2": r2, "rmse": float(round(rmse, 6))}
+
+
+# --------------------------------------------------
+# prediction artifact helper
+# --------------------------------------------------
+def _save_prediction_artifact(
+    df: pd.DataFrame,
+    preds: np.ndarray,
+    plan_id: str,
+    run_id: str,
+) -> str:
+    """
+    df + preds → artifact Parquet を生成し、保存 URI を返す。
+    """
+    artifact_df = pd.DataFrame(
+        {
+            "symbol": df.index.map(lambda _: plan_id),  # FIXME: ハードコード
+            "ts": df.index,
+            "horizon": 1,
+            "y_true": df["Close"].shift(-1).dropna(),
+            "y_pred": preds,
+            "model_id": "linreg",  # FIXME: ハードコード
+        }
+    ).dropna()
+
+    uri = save_predictions(artifact_df, plan_id=plan_id, run_id=run_id)
+    return uri

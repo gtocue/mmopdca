@@ -150,11 +150,12 @@ class DoResponse(BaseModel):
     )
 
     # ----- 付加情報 ---------------------------------------------------
+    artifact_uri: Optional[str] = Field(          # ★ 追加
+        default=None,
+        description="Parquet 予測ファイルの保存 URI",
+    )
     dashboard_url: Optional[HttpUrl] = Field(
         default=None,
         description="Superset 等に自動生成された可視化 URL（任意）",
     )
-
-
-# 公開シンボル
-__all__ = ["DoStatus", "DoCreateRequest", "DoResponse"]
+    
