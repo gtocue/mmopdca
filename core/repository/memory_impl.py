@@ -1,32 +1,61 @@
 # =========================================================
-# ASSIST_KEY: 【core/repository/memory_impl.py】
+#  core/repository/memory_impl.py
 # =========================================================
-#
-# インメモリ辞書で CRUD を提供するシンプル実装。
-# ---------------------------------------------------------
+"""
+インメモリ実装 ― unittest やローカル開発用の軽量レポジトリ。
+スレッドセーフ性は（現状の用途では）考慮していません。
+"""
 
 from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from .base import BaseRepository
 
+class MemoryRepository:
+    """dict ベースのシンプルな Repository。"""
 
-class MemoryRepository(BaseRepository):
-    """開発・テスト用の軽量実装（プロセス終了で消える）"""
+    # テーブル名 → ストア(dict) のシングルトン管理
+    _TABLES: Dict[str, Dict[str, Dict[str, Any]]] = {}
 
-    _GLOBAL_STORE: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    # --------------------------------------------------
+    # constructor
+    # --------------------------------------------------
+    def __init__(self, table: str = "default") -> None:
+        self.table = table
+        MemoryRepository._TABLES.setdefault(table, {})
 
-    # ------------ CRUD ------------
-    def create(self, obj_id: str, data: Dict[str, Any]) -> None:
-        tbl = self._GLOBAL_STORE.setdefault(self.table, {})
-        tbl[obj_id] = data
+    # --------------------------------------------------
+    # CRUD
+    # --------------------------------------------------
+    def create(self, key: str, record: Dict[str, Any]) -> None:
+        self._store()[key] = record
 
-    def get(self, obj_id: str) -> Dict[str, Any] | None:
-        return self._GLOBAL_STORE.get(self.table, {}).get(obj_id)
+    def get(self, key: str) -> Dict[str, Any] | None:
+        return self._store().get(key)
+
+    def delete(self, key: str) -> None:
+        self._store().pop(key, None)
 
     def list(self) -> List[Dict[str, Any]]:
-        return list(self._GLOBAL_STORE.get(self.table, {}).values())
+        return list(self._store().values())
 
-    def delete(self, obj_id: str) -> None:
-        self._GLOBAL_STORE.get(self.table, {}).pop(obj_id, None)
+    # --------------------------------------------------
+    # 追加分（metrics／Do 用）
+    # --------------------------------------------------
+    def upsert(self, key: str, record: Dict[str, Any]) -> None:
+        """存在すれば更新・無ければ作成。"""
+        self._store()[key] = record
+
+    def put(self, key: str, record: Dict[str, Any]) -> None:
+        """metrics_repo 互換エイリアス。"""
+        self.upsert(key, record)
+
+    def keys(self) -> List[str]:
+        """登録済みキー一覧を返す。"""
+        return list(self._store().keys())
+
+    # --------------------------------------------------
+    # internal
+    # --------------------------------------------------
+    def _store(self) -> Dict[str, Dict[str, Any]]:
+        return MemoryRepository._TABLES[self.table]

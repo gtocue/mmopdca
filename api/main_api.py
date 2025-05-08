@@ -11,37 +11,36 @@
 #   • api/routers/do_api.py         – Do (Celery enqueue)
 #   • api/routers/check_api.py      – Check (Parquet 評価)
 #   • api/routers/act_api.py        – Act   (未実装なら 501 Stub)
-#   • api/routers/metrics.py        – Prometheus 指標 (任意)
+#   • api/routers/metrics.py        – 指標 CRUD API (任意)
+#   • api/routers/metrics_exporter.py – Prometheus Exporter (任意)
 #
-# 追加・変更ポリシ:
-#   1) **破壊的変更は禁止**（追加のみ可）
+# ポリシ
+#   1) 破壊的変更は禁止（追加のみ可）
 #   2) /health は include_in_schema=False でドキュメント非公開
 # ---------------------------------------------------------------------
 from __future__ import annotations
 
 import logging
 from importlib import import_module
-from typing import List
 
 from dotenv import load_dotenv, find_dotenv
-load_dotenv(find_dotenv())   # *.env を再帰探索して環境変数に投入
+
+load_dotenv(find_dotenv())  # *.env を再帰探索して環境変数に投入
 
 from fastapi import APIRouter, FastAPI
 
+# ───────────────────────── logger
 logger = logging.getLogger(__name__)
+logger.setLevel("INFO")
 
 # ----------------------------------------------------------------------
-# Helper : 任意ルータを安全に import（無ければ 501 Stub で代替）
+# Helper : 任意ルータを安全に import（無ければ 501 Stub へフォールバック）
 # ----------------------------------------------------------------------
 def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
-    """
-    任意ルータを安全に import。ModuleNotFoundError だけでなく
-    **FileNotFoundError も握って 501 Stub** にフォールバックする。
-    """
     try:
         module = import_module(path)
         return getattr(module, "router")
-    except (ModuleNotFoundError, FileNotFoundError):  # 👈 追加
+    except (ModuleNotFoundError, FileNotFoundError):
         logger.warning("[main_api] %s unavailable – 501 stub で代替", path)
         stub = APIRouter(prefix=prefix, tags=[tag])
 
@@ -62,9 +61,17 @@ from api.routers.do_api import router as do_router              # type: ignore
 # ----------------------------------------------------------------------
 # Optional Routers（存在しなければ stub）
 # ----------------------------------------------------------------------
-check_router   = _import_optional("api.routers.check_api", "/check", "check")
-act_router     = _import_optional("api.routers.act_api", "/act", "act")
-metrics_router = _import_optional("api.routers.metrics", "/metrics", "metrics")
+check_router = _import_optional("api.routers.check_api", "/check", "check")
+act_router = _import_optional("api.routers.act_api", "/act", "act")
+metrics_router = _import_optional("api.routers.metrics", "/metrics-api", "metrics")
+
+# ── Prometheus Exporter は “サブアプリ” のため別 import
+try:
+    from api.routers.metrics_exporter import create_metrics_exporter
+    exporter_app = create_metrics_exporter()
+except (ModuleNotFoundError, FileNotFoundError):
+    exporter_app = None
+    logger.warning("[main_api] metrics_exporter unavailable – skip mount")
 
 # ----------------------------------------------------------------------
 # FastAPI Application
@@ -84,7 +91,6 @@ meta_router = APIRouter(tags=["meta"])
 
 @meta_router.get("/health", include_in_schema=False)
 def health() -> dict[str, str]:
-    """Liveness / Readiness Probe for k8s / Docker HEALTHCHECK."""
     return {"status": "ok"}
 
 
@@ -95,13 +101,17 @@ app.include_router(meta_router)
 # ----------------------------------------------------------------------
 app.include_router(plan_router)        # /plan
 app.include_router(plan_dsl_router)    # /plan-dsl
-app.include_router(do_router)          # /do   (202 Accepted & Celery run)
+app.include_router(do_router)          # /do
 app.include_router(check_router)       # /check
 app.include_router(act_router)         # /act
-app.include_router(metrics_router)     # /metrics
+app.include_router(metrics_router)     # /metrics-api  ← CRUD 側
+
+# Prometheus Exporter (/metrics) – 任意
+if exporter_app:
+    app.mount("/metrics", exporter_app, name="metrics-exporter")
 
 # ----------------------------------------------------------------------
 # NOTE:
 #   • 認証 / CORS / 共通エラーハンドラは別ユニットで追加予定
-#   • /metrics/* は Prometheus Exporter など外部用途でも再利用
-# ----------------------------------------------------------------------
+#   • /metrics (exporter) と /metrics-api (CRUD) を分離
+# ---------------------------------------------------------------------

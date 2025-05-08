@@ -2,13 +2,11 @@
 # ASSIST_KEY: このファイルは【api/routers/do_api.py】に位置するユニットです
 # =========================================================
 #
-# 【概要】
-#   Do-phase Router  – Celery 完全オフロード
+# Do-phase Router – Celery 完全オフロード
 #   • POST  /do/{plan_id}        : 202 Accepted で {do_id, task_id}
 #   • GET   /do/{do_id}          : 実行状態／結果 (DoResponse)
 #   • GET   /do/                 : 一覧
 #   • GET   /do/status/{task_id} : Celery タスク state
-#
 # ---------------------------------------------------------
 from __future__ import annotations
 
@@ -32,7 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/do", tags=["do"])
 
 _plan_repo = get_repo("plan")
-_do_repo = get_repo("do")
+_do_repo   = get_repo("do")
 
 # ------------------------------------------------------------------ #
 # helpers
@@ -41,7 +39,7 @@ def _merge_params(plan: PlanResponse, req: DoCreateRequest) -> Dict[str, Any]:
     params: Dict[str, Any] = {
         "symbol": req.symbol or plan.symbol,
         "start": (req.start or plan.start).isoformat(),
-        "end": (req.end or plan.end).isoformat(),
+        "end":   (req.end or plan.end).isoformat(),
         "indicators": req.indicators or [],
         "run_no": req.run_no,
         "run_tag": req.run_tag,
@@ -57,9 +55,7 @@ def _merge_params(plan: PlanResponse, req: DoCreateRequest) -> Dict[str, Any]:
 
 
 def _upsert(rec: Dict[str, Any]) -> None:
-    _do_repo.delete(rec["do_id"])
-    _do_repo.create(rec["do_id"], rec)
-
+    _do_repo.upsert(rec["do_id"], rec)
 
 # ------------------------------------------------------------------ #
 # POST /do/{plan_id}
@@ -81,15 +77,17 @@ def enqueue_do(plan_id: str, body: Optional[DoCreateRequest] = None) -> JSONResp
     run_no = req.run_no or req.seq or 1
     req.run_no = req.seq = run_no
 
-    # --- Celery 発火 --------------------------------------------------
+    # --- ID 生成 -----------------------------------------------------
     task_id = uuid.uuid4().hex
-    run_do_task.apply_async(
-        args=[plan.id, _merge_params(plan, req)],
+    do_id   = f"do-{task_id[:8]}"        # ★ Celery 引数に必要なので先に作成
+
+    # --- Celery 発火 --------------------------------------------------
+    run_do_task.apply_async(             # ★ 引数は 3 つ
+        args=[do_id, plan.id, _merge_params(plan, req)],
         task_id=task_id,
     )
 
     # --- 初期レコード保存 -------------------------------------------
-    do_id = f"do-{task_id[:8]}"
     _do_repo.create(
         do_id,
         {
