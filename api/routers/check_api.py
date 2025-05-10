@@ -25,7 +25,6 @@
 #   3) Pydantic v2 モデルとのフィールド整合性保持
 # ---------------------------------------------------------
 from __future__ import annotations
-
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -38,7 +37,6 @@ from celery.backends.base import DisabledBackend
 from celery.result import AsyncResult
 
 from core.celery_app import celery_app
-from core.tasks.check_tasks import run_check_task
 from core.repository.factory import get_repo
 from core.schemas.check_schemas import CheckResult
 
@@ -70,12 +68,13 @@ def enqueue_check(do_id: str) -> JSONResponse:
         logger.error("Do '%s' not found", do_id)
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Do '{do_id}' not found")
 
-    # ID・タスクID 生成
+    # task_id / check_id 生成
     task_id  = uuid.uuid4().hex
     check_id = f"check-{task_id[:8]}"
 
-    # Celery にキュー投入
-    run_check_task.apply_async(
+    # Celery に enqueue (文字列タスク名)
+    celery_app.send_task(
+        "core.tasks.check_tasks.run_check_task",
         args=[check_id, do_id],
         task_id=task_id,
     )

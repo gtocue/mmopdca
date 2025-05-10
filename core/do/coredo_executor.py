@@ -1,27 +1,17 @@
-# =========================================================
-# ASSIST_KEY: 【core/do/coredo_executor.py】
-# =========================================================
+# ======================================================================
+#  core/do/coredo_executor.py
+# ======================================================================
 #
-# 【概要】
-#   Do-phase Executor – “Spot-Checkpoint × Shard” 拡張版
+# Do-phase Executor  ― Spot-Checkpoint × Shard 拡張版
 #
-# 【主な役割】
-#   1. 価格取得 (IDataSource / yfinance fallback)
-#   2. 指標計算  : SMA / EMA / RSI
-#   3. モデリング: 線形回帰で翌営業日 Close を予測
-#   4. チェックポイント: shard(epoch) 毎に JSON 保存し再開を保証
+# 1. 価格データ取得      (IDataSource → fallback: yfinance)
+# 2. テクニカル指標計算  SMA / EMA / RSI
+# 3. 線形回帰で翌営業日 Close を予測
+# 4. shard(epoch) 毎にチェックポイント保存して再開保証
 #
-# 【連携先・依存関係】
-#   - core.datasource.get_source()      … 任意データソース
-#   - core.celery_app.run_do_task       … Celery シャーディング
-#   - core.do.checkpoint               … save / load / duplicate-guard
-#   - core.common.io_utils             … Parquet 保存ユーティリティ
-#
-# 【ルール遵守】
-#   1) Close_main / Open_main を直接操作しない
-#   2) 型安全重視・ハードコードに “TODO” コメント
-#   3) breaking change 禁止（パラメータ追加のみ）
-# ---------------------------------------------------------
+# Check-phase へ返すインターフェース
+#   └ 最終 shard の return に **status / r2 / threshold / passed** を含める
+# ----------------------------------------------------------------------
 
 from __future__ import annotations
 
@@ -37,9 +27,9 @@ from pandas.tseries.offsets import BDay, CustomBusinessDay
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 
-from core.do import checkpoint as ckpt  # ★ checkpoint ユーティリティ
-from core.common.io_utils import save_predictions  # ★ Parquet 保存
-from core.constants import ensure_directories  # ディレクトリ作成ヘルパー
+from core.do import checkpoint as ckpt
+from core.common.io_utils import save_predictions
+from core.constants import ensure_directories
 
 # ───────────────────────────── logger
 logger = logging.getLogger(__name__)
@@ -50,7 +40,8 @@ if not logger.handlers:
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
 
 # ───────────────────────────── env & const
-TOTAL_EPOCHS = int(os.getenv("DO_TOTAL_SHARDS", "12"))  # Celery と共有
+TOTAL_EPOCHS: int   = int(os.getenv("DO_TOTAL_SHARDS", "12"))
+METRIC_THRESHOLD: float = float(os.getenv("CHECK_R2_THRESHOLD", "0.80"))
 
 # ───────────────────────────── datasource
 try:
@@ -63,10 +54,10 @@ except Exception:  # noqa: BLE001
 
     logger.warning("[Do] datasource fallback to yfinance")
 
-# =========================================================
+# ======================================================================
 # public API
-# =========================================================
-def run_do(  # noqa: D401
+# ======================================================================
+def run_do(
     plan_id: str,
     params: Dict[str, Any],
     *,
@@ -76,8 +67,8 @@ def run_do(  # noqa: D401
     """
     1 shard (=1 epoch) 分の処理を行う。
 
-    * 最終 shard だけ詳細結果 (summary/predictions) を返す
-    * 中間 shard は軽量な進捗オブジェクトのみ
+    * 最終 shard は詳細結果 (summary / metrics / predictions …) を返す
+    * 中間 shard は軽量オブジェクトのみ返す
     """
     ensure_directories()  # artifacts/・pdca_data/ を必ず作成
 
@@ -86,12 +77,11 @@ def run_do(  # noqa: D401
 
     # ───── duplicate guard
     if ckpt.is_done(run_id, epoch_idx):
-        logger.info("[Do] duplicate detected – %s epoch %d already done", run_id, epoch_idx)
+        logger.info("[Do] duplicate – %s epoch %d already done", run_id, epoch_idx)
         return {"run_id": run_id, "epoch": epoch_idx, "status": "SKIPPED_DUPLICATE"}
 
-    # ───── ckpt load (resume support)
+    # ───── checkpoint resume
     state = ckpt.load_latest_ckpt(run_id, epoch_idx) or {"current_epoch": 0}
-
     logger.info(
         "[Do] run %s epoch %d/%d (resume=%s)",
         run_id,
@@ -100,58 +90,62 @@ def run_do(  # noqa: D401
         state["current_epoch"],
     )
 
-    # ───── epoch simulate & ckpt flush
+    # ───── simulate training work & flush ckpt
     _train_one_epoch(epoch_idx)
     state["current_epoch"] = epoch_idx + 1
     ckpt.save_ckpt(run_id, epoch_idx, state)
 
-    # ───── if last shard → full pipeline & return
+    # ───── 最終 shard でフルパイプライン
     if epoch_idx + 1 == epoch_cnt:
         df = _download_prices(sym, start, end)
         df = _add_indicators(df, ind_cfg)
-        preds, model, fcols, metrics = _train_and_predict(df)
+        preds, model, fcols, m = _train_and_predict(df)
 
-        ckpt.mark_done(run_id, epoch_idx)  # duplicate-guard sentinel
+        # checkpoint 完了マーク
+        ckpt.mark_done(run_id, epoch_idx)
 
-        # 直近 30
+        # 直近 30 business-day 予測
         bday = _make_bday_offset(holidays)
         dates = (df.index + bday).strftime("%Y-%m-%d")[-30:]
-        last30 = [
-            {"date": d, "price": float(round(p, 4))}
-            for d, p in zip(dates, preds[-30:])
-        ]
+        last30 = [{"date": d, "price": float(round(p, 4))} for d, p in zip(dates, preds[-30:])]
 
-        # ───── Parquet 保存 (prediction artifact)
+        # Parquet artifact
         artifact_uri = _save_prediction_artifact(df, preds, plan_id, run_id)
 
-        summary = {
-            "rows": int(len(df)),
-            "features_used": fcols,
-            "coef": np.round(model.coef_, 6).tolist(),
-            "intercept": float(round(model.intercept_, 6)),
+        # ---- Check-phase が必要とするフィールド
+        r2 = m["r2"]
+        passed = bool(r2 >= METRIC_THRESHOLD)
+        metrics = {
+            "r2": r2,
+            "rmse": m["rmse"],
+            "threshold": METRIC_THRESHOLD,
+            "passed": passed,
         }
+
         return {
+            "status": "SUCCESS",          # ★ Check が参照
             "run_id": run_id,
             "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "summary": summary,
+            "summary": {
+                "rows": int(len(df)),
+                "features_used": fcols,
+                "coef": np.round(model.coef_, 6).tolist(),
+                "intercept": float(round(model.intercept_, 6)),
+            },
             "metrics": metrics,
             "predictions": last30,
-            "artifact_uri": artifact_uri,  # ★ ← DoResponse 用
+            "artifact_uri": artifact_uri,
         }
 
     # ───── intermediate shard
     return {"run_id": run_id, "epoch": epoch_idx + 1, "status": "IN_PROGRESS"}
 
 
-# =========================================================
-# internal helpers  (以下は MVP 版と同等)
-# =========================================================
+# ======================================================================
+# internal helpers
+# ======================================================================
 def _train_one_epoch(epoch: int) -> None:
-    """
-    疑似的な学習時間を sleep で再現。
-
-    Spot インスタンス時は SIGTERM 猶予を考慮し長めに sleep。
-    """
+    """疑似的な学習時間を sleep で再現。"""
     if os.getenv("ONSPOT_INSTANCE", "false").lower() == "true":
         time.sleep(5)
     else:
@@ -184,12 +178,7 @@ def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
         df = _DS.fetch_ohlcv(symbol=symbol, start=start, end=end)
     else:
         df = yf.download(  # type: ignore
-            symbol,
-            start=start,
-            end=end,
-            progress=False,
-            auto_adjust=False,
-            group_by="column",
+            symbol, start=start, end=end, progress=False, auto_adjust=False, group_by="column"
         )
 
     if df.empty:
@@ -198,26 +187,27 @@ def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = ["_".join(map(str, c)) for c in df.columns]
     df.columns = [str(c).capitalize() for c in df.columns]
+
     req: Sequence[str] = ["Open", "High", "Low", "Close", "Volume"]
     if "Adj close" in df.columns:
         df = df.rename(columns={"Adj close": "Adj Close"})
-        req = list(req)
-        req.insert(4, "Adj Close")
+        req = list(req); req.insert(4, "Adj Close")
+
     miss = [c for c in req if c not in df.columns]
     if miss:
         raise RuntimeError(f"missing columns {miss}")
     return df[req].dropna(subset=["Close"]).copy()
 
 
-def _sma(s: pd.Series, w: int) -> pd.Series:  # noqa: D401
+def _sma(s: pd.Series, w: int) -> pd.Series:
     return s.rolling(w, min_periods=w).mean()
 
 
-def _ema(s: pd.Series, w: int) -> pd.Series:  # noqa: D401
+def _ema(s: pd.Series, w: int) -> pd.Series:
     return s.ewm(span=w, adjust=False).mean()
 
 
-def _rsi(s: pd.Series, w: int) -> pd.Series:  # noqa: D401
+def _rsi(s: pd.Series, w: int) -> pd.Series:
     delta = s.diff()
     gain = delta.clip(lower=0).rolling(w, min_periods=w).mean()
     loss = -delta.clip(upper=0).rolling(w, min_periods=w).mean()
@@ -235,13 +225,16 @@ _IND_FUNCS: Dict[str, Callable[[pd.Series, int], pd.Series]] = {
 def _add_indicators(df: pd.DataFrame, cfg: List[Dict[str, Any]]) -> pd.DataFrame:
     close = df["Close"]
     for ind in cfg:
-        name, win = ind["name"].upper(), int(ind.get("window", 5))
+        name = ind["name"].upper()
+        win = int(ind.get("window", 5))
         col = f"{name}_{win}"
         func = _IND_FUNCS.get(name)
         if func is None:
             raise RuntimeError(f"unsupported indicator '{name}'")
         if col not in df.columns:
             df[col] = func(close, win)
+
+    # デフォルトで SMA_5 を必ず入れる
     if "SMA_5" not in df.columns:
         df["SMA_5"] = _sma(close, 5)
     return df.dropna()
@@ -254,12 +247,15 @@ def _train_and_predict(
     feats = [c for c in df.columns if c.startswith(("SMA_", "EMA_", "RSI_"))]
     if not feats:
         raise RuntimeError("no features")
+
     X, y = df[feats].values, df["target"].values
     model = LinearRegression().fit(X, y)
     preds = model.predict(X)
+
     rmse = mean_squared_error(y, preds, squared=False)
     r2 = float(np.corrcoef(y, preds)[0, 1] ** 2)
     logger.info("[Do] rows=%d r2=%.4f rmse=%.4f", len(df), r2, rmse)
+
     return preds, model, feats, {"r2": r2, "rmse": float(round(rmse, 6))}
 
 
@@ -272,19 +268,16 @@ def _save_prediction_artifact(
     plan_id: str,
     run_id: str,
 ) -> str:
-    """
-    df + preds → artifact Parquet を生成し、保存 URI を返す。
-    """
+    """df + preds → Parquet を生成して保存 URI を返す。"""
     artifact_df = pd.DataFrame(
         {
-            "symbol": df.index.map(lambda _: plan_id),  # FIXME: ハードコード
+            "symbol": df.index.map(lambda _: plan_id),  # TODO: symbol カラム追加予定
             "ts": df.index,
             "horizon": 1,
             "y_true": df["Close"].shift(-1).dropna(),
             "y_pred": preds,
-            "model_id": "linreg",  # FIXME: ハードコード
+            "model_id": "linreg",
         }
     ).dropna()
 
-    uri = save_predictions(artifact_df, plan_id=plan_id, run_id=run_id)
-    return uri
+    return save_predictions(artifact_df, plan_id=plan_id, run_id=run_id)

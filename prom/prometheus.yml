@@ -3,32 +3,21 @@
 # ======================================================================
 
 global:
-  # 全体スクレイプ間隔・ルール評価間隔
-  scrape_interval:     15s
+  scrape_interval: 15s
   evaluation_interval: 15s
 
-# Recording / Alert ルール定義ファイル
 rule_files:
-  - /etc/prometheus/rules_mmopdca.yml
+  - /etc/prometheus/rules_mmopdca.yml   # ← 下で書き換え
 
 scrape_configs:
-  # Flower メトリクス
-  - job_name: flower
-    metrics_path: /metrics
-    static_configs:
-      - targets: ["flower:5555"]
-
-  # Celery Exporter
   - job_name: celery-exporter
     static_configs:
-      - targets: ["celery-exporter:9808"]
+      - targets: ['celery-exporter:9808']
 
-  # Redis Exporter
   - job_name: redis-exporter
     static_configs:
-      - targets: ["redis-exporter:9121"]
+      - targets: ['redis-exporter:9121']
 
-  # Prometheus 自身のメトリクス
   - job_name: prometheus
     static_configs:
-      - targets: ["localhost:9090"]
+      - targets: ['localhost:9090']

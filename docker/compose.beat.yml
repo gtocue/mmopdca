@@ -1,12 +1,10 @@
 # docker/compose.beat.yml
-version: "3.9"
-
 services:
   beat:
-    # Celery Beat を直接起動するコマンドだけをオーバーライド
     command:
       - celery
       - -A
       - core.celery_app:celery_app
       - beat
       - --loglevel=info
+      - --schedule=/mnt/checkpoints/celerybeat-schedule

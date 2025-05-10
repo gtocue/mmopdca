@@ -1,10 +1,8 @@
+#################################################################################
 # docker/compose.core.yml
+#  - .env を services.env_file で読み、同名環境変数をそのままパススルー
+#  - `${VAR}` 展開を使わず、<<VAR>> のようにダミー値を入れない
 #################################################################################
-# 全サービスで .env を読み込み、必要分だけ直書き
-#   ・共通アンカーは廃止
-#   ・外部ポートは docker/compose.ports.yml で管理
-#################################################################################
-
 version: "3.9"
 
 services:
@@ -16,11 +14,12 @@ services:
       context: ..
       dockerfile: Dockerfile.main_api
     user: "1000:1000"
-    env_file: [ ../.env ]
+    env_file:
+      - ../.env # ここで .env を注入
     environment:
-      DSL_ROOT: ${DSL_ROOT}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
+      - DSL_ROOT # ← .env の値をそのまま渡す
+      - CELERY_BROKER_URL
+      - CELERY_RESULT_BACKEND
     entrypoint: [ /usr/local/bin/docker-entrypoint-init-dsl.sh ]
     command: >
       python -m uvicorn api.main_api:app
@@ -44,9 +43,9 @@ services:
     user: "1000:1000"
     env_file: [ ../.env ]
     environment:
-      DSL_ROOT: ${DSL_ROOT}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
+      - DSL_ROOT
+      - CELERY_BROKER_URL
+      - CELERY_RESULT_BACKEND
     entrypoint: [ /usr/local/bin/docker-entrypoint-init-dsl.sh ]
     command: >
       celery -A core.celery_app:celery_app worker --loglevel=info
@@ -69,9 +68,9 @@ services:
     user: "1000:1000"
     env_file: [ ../.env ]
     environment:
-      DSL_ROOT: ${DSL_ROOT}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
+      - DSL_ROOT
+      - CELERY_BROKER_URL
+      - CELERY_RESULT_BACKEND
     entrypoint: [ /usr/local/bin/docker-entrypoint-init-dsl.sh ]
     command: >
       celery -A core.celery_app:celery_app
@@ -86,14 +85,14 @@ services:
     restart: on-failure
 
   # ---------------------------------------------------------------------------
-  # Flower
+  # Flower（監視 UI）
   # ---------------------------------------------------------------------------
   flower:
     image: mher/flower:1.2
     env_file: [ ../.env ]
     environment:
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      CELERY_RESULT_BACKEND: ${CELERY_BROKER_URL}
+      - CELERY_BROKER_URL
+      - CELERY_RESULT_BACKEND
     depends_on:
       redis: { condition: service_started }
     restart: unless-stopped
@@ -137,7 +136,7 @@ services:
     image: danihodovic/celery-exporter:0.9.1
     env_file: [ ../.env ]
     environment:
-      CE_BROKER_URL: redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0
+      CE_BROKER_URL: ${CELERY_BROKER_URL}
       CE_PORT: 9808
     restart: unless-stopped
 
@@ -145,7 +144,7 @@ services:
     image: oliver006/redis_exporter:v1.60.0
     env_file: [ ../.env ]
     command:
-      - "--redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379"
+      - --redis.addr=${CELERY_BROKER_URL}
     depends_on:
       redis: { condition: service_started }
     restart: unless-stopped

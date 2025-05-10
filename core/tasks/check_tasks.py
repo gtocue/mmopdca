@@ -1,27 +1,40 @@
+# =========================================================
 # core/tasks/check_tasks.py
 # =========================================================
+#
 # Check フェーズの Celery タスク実装
-#   • Do フェーズの結果を評価し、レポジトリにレポートを記録
-#   • 必要なメトリクスが揃うまでリトライ
-# =========================================================
+#   - Do フェーズの結果を評価し、レポジトリにレポートを記録
+#
+# run_check_task:
+#   • PENDING → RUNNING → SUCCESS/FAILURE を管理
+#   • Do フェーズの完了待ち & メトリクス充足待ち
+#   • SQLiteRepository は delete/create で upsert
+#   • datetime は UTC ISO8601形式
+# ---------------------------------------------------------
 
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, List
+
+from celery import states
+from celery.backends.base import DisabledBackend
 
 from core.celery_app import celery_app
 from core.repository.factory import get_repo
 from core.schemas.check_schemas import CheckReport
+from core.schemas.do_schemas import DoStatus  # Do フェーズの状態定義
 
 logger = logging.getLogger(__name__)
 _check_repo = get_repo("check")
-_do_repo    = get_repo("do")
+_do_repo = get_repo("do")
 
 
 def _upsert(check_id: str, rec: Dict[str, Any]) -> None:
-    # delete/create で upsert
+    """
+    同 ID があれば削除し、新規レコードを作成して upsert を実現
+    """
     try:
         _check_repo.delete(check_id)
     except Exception:
@@ -42,53 +55,57 @@ def run_check_task(self, check_id: str, do_id: str) -> None:
 
     # 1) RUNNING 状態を保存
     rec = _check_repo.get(check_id) or {
-        "id":         check_id,
-        "do_id":      do_id,
+        "id": check_id,
+        "do_id": do_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     rec.update({
-        "status":     "RUNNING",
+        "status": "RUNNING",
         "updated_at": datetime.now(timezone.utc).isoformat(),
     })
     _upsert(check_id, rec)
 
-    # 2) Do フェーズ結果取得
-    rec_do = _do_repo.get(do_id)
-    if rec_do is None or rec_do.get("result") is None:
-        # まだ Do の結果が来ていない
-        logger.info("Do result not found, retrying check: %s", do_id)
-        raise self.retry(countdown=3)
-
-    result_payload: Dict[str, Any] = rec_do["result"]
-
-    # 3) メトリクスが揃っているかチェック
-    #    run_check(do)→ result に status="SUCCESS" と必須フィールドが揃っている想定
-    if result_payload.get("status") != "SUCCESS" or \
-       not all(k in result_payload for k in ("r2", "threshold", "passed")):
-        logger.info("Check not ready (status=%s), retrying...", result_payload.get("status"))
-        raise self.retry(countdown=3)
-
     try:
-        # 4) Pydantic で最終バリデーション＆レポート生成
+        # 2) Do フェーズ結果取得
+        rec_do = _do_repo.get(do_id) or {}
+
+        # 2.1) Do フェーズが完了しているかチェック
+        status_do = rec_do.get("status")
+        if status_do != DoStatus.DONE:
+            logger.info("Do status=%s, retrying…", status_do)
+            # カウントダウンしてリトライ
+            raise self.retry(countdown=3)
+
+        result_payload = rec_do.get("result", {})
+
+        # 2.2) 必須メトリクス揃い待ち
+        required: List[str] = ["r2", "threshold", "passed"]
+        missing = [k for k in required if k not in result_payload]
+        if missing:
+            logger.info("Metrics missing: %s, retrying…", missing)
+            raise self.retry(countdown=3)
+
+        # 3) Pydantic でバリデート＆レポート生成
         report = CheckReport(**result_payload)
 
-        # 5) SUCCESS と report を保存
+        # 4) SUCCESS と report を保存
         rec = _check_repo.get(check_id) or {}
         rec.update({
-            "status":       report.status,
-            "report":       report.model_dump(),
+            "status": report.status,
+            "report": report.model_dump(),
             "completed_at": datetime.now(timezone.utc).isoformat(),
         })
         _upsert(check_id, rec)
 
     except Exception as exc:
-        # 6) 例外時は FAILURE とエラーを保存
-        logger.error("Check task failed permanently: %s", exc, exc_info=True)
+        # 5) 例外時は FAILURE とエラーメッセージを保存
+        logger.error("Check task failed: %s", exc, exc_info=True)
         rec = _check_repo.get(check_id) or {}
         rec.update({
-            "status":       "FAILURE",
-            "error":        str(exc),
+            "status": "FAILURE",
+            "error": str(exc),
             "completed_at": datetime.now(timezone.utc).isoformat(),
         })
         _upsert(check_id, rec)
+        # Celery にも例外として伝搬
         raise

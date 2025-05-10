@@ -16,18 +16,20 @@
 #
 # ポリシ
 #   1) 破壊的変更は禁止（追加のみ可）
-#   2) /health は include_in_schema=False でドキュメント非公開
+#   2) /healthz は include_in_schema=False でドキュメント非公開
 # ---------------------------------------------------------------------
 from __future__ import annotations
+
 import logging
+from importlib import import_module
+from typing import Final
+
 from dotenv import load_dotenv, find_dotenv
-
-load_dotenv(find_dotenv())  # *.env を再帰探索して環境変数に投入
-
 from fastapi import APIRouter, FastAPI
 
-# ───────────────────────── logger
-logger = logging.getLogger(__name__)
+# ─────────────────────────── env / logger
+load_dotenv(find_dotenv())  # *.env を再帰探索して環境変数に投入
+logger: Final = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # ----------------------------------------------------------------------
@@ -41,19 +43,32 @@ from api.routers.check_api import router as check_router        # type: ignore
 # ----------------------------------------------------------------------
 # Optional Routers（存在しなければ stub）
 # ----------------------------------------------------------------------
-from importlib import import_module
-
 def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
+    """
+    存在しないルータは 501 Stub で代替するヘルパ。
+
+    Parameters
+    ----------
+    path : str
+        importlib.import_module 互換のモジュールパス
+    prefix : str
+        APIRouter prefix
+    tag : str
+        ドキュメントタグ
+    """
     try:
         module = import_module(path)
         return getattr(module, "router")
     except (ModuleNotFoundError, FileNotFoundError):
         logger.warning("[main_api] %s unavailable – 501 stub で代替", path)
         stub = APIRouter(prefix=prefix, tags=[tag])
+
         @stub.get("/", status_code=501)
         def _stub() -> dict[str, str]:
             return {"detail": f"{tag.capitalize()} phase not implemented yet"}
+
         return stub
+
 
 act_router = _import_optional("api.routers.act_api", "/act", "act")
 metrics_router = _import_optional("api.routers.metrics", "/metrics-api", "metrics")
@@ -71,18 +86,21 @@ except (ModuleNotFoundError, FileNotFoundError):
 # ----------------------------------------------------------------------
 app = FastAPI(
     title="mmopdca MVP",
-    version="0.2.0",
+    version="0.3.0",
     description="Command-DSL-driven forecasting micro-service (Plan / Do / Check)",
     contact={"name": "gtocue", "email": "gtocue510@gmail.com"},
 )
 
 # ----------------------------------------------------------------------
-# Meta / Health Router
+# Health / Meta Routers
 # ----------------------------------------------------------------------
-meta_router = APIRouter(tags=["meta"])
-@meta_router.get("/health", include_in_schema=False)
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+# /healthz → api/routes/health.py で実装（HTTP 204 No Content）
+from api.routes.health import router as health_router  # type: ignore
+
+app.include_router(health_router)  # /healthz
+
+# 追加メタ情報用 (例: /info) – 現状は空
+meta_router = APIRouter(prefix="/meta", tags=["meta"])
 app.include_router(meta_router)
 
 # ----------------------------------------------------------------------

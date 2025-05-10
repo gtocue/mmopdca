@@ -1,30 +1,25 @@
 groups:
-  - name: mmopdca-flower
-    interval: 15s
-    rules:
+- name: mmopdca-core
+  interval: 15s
+  rules:
+  # ── Recording rules ────────────────────────────────
+  - record: mmopdca_task_succeeded_per_min
+    expr: rate(celery_task_succeeded_total[1m]) * 60
 
-      # ============================
-      # 記録ルール (Recording rules)
-      # ============================
-      - record: mmopdca_task_succeeded_per_min
-        expr: rate(flower_events_total{type="task-succeeded"}[1m]) * 60
+  - record: mmopdca_task_failed_per_min
+    expr: rate(celery_task_failed_total[1m]) * 60
 
-      - record: mmopdca_task_failed_per_min
-        expr: rate(flower_events_total{type="task-failed"}[1m]) * 60
+  - record: mmopdca_task_success_ratio
+    expr: |
+      mmopdca_task_succeeded_per_min /
+      (mmopdca_task_succeeded_per_min + mmopdca_task_failed_per_min) * 100
 
-      - record: mmopdca_task_success_ratio
-        expr: |
-          mmopdca_task_succeeded_per_min /
-          (mmopdca_task_succeeded_per_min + mmopdca_task_failed_per_min) * 100
-
-      # ============================
-      # アラートルール (Alert rules)
-      # ============================
-      - alert: FlowerWorkersDown
-        expr: sum(flower_worker_online) < 1
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary:     "Flower workers are DOWN"
-          description: "No Celery workers have reported online for more than 1 minute."
+  # ── Alert rules ────────────────────────────────────
+  - alert: CeleryWorkersDown
+    expr: sum(celery_worker_online) < 1
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Celery workers are DOWN"
+      description: "No Celery workers have reported online for more than 1 minute."

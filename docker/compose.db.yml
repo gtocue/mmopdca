@@ -3,8 +3,9 @@ version: "3.9"
 services:
   db:
     image: postgres:16-alpine
-    env_file: [ ../.env ]
+    env_file: [ ../.env ] # ← すでに OK
     environment:
+      # 変数が .env から展開される
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

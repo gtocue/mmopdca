@@ -1,12 +1,12 @@
+version: "3.9"
+
 services:
-  worker:
-    # Celery Worker を直接起動するコマンドに変更
+  beat:
+    # Celery Beat のみを起動
     command:
       - celery
       - -A
       - core.celery_app:celery_app
-      - worker
+      - beat
       - --loglevel=info
-    # …（以下は既存の deploy, entrypoint, environment 等そのまま）
-
-
+      # スケジュールファイル配置先を変える場合はここに --schedule=... を追加
