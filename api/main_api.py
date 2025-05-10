@@ -9,7 +9,7 @@
 #   • api/routers/plan_api.py       – Plan CRUD
 #   • api/routers/plan_dsl_api.py   – Plan DSL
 #   • api/routers/do_api.py         – Do (Celery enqueue)
-#   • api/routers/check_api.py      – Check (Parquet 評価)
+#   • api/routers/check_api.py      – Check (評価)
 #   • api/routers/act_api.py        – Act   (未実装なら 501 Stub)
 #   • api/routers/metrics.py        – 指標 CRUD API (任意)
 #   • api/routers/metrics_exporter.py – Prometheus Exporter (任意)
@@ -19,10 +19,7 @@
 #   2) /health は include_in_schema=False でドキュメント非公開
 # ---------------------------------------------------------------------
 from __future__ import annotations
-
 import logging
-from importlib import import_module
-
 from dotenv import load_dotenv, find_dotenv
 
 load_dotenv(find_dotenv())  # *.env を再帰探索して環境変数に投入
@@ -31,25 +28,7 @@ from fastapi import APIRouter, FastAPI
 
 # ───────────────────────── logger
 logger = logging.getLogger(__name__)
-logger.setLevel("INFO")
-
-# ----------------------------------------------------------------------
-# Helper : 任意ルータを安全に import（無ければ 501 Stub へフォールバック）
-# ----------------------------------------------------------------------
-def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
-    try:
-        module = import_module(path)
-        return getattr(module, "router")
-    except (ModuleNotFoundError, FileNotFoundError):
-        logger.warning("[main_api] %s unavailable – 501 stub で代替", path)
-        stub = APIRouter(prefix=prefix, tags=[tag])
-
-        @stub.get("/", status_code=501)
-        def _stub() -> dict[str, str]:
-            return {"detail": f"{tag.capitalize()} phase not implemented yet"}
-
-        return stub
-
+logger.setLevel(logging.INFO)
 
 # ----------------------------------------------------------------------
 # Core Routers（必須）
@@ -57,15 +36,29 @@ def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
 from api.routers.plan_api import router as plan_router          # type: ignore
 from api.routers.plan_dsl_api import router as plan_dsl_router  # type: ignore
 from api.routers.do_api import router as do_router              # type: ignore
+from api.routers.check_api import router as check_router        # type: ignore
 
 # ----------------------------------------------------------------------
 # Optional Routers（存在しなければ stub）
 # ----------------------------------------------------------------------
-check_router = _import_optional("api.routers.check_api", "/check", "check")
+from importlib import import_module
+
+def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
+    try:
+        module = import_module(path)
+        return getattr(module, "router")
+    except (ModuleNotFoundError, FileNotFoundError):
+        logger.warning("[main_api] %s unavailable – 501 stub で代替", path)
+        stub = APIRouter(prefix=prefix, tags=[tag])
+        @stub.get("/", status_code=501)
+        def _stub() -> dict[str, str]:
+            return {"detail": f"{tag.capitalize()} phase not implemented yet"}
+        return stub
+
 act_router = _import_optional("api.routers.act_api", "/act", "act")
 metrics_router = _import_optional("api.routers.metrics", "/metrics-api", "metrics")
 
-# ── Prometheus Exporter は “サブアプリ” のため別 import
+# Prometheus Exporter (/metrics) – サブアプリ扱い
 try:
     from api.routers.metrics_exporter import create_metrics_exporter
     exporter_app = create_metrics_exporter()
@@ -84,16 +77,12 @@ app = FastAPI(
 )
 
 # ----------------------------------------------------------------------
-# Meta / Utility Router
+# Meta / Health Router
 # ----------------------------------------------------------------------
 meta_router = APIRouter(tags=["meta"])
-
-
 @meta_router.get("/health", include_in_schema=False)
 def health() -> dict[str, str]:
     return {"status": "ok"}
-
-
 app.include_router(meta_router)
 
 # ----------------------------------------------------------------------
@@ -104,9 +93,9 @@ app.include_router(plan_dsl_router)    # /plan-dsl
 app.include_router(do_router)          # /do
 app.include_router(check_router)       # /check
 app.include_router(act_router)         # /act
-app.include_router(metrics_router)     # /metrics-api  ← CRUD 側
+app.include_router(metrics_router)     # /metrics-api
 
-# Prometheus Exporter (/metrics) – 任意
+# Prometheus Exporter (/metrics)
 if exporter_app:
     app.mount("/metrics", exporter_app, name="metrics-exporter")
 

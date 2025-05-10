@@ -16,16 +16,17 @@ from typing import Any, Dict
 
 from dotenv import load_dotenv
 
-load_dotenv()  # .env → os.environ へロード
+# .env → os.environ にロード
+load_dotenv()
 
-from celery import Celery  # noqa: E402  pylint: disable=wrong-import-position
+from celery import Celery  # noqa: E402
 
 # ───────────────────────────── logger
 logger = logging.getLogger(__name__)
 if not logger.handlers:
-    _h = logging.StreamHandler()
-    _h.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
-    logger.addHandler(_h)
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
+    logger.addHandler(handler)
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
 
 
@@ -68,9 +69,13 @@ celery_app.conf.update(
     task_acks_late=True,               # Worker 落下時に再キュー
     worker_max_tasks_per_child=100,    # メモリリーク予防
     soft_time_limit=int(os.getenv("DO_SOFT_TL", "890")),  # TODO: 外部設定へ
-    imports=("core.tasks.do_tasks",),  # 明示 import で先読み
+    imports=(
+        "core.tasks.do_tasks",
+        "core.tasks.check_tasks",  # Check-phase tasks を明示的に import
+    ),
 )
 
+# autoload tasks under core.tasks
 celery_app.autodiscover_tasks(["core.tasks"])
 
 # ───────────────────────────── Do shard task
@@ -84,7 +89,7 @@ _TOTAL_SHARDS = int(os.getenv("DO_TOTAL_SHARDS", "12"))  # TODO: 外部設定へ
     retry_backoff=5,
     retry_kwargs={"max_retries": 3},
 )
-def run_do_task(           # noqa: D401
+def run_do_task(
     self,                  # type: ignore[override]
     plan_id: str,
     params: Dict[str, Any],
@@ -98,7 +103,7 @@ def run_do_task(           # noqa: D401
     logger.info("[Celery] run_do shard %d/%d  plan=%s", shard_idx, total_shards, plan_id)
 
     # 遅延 import で循環依存回避
-    from core.do import checkpoint as ckpt
+    from core.do import checkpoint as ckpt  # type: ignore
     from core.do.coredo_executor import run_do  # type: ignore
 
     run_tag = params.get("run_no", 0)

@@ -1,23 +1,18 @@
 # =========================================================
-# ASSIST_KEY: 【core/schemas/check_schemas.py】に位置するユニットです
+# core/schemas/check_schemas.py
 # =========================================================
 #
-# 【概要】
-#   CheckResult スキーマ定義（Pydantic v2 系）
+# CheckResult スキーマ定義（Pydantic v2 系）
 #   - Do フェーズの出力を評価したメトリクスを保持
 #
-# 【主な役割】
-#   - CheckResult : /check API の I/O モデル
-#
-# 【連携先・依存関係】
-#   - api/routers/check_api.py           … 生成 & 永続化
-#   - core/repository/*                  … 任意バックエンド
-#
+# 修正ポイント:
+#   report フィールドに None を許可する Optional 指定を追加
 # ---------------------------------------------------------
+
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Union
+from typing import Any, Dict, Union, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -39,14 +34,17 @@ class CheckReport(BaseModel):
 class CheckResult(BaseModel):
     """
     /check エンドポイントのレスポンス & ストレージフォーマット
+    report はタスク未完了時に None を返すケースを考慮
     """
 
-    id: str = Field(..., description="check-xxxx 形式の一意 ID")
-    do_id: str = Field(..., description="評価対象の Do ID")
+    id:         str  = Field(..., description="check-xxxx 形式の一意 ID")
+    do_id:      str  = Field(..., description="評価対象の Do ID")
     created_at: datetime = Field(..., description="UTC ISO8601")
 
-    # report は厳密モデル(CheckReport)でも任意 Dict でも可
-    report: Dict[str, Union[int, float, str, bool]] | CheckReport = Field(
-        ...,
-        description="メトリクス JSON",
+    # report は未完了時に None 許可
+    report: Optional[Dict[str, Union[int, float, str, bool]] | CheckReport] = Field(
+        None,
+        description="メトリクス JSON (タスク完了前は None)",
     )
+
+    model_config = ConfigDict(from_attributes=True)

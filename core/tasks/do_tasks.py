@@ -1,103 +1,101 @@
-# =====================================================================
-# ASSIST_KEY: 【core/tasks/do_tasks.py】 – Celery Task Entrypoint
-# =====================================================================
+# core/tasks/do_tasks.py
+# =========================================================
+# 【概要】
+#   Do フェーズの Celery タスク実装
+#   - Do タスクの実行ステータス管理と結果の永続化
 #
-# “Do フェーズ” をバックグラウンドで実行する Celery / Sync タスク。
-#   • args = (do_id, plan_id, params)  ← ← ★ ココが標準
-#   • 成功時は metrics_repo にも push
-# ---------------------------------------------------------------------
-from __future__ import annotations
+# 【主な役割】
+#   - run_do_task: Do フェーズの非同期実行
+#   - ステータス遷移（PENDING → RUNNING → DONE/FAILED）
+#   - 結果またはエラー詳細の格納
+#
+# 【連携先・依存関係】
+#   - core.do.coredo_executor.run_do
+#   - core.repository.factory.get_repo
+#   - core.schemas.do_schemas.DoStatus
+#
+# 【ルール遵守】
+#   1) Pydantic 型名・リポジトリ key は統一
+#   2) datetime は UTC ISO8601 形式
+#   3) SQLiteRepository のメソッド（delete/create）を利用し upsert を実現
+# =========================================================
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict
 
-from core.repository.factory import get_repo
+from celery import shared_task
+
 from core.do.coredo_executor import run_do
+from core.repository.factory import get_repo
 from core.schemas.do_schemas import DoStatus
 
 logger = logging.getLogger(__name__)
+_do_repo = get_repo("do")
 
-# ------------------------------------------------------------------ #
-# Repositories
-# ------------------------------------------------------------------ #
-_do_repo      = get_repo("do")
-_metrics_repo = get_repo("metrics")
 
-def _upsert(rec: Dict[str, Any]) -> None:
-    _do_repo.upsert(rec["do_id"], rec)
+def _upsert(do_id: str, rec: dict) -> None:
+    """
+    指定した do_id のレコードを削除し、
+    新規作成することで upsert を実現するユーティリティ。
+    """
+    try:
+        _do_repo.delete(do_id)
+    except Exception:
+        # 存在しない場合は無視
+        pass
+    _do_repo.create(do_id, rec)
 
-# ------------------------------------------------------------------ #
-# 実行本体
-# ------------------------------------------------------------------ #
-def _execute(do_id: str, plan_id: str, params: Dict[str, Any]) -> None:
+
+@shared_task(
+    name="core.tasks.do_tasks.run_do_task",
+    acks_late=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+def run_do_task(do_id: str, plan_id: str, params: dict) -> None:
+    """
+    Do フェーズを実行し、リポジトリにステータスと結果を記録する Celery タスク。
+
+    Args:
+        do_id (str): Do フェーズの一意 ID ("do-xxxxxx")
+        plan_id (str): 元となる Plan の ID ("plan-xxxxxx")
+        params (dict): run_do 関数に渡すパラメータ
+    """
+    # 1) RUNNING にステータス更新
     rec = _do_repo.get(do_id) or {}
-    rec.update(status=DoStatus.RUNNING, started_at=datetime.now(timezone.utc).isoformat())
-    _upsert(rec)
+    rec.update({
+        "do_id":      do_id,
+        "plan_id":    plan_id,
+        "status":     DoStatus.RUNNING,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
+    _upsert(do_id, rec)
 
     try:
-        result  = run_do(plan_id, params)
-        metrics = result.get("metrics") or {}
-        if metrics:
-            _metrics_repo.put(do_id, metrics)
+        # 2) 実際の分析処理を呼び出し
+        #    run_do は { "run_id": "...", "r2": ..., "threshold": ..., "passed": ..., ... }
+        #    という辞書を返す想定
+        result = run_do(plan_id, params)
 
-        rec.update(
-            status       = DoStatus.DONE,
-            finished_at  = datetime.now(timezone.utc).isoformat(),
-            result       = result,
-            artifact_uri = result.get("artifact_uri"),
-        )
-        logger.info("[Do] ✓ %s DONE", do_id)
-    except Exception as exc:  # noqa: BLE001
-        rec.update(
-            status       = DoStatus.FAILED,
-            finished_at  = datetime.now(timezone.utc).isoformat(),
-            result       = {"error": str(exc)},
-        )
-        logger.error("[Do] ✗ %s FAILED – %s", do_id, exc)
+        # 3) DONE と結果を保存
+        rec = _do_repo.get(do_id) or {}
+        rec.update({
+            "status":       DoStatus.DONE,
+            "result":       result,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        })
+        _upsert(do_id, rec)
 
-    _upsert(rec)
-
-# ------------------------------------------------------------------ #
-# Celery or Sync?
-# ------------------------------------------------------------------ #
-try:
-    from celery import shared_task, Task  # type: ignore
-    _HAS_CELERY = True
-except ModuleNotFoundError:  # pragma: no cover
-    _HAS_CELERY = False
-
-if _HAS_CELERY:                      # ───── Celery 版 ─────
-    @shared_task(
-        bind=True,
-        name="core.tasks.do_tasks.run_do_task",
-        acks_late=True,
-        max_retries=3,
-    )
-    def run_do_task(self: Task, do_id: str, plan_id: str, params: dict) -> None:  # type: ignore[override]
-        try:
-            _execute(do_id, plan_id, params)
-        except Exception as exc:  # noqa: BLE001
-            raise self.retry(exc=exc, countdown=min(300, 30 * (self.request.retries + 1)))
-else:                                # ───── フォールバック ─────
-    class _SyncAsyncResult:
-        def __init__(self, task_id: str):
-            self.id = task_id
-        @property
-        def state(self) -> str:  # noqa: D401
-            return "SUCCESS"
-
-    class _SyncTask:
-        @staticmethod
-        def apply_async(
-            args: list | tuple,
-            kwargs: dict | None = None,
-            task_id: str | None = None,
-            **__,
-        ) -> _SyncAsyncResult:
-            _execute(*args)
-            return _SyncAsyncResult(task_id or "sync-mode")
-
-    run_do_task = _SyncTask()  # type: ignore[assignment]
-
-__all__ = ["run_do_task"]
+    except Exception as e:
+        # 4) FAILED とエラー詳細を保存
+        logger.error("Do task failed: %s", e, exc_info=True)
+        rec = _do_repo.get(do_id) or {}
+        rec.update({
+            "status":       DoStatus.FAILED,
+            "error":        str(e),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        })
+        _upsert(do_id, rec)
+        # Celery にも例外を伝搬させて失敗として扱わせる
+        raise
