@@ -2,21 +2,25 @@ version: "3.9"
 
 services:
   db:
-    image: postgres:16-alpine
-    env_file: [ ../.env ] # ← すでに OK
-    environment:
-      # 変数が .env から展開される
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      TZ: ${TZ:-UTC}
+    image: postgres:15
+    env_file:
+      - ../.env
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      # CMD-SHELL を正しく配列指定。シェル内で環境変数を評価。
+      test: [ "CMD-SHELL", "PGPASSWORD=$POSTGRES_PASSWORD pg_isready -U $POSTGRES_USER -d $POSTGRES_DB" ]
       interval: 10s
+      timeout: 5s
       retries: 5
+    networks:
+      - mmopdca_default
     restart: unless-stopped
 
 volumes:
   pg_data:
+
+
+networks:
+  mmopdca_default:
+    external: true

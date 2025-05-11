@@ -1,11 +1,26 @@
-version: "3.9"
-
+# docker/compose.ports.yml — ポート公開設定だけを継承
 services:
-  api: { ports: [ "8001:8001" ] }
-  flower: { ports: [ "5555:5555" ] }
-  grafana: { ports: [ "3000:3000" ] }
-  prom: { ports: [ "9090:9090" ] }
-  redis: { ports: [ "6379:6379" ] }
-  redis-exporter: { ports: [ "9121:9121" ] }
-  celery-exporter: { ports: [ "9808:9808" ] }
-  db: { ports: [ "5432:5432" ] }
+  api:
+    ports:
+      - "8001:8001"
+  redis:
+    ports:
+      - "6379:6379"
+  db:
+    ports:
+      - "5432:5432"
+  prom:
+    ports:
+      - "9090:9090"
+  grafana:
+    ports:
+      - "3000:3000"
+  redis-exporter:
+    ports:
+      - "9121:9121"
+  celery-exporter:
+    ports:
+      - "9808:9808"
+  alertmanager:
+    ports:
+      - "9093:9093"

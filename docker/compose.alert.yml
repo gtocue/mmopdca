@@ -1,0 +1,24 @@
+version: "3.8"
+services:
+  alertmanager:
+    build:
+      context: .
+      dockerfile: Dockerfile.alertmanager
+    image: mmopdca_alertmanager:latest
+    env_file:
+      - ../.env
+    environment:
+      - SMTP_SMARTHOST
+      - SMTP_FROM
+      - ALERTMAIL_TO
+      - SG_USER
+      - SG_PASS
+    ports:
+      - "9093:9093"
+    networks:
+      - mmopdca_default
+    restart: unless-stopped
+
+networks:
+  mmopdca_default:
+    external: true

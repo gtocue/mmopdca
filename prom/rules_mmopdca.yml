@@ -1,3 +1,4 @@
+# prometheus/rules_mmopdca.yml
 groups:
 - name: mmopdca-core
   interval: 15s

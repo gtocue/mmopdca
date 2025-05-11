@@ -1,0 +1,21 @@
+global:
+  # --- SendGrid SMTP -------------------------------------------------
+  smtp_smarthost:   'smtp.sendgrid.net:587'
+  smtp_from:        '${SMTP_FROM}'
+  smtp_auth_username: '${SG_USER}'
+  smtp_auth_password: '${SG_PASS}'
+  smtp_require_tls: true
+  resolve_timeout: 5m
+
+route:
+  receiver: mail
+  group_by: ['alertname', 'instance']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+
+receivers:
+  - name: mail
+    email_configs:
+      - to: 'gtocue510@gmail.com'   # 宛先。複数はカンマ区切り
+        send_resolved: true

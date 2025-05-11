@@ -1,0 +1,54 @@
+# ───────────────────────────────────────────────────────
+# prometheus/rules/celery_exporter.yml
+# Celery-Exporter 由来メトリクス（Flower 依存なし）
+# ───────────────────────────────────────────────────────
+groups:
+- name: celery-exporter
+  interval: 15s
+
+  rules:
+  # ── Recording rules ─────────────────────────────────
+  - record: celery_task_succeeded_per_min
+    expr: sum(rate(celery_task_succeeded_total[1m])) * 60
+
+  - record: celery_task_failed_per_min
+    expr: sum(rate(celery_task_failed_total[1m])) * 60
+
+  - record: celery_task_success_ratio
+    expr: |
+      celery_task_succeeded_per_min /
+      (celery_task_succeeded_per_min + celery_task_failed_per_min) * 100
+
+  - record: celery_queue_backlog_total
+    expr: sum(celery_queue_length)
+
+  # ── Alert rules ────────────────────────────────────
+  - alert: HighCeleryTaskFailureRate
+    expr: celery_task_failed_per_min > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Celery task failure rate is high"
+      description: |
+        More than 1 task failure per minute on average in the last 5 minutes.
+
+  - alert: CeleryQueueBacklog
+    expr: celery_queue_backlog_total > 100
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Celery queue backlog is growing"
+      description: |
+        Total tasks waiting in Celery queues exceeded 100 for more than 5 minutes.
+
+  - alert: CeleryWorkersDown
+    expr: sum(celery_worker_online) < 1
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "All Celery workers are down"
+      description: |
+        No Celery workers have reported online for more than 1 minute.

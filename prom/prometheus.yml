@@ -6,18 +6,21 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 rule_files:
-  - /etc/prometheus/rules_mmopdca.yml   # ← 下で書き換え
+  - /etc/prometheus/rules_mmopdca.yml
+  - /etc/prometheus/rules/celery_exporter.yml
 
 scrape_configs:
   - job_name: celery-exporter
-    static_configs:
-      - targets: ['celery-exporter:9808']
+    static_configs: [ { targets: ["celery-exporter:9808"] } ]
 
   - job_name: redis-exporter
-    static_configs:
-      - targets: ['redis-exporter:9121']
+    static_configs: [ { targets: ["redis-exporter:9121"] } ]
 
   - job_name: prometheus
-    static_configs:
-      - targets: ['localhost:9090']
+    static_configs: [ { targets: ["localhost:9090"] } ]

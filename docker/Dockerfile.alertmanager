@@ -1,0 +1,17 @@
+# Stage1: 公式バイナリ
+FROM prom/alertmanager:v0.27.0 AS base
+
+# Stage2: Alpine + envsubst
+FROM alpine:3.18
+RUN apk add --no-cache gettext
+
+COPY --from=base /bin/alertmanager /bin/alertmanager
+COPY alertmanager.yml.tmpl /etc/alertmanager/alertmanager.yml.tmpl
+
+ENTRYPOINT [ "sh", "-c", "\
+    envsubst < /etc/alertmanager/alertmanager.yml.tmpl \
+    > /etc/alertmanager/alertmanager.yml && \
+    exec /bin/alertmanager \
+    --config.file=/etc/alertmanager/alertmanager.yml \
+    --log.level=debug \
+    " ]

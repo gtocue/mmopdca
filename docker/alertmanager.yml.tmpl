@@ -1,0 +1,17 @@
+global:
+  smtp_smarthost: "${SMTP_SMARTHOST}"
+  smtp_from:     "${SMTP_FROM}"
+  smtp_require_tls: true
+  smtp_auth_username: "${SG_USER}"
+  smtp_auth_password: "${SG_PASS}"
+
+# 初回通知を即時に出す
+route:
+  group_wait: 0s
+  receiver: mail
+
+receivers:
+  - name: mail
+    email_configs:
+      - to: "${ALERTMAIL_TO}"
+        send_resolved: true
