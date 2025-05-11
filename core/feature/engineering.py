@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 def make_features(
     df: pd.DataFrame,
     *,
-    lags: Iterable[int] = (1, 2, 3, 5, 10),           # TODO: 外部設定へ
+    lags: Iterable[int] = (1, 2, 3, 5, 10),  # TODO: 外部設定へ
     ma_windows: Iterable[int] = (5, 10, 20, 60, 120),  # TODO: 外部設定へ
 ) -> Tuple[pd.DataFrame, pd.Series]:
     """

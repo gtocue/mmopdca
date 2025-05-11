@@ -44,8 +44,6 @@ try:
 
     _DF_LIB = "polars"
 except ModuleNotFoundError:  # pragma: no cover
-    import pandas as pd  # type: ignore
-
     _DF_LIB = "pandas"
 
 
@@ -111,7 +109,11 @@ class CheckExecutor:
                 continue
 
             value = _METRIC_FUNCS[spec.name](y_true, y_pred)
-            passed = value <= spec.threshold if spec.name != "r2" else value >= spec.threshold
+            passed = (
+                value <= spec.threshold
+                if spec.name != "r2"
+                else value >= spec.threshold
+            )
 
             report_dict[spec.name] = value
             report_dict[f"{spec.name}_threshold"] = spec.threshold

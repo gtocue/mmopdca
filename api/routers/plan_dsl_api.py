@@ -24,8 +24,9 @@ from core.schemas.plan_schemas import PlanResponse
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/plan-dsl", tags=["plan-dsl"])
 
-_repo:   Any         = get_repo(table="plan")
-_loader: PlanLoader  = PlanLoader(validate=True)
+_repo: Any = get_repo(table="plan")
+_loader: PlanLoader = PlanLoader(validate=True)
+
 
 # ------------------------------------------------------------------ #
 # helpers
@@ -49,7 +50,11 @@ def _ensure_text(data: bytes | str | None) -> str:
 def _parse_dsl(text: str) -> Dict[str, Any]:
     """拡張子に頼らず YAML / JSON を自動判定"""
     try:
-        return json.loads(text) if text.lstrip().startswith(("{", "[")) else yaml.safe_load(text) or {}
+        return (
+            json.loads(text)
+            if text.lstrip().startswith(("{", "["))
+            else yaml.safe_load(text) or {}
+        )
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, detail=f"DSL parse error: {exc}") from None
 
@@ -65,7 +70,7 @@ def _parse_dsl(text: str) -> Dict[str, Any]:
 )
 async def create_plan_dsl(
     request: Request,
-    file: UploadFile | None = File(default=None),           # multipart/form-data
+    file: UploadFile | None = File(default=None),  # multipart/form-data
 ) -> PlanResponse:
     """
     DSL ファイル *または* 生テキスト body を受け取り Plan を登録。
@@ -82,12 +87,12 @@ async def create_plan_dsl(
     ```
     """
     # ---------- 本文取得 ----------
-    if file is not None:                              # multipart
+    if file is not None:  # multipart
         raw_bytes = await file.read()
-        src_name  = file.filename or "upload"
-    else:                                             # raw body
+        src_name = file.filename or "upload"
+    else:  # raw body
         raw_bytes = await request.body()
-        src_name  = "inline"
+        src_name = "inline"
 
     # ---------- DSL → dict ----------
     plan_dict = _loader.load_dict(_parse_dsl(_ensure_text(raw_bytes)))

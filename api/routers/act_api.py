@@ -27,17 +27,18 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Path, status
 
 from core.repository.factory import get_repo
-from core.schemas.act_schemas   import ActDecision
+from core.schemas.act_schemas import ActDecision
 from core.schemas.check_schemas import CheckResult
-from core.act.decision_engine   import decide
+from core.act.decision_engine import decide
 
 router = APIRouter(prefix="/act", tags=["act"])
 
 # ──────────────────────────────────────────────
 # Repository インスタンス（メモリ or SQLite）
 # ──────────────────────────────────────────────
-_act_repo   = get_repo(table="act")
+_act_repo = get_repo(table="act")
 _check_repo = get_repo(table="check")
+
 
 # =========================================================
 # POST /act/{check_id}  ― ActDecision 作成
@@ -48,7 +49,9 @@ _check_repo = get_repo(table="check")
     status_code=status.HTTP_201_CREATED,
     summary="Run Act (decide next action)",
 )
-def create_act(check_id: str = Path(..., description="Check ID to act on")) -> ActDecision:
+def create_act(
+    check_id: str = Path(..., description="Check ID to act on"),
+) -> ActDecision:
     # 1) Check をロード
     raw = _check_repo.get(check_id)
     if raw is None:

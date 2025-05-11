@@ -7,9 +7,9 @@ Revision ID: 44d6ab02d62f
 Revises: 004a47cc13cd
 Create Date: 2025-04-26 20:35:00
 """
+
 from typing import Sequence, Union
 from alembic import op
-import sqlalchemy as sa
 
 # ──────────────────────────────────────────────
 revision: str = "44d6ab02d62f"
@@ -24,7 +24,7 @@ def _ensure_created_at(table: str) -> None:
     # 1) 追加（無ければ）
     op.execute(
         f'ALTER TABLE "{table}" '
-        f'ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();'
+        f"ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();"
     )
     # 2) NULL 行を埋める（途中で列を作った場合に備える）
     op.execute(f'UPDATE "{table}" SET created_at = now() WHERE created_at IS NULL;')

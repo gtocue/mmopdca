@@ -18,8 +18,6 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from celery import states
-from celery.backends.base import DisabledBackend
 
 from core.celery_app import celery_app
 from core.repository.factory import get_repo
@@ -59,10 +57,12 @@ def run_check_task(self, check_id: str, do_id: str) -> None:
         "do_id": do_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    rec.update({
-        "status": "RUNNING",
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    })
+    rec.update(
+        {
+            "status": "RUNNING",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
     _upsert(check_id, rec)
 
     try:
@@ -90,22 +90,26 @@ def run_check_task(self, check_id: str, do_id: str) -> None:
 
         # 4) SUCCESS と report を保存
         rec = _check_repo.get(check_id) or {}
-        rec.update({
-            "status": report.status,
-            "report": report.model_dump(),
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-        })
+        rec.update(
+            {
+                "status": report.status,
+                "report": report.model_dump(),
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         _upsert(check_id, rec)
 
     except Exception as exc:
         # 5) 例外時は FAILURE とエラーメッセージを保存
         logger.error("Check task failed: %s", exc, exc_info=True)
         rec = _check_repo.get(check_id) or {}
-        rec.update({
-            "status": "FAILURE",
-            "error": str(exc),
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-        })
+        rec.update(
+            {
+                "status": "FAILURE",
+                "error": str(exc),
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         _upsert(check_id, rec)
         # Celery にも例外として伝搬
         raise

@@ -41,8 +41,12 @@ class PlanCreateRequest(BaseModel):
         examples=["plan_0001", "3fa85f64-5717-4562-b3fc-2c963f66afa6"],
     )
     symbol: str = Field(..., description="ティッカーシンボル", examples=["AAPL"])
-    start: date = Field(..., description="学習開始日 (YYYY-MM-DD)", examples=["2024-01-01"])
-    end: date = Field(..., description="学習終了日 (YYYY-MM-DD)", examples=["2024-12-31"])
+    start: date = Field(
+        ..., description="学習開始日 (YYYY-MM-DD)", examples=["2024-01-01"]
+    )
+    end: date = Field(
+        ..., description="学習終了日 (YYYY-MM-DD)", examples=["2024-12-31"]
+    )
 
 
 # --------------------------------------------------

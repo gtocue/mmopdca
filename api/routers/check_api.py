@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/check", tags=["check"])
 
 _check_repo = get_repo("check")
-_do_repo    = get_repo("do")
+_do_repo = get_repo("do")
 
 
 def _upsert(rec: Dict[str, Any]) -> None:
@@ -69,7 +69,7 @@ def enqueue_check(do_id: str) -> JSONResponse:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Do '{do_id}' not found")
 
     # task_id / check_id 生成
-    task_id  = uuid.uuid4().hex
+    task_id = uuid.uuid4().hex
     check_id = f"check-{task_id[:8]}"
 
     # Celery に enqueue (文字列タスク名)
@@ -106,7 +106,9 @@ def get_check(check_id: str) -> CheckResult:
     rec = _check_repo.get(check_id)
     if rec is None:
         logger.error("Check '%s' not found", check_id)
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Check '{check_id}' not found")
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, detail=f"Check '{check_id}' not found"
+        )
     return CheckResult(**rec)
 
 
@@ -116,7 +118,7 @@ def get_check(check_id: str) -> CheckResult:
 )
 def get_check_status(task_id: str) -> Dict[str, Any]:
     """Celery タスクの生ステータスおよびエラーを取得"""
-    res   = AsyncResult(task_id)
+    res = AsyncResult(task_id)
     state = res.state
     payload: Dict[str, Any] = {"state": state}
     if state == states.FAILURE and res.result:

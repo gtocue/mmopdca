@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Union, Optional
+from typing import Dict, Union, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -37,8 +37,8 @@ class CheckResult(BaseModel):
     report はタスク未完了時に None を返すケースを考慮
     """
 
-    id:         str  = Field(..., description="check-xxxx 形式の一意 ID")
-    do_id:      str  = Field(..., description="評価対象の Do ID")
+    id: str = Field(..., description="check-xxxx 形式の一意 ID")
+    do_id: str = Field(..., description="評価対象の Do ID")
     created_at: datetime = Field(..., description="UTC ISO8601")
 
     # report は未完了時に None 許可

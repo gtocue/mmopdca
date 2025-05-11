@@ -19,22 +19,26 @@ logger = logging.getLogger(__name__)
 
 # ── Optional back-ends ───────────────────────────────────
 try:
-    from .postgres_impl import PostgresRepository           # type: ignore
+    from .postgres_impl import PostgresRepository  # type: ignore
+
     _HAS_PG = True
 except ModuleNotFoundError:
-    PostgresRepository = None                               # type: ignore[assignment]
+    PostgresRepository = None  # type: ignore[assignment]
     _HAS_PG = False
 
 try:
-    from .redis_impl import RedisRepository                 # type: ignore
+    from .redis_impl import RedisRepository  # type: ignore
+
     _HAS_REDIS = True
 except ModuleNotFoundError:
-    RedisRepository = None                                  # type: ignore[assignment]
+    RedisRepository = None  # type: ignore[assignment]
     _HAS_REDIS = False
 
-_SUPPORTED = {"memory", "sqlite"} \
-    | ({"postgres"} if _HAS_PG else set()) \
-    | ({"redis"}    if _HAS_REDIS else set())
+_SUPPORTED = (
+    {"memory", "sqlite"}
+    | ({"postgres"} if _HAS_PG else set())
+    | ({"redis"} if _HAS_REDIS else set())
+)
 
 
 def get_repo(table: str = "plan"):
@@ -59,7 +63,7 @@ def get_repo(table: str = "plan"):
 
     # Redis
     if backend == "redis" and _HAS_REDIS:
-        return RedisRepository(table=table)                    # ← 統一
+        return RedisRepository(table=table)  # ← 統一
 
     # フォールバック
     if backend not in _SUPPORTED:

@@ -34,12 +34,14 @@ _metrics_repo = get_repo("metrics")  # Memory / Redis / FS など抽象化
 # ---------------------------------------------------------------------- #
 class MetricsPayload(BaseModel):
     """POST 時に受け取る Raw 配列（柔軟に許容）"""
+
     actual: list[float] = Field(..., description="実績値 (y)")
     pred: list[float] = Field(..., description="予測値 (ŷ)")
 
 
 class MetricsRecord(BaseModel):
     """永続ストアに保存する正規化済みレコード"""
+
     run_id: str
     created_at: datetime
     r2: float

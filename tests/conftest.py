@@ -19,10 +19,10 @@ import uvicorn
 import api.routers.do_api as _do_api
 
 # キャッシュを消して最新ソースをロード
-_do_api = importlib.reload(_do_api)          # noqa: PLW0603
+_do_api = importlib.reload(_do_api)  # noqa: PLW0603
 
 # Celery を使わないため apply_async を NO-OP へダミーパッチ
-_do_api.run_do_task.apply_async = lambda *_, **__: None    # type: ignore[attr-defined]
+_do_api.run_do_task.apply_async = lambda *_, **__: None  # type: ignore[attr-defined]
 
 # ----------------------------------------------------------------------
 # ❷ FastAPI アプリ本体（※ do_api リロード済み状態で import）
@@ -32,7 +32,8 @@ from api.main_api import app  # noqa: E402  (意図的：reload 後に import)
 # ----------------------------------------------------------------------
 # ❸ Uvicorn 起動設定
 # ----------------------------------------------------------------------
-_HOST, _PORT = "127.0.0.1", 8001        # ← ★ 2 要素タプルで明示
+_HOST, _PORT = "127.0.0.1", 8001  # ← ★ 2 要素タプルで明示
+
 
 def _port_is_open() -> bool:
     """ポートが LISTEN 中なら True"""

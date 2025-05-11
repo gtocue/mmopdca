@@ -7,6 +7,7 @@ import sys
 
 DB_FILE = "mmopdca.db"
 
+
 def ensure_column(conn, table: str, column: str, coltype: str = "TEXT"):
     """指定テーブルにカラムがなければ追加する。"""
     cursor = conn.execute(f"PRAGMA table_info('{table}')")
@@ -16,6 +17,7 @@ def ensure_column(conn, table: str, column: str, coltype: str = "TEXT"):
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype};")
     else:
         print(f"`{table}` already has column `{column}`. Skipping.")
+
 
 def main():
     try:
@@ -32,6 +34,7 @@ def main():
     conn.commit()
     conn.close()
     print("Migration complete.")
+
 
 if __name__ == "__main__":
     main()

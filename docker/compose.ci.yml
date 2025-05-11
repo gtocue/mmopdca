@@ -1,12 +1,16 @@
-# -----------------------------------------------------------------------------
-# File:      docker/compose.ci.yml
-# Summary:   CI 用 Docker スタック（FastAPI, Celery, Redis, PostgreSQL,
-#            Exporters, Prometheus）を一発で立ち上げるための Compose 定義
-# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------
+# File: docker/compose.ci.yml
+# Name: CI 用 Docker スタック定義（Eager モード版）
+# Summary:
+#   - API コンテナのみを Eager モードにして同期実行
+#   - worker/beat コンテナは CI では不要なので除去
+# ----------------------------------------------------------------------
+version: "3.9"
+
 services:
 
   ########################################################################
-  # FastAPI (API サーバー)
+  # FastAPI (API サーバー) - Eager モードでタスクを同期実行
   ########################################################################
   api:
     build:
@@ -14,7 +18,12 @@ services:
       dockerfile: Dockerfile.main_api
     command: >
       python -m uvicorn api.main_api:app --host 0.0.0.0 --port 8001 --proxy-headers
-    env_file: [ ../.env ]
+    env_file:
+      - ../.env
+    environment:
+      # Celery Eager モード設定
+      CELERY_TASK_ALWAYS_EAGER: "true"
+      CELERY_TASK_EAGER_PROPAGATES: "true"
     tmpfs:
       - /mnt/data/dsl
       - /mnt/checkpoints
@@ -30,32 +39,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
-
-  ########################################################################
-  # Celery Worker & Beat
-  ########################################################################
-  worker:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      target: runtime
-    command: celery -A core.celery_app:celery_app worker --loglevel=info
-    env_file: [ ../.env ]
-    depends_on:
-      redis:
-        condition: service_started
-
-  beat:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-      target: runtime
-    command: >
-      celery -A core.celery_app:celery_app beat --loglevel=info --schedule=/mnt/checkpoints/celerybeat-schedule
-    env_file: [ ../.env ]
-    depends_on:
-      redis:
-        condition: service_started
 
   ########################################################################
   # Redis (Broker)
@@ -75,7 +58,8 @@ services:
   ########################################################################
   db:
     image: postgres:16-alpine
-    env_file: [ ../.env ]
+    env_file:
+      - ../.env
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 5s
@@ -83,11 +67,12 @@ services:
       retries: 10
 
   ########################################################################
-  # Redis-Exporter
+  # Redis-Exporter（オプション）
   ########################################################################
   redis-exporter:
     image: oliver006/redis_exporter:v1.60.0
-    env_file: [ ../.env ]
+    env_file:
+      - ../.env
     command:
       - "--redis.addr=redis://default:${REDIS_PASSWORD}@redis:6379"
     depends_on:
@@ -102,14 +87,15 @@ services:
       retries: 12
 
   ########################################################################
-  # Celery-Exporter
+  # Celery-Exporter（オプション）
   ########################################################################
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
-    env_file: [ ../.env ]
+    env_file:
+      - ../.env
     environment:
-      CE_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
-      CE_PORT: 9808
+      CE_BROKER_URL: "redis://default:${REDIS_PASSWORD}@redis:6379/0"
+      CE_PORT: "9808"
     depends_on:
       redis:
         condition: service_started
@@ -122,20 +108,17 @@ services:
       retries: 12
 
   ########################################################################
-  # Prometheus
+  # Prometheus（オプション）
   ########################################################################
   prom:
     image: prom/prometheus:v2.52.0
-    # 既存の entrypoint は /bin/prometheus なので、command はフラグだけ！
     command:
-      - --config.file=/etc/prometheus/prometheus.yml # ← 追加
+      - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=24h
       - --web.enable-lifecycle
     volumes:
       - ../prom/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      # （オプション）TSDB データ用に永続化ボリュームを切るなら
-      # - prom-data:/prometheus
     depends_on:
       redis-exporter:
         condition: service_started
@@ -149,8 +132,6 @@ services:
       timeout: 3s
       retries: 12
 
-# -----------------------------------------------------------------------------
-# （オプション）TSDB 永続化を使う場合
-# -----------------------------------------------------------------------------
-# volumes:
-#   prom-data:
+networks:
+  default:
+    name: docker_cicd_default

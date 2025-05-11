@@ -7,7 +7,7 @@ import asyncio
 import uuid
 import httpx
 
-BASE = "http://127.0.0.1:8001"          # tests/conftest.py が Uvicorn を起動
+BASE = "http://127.0.0.1:8001"  # tests/conftest.py が Uvicorn を起動
 
 
 async def _wait_done(do_id: str, timeout: int = 30) -> bool:
@@ -34,7 +34,7 @@ def test_plan_do_flow() -> None:
     with httpx.Client() as c:
         assert c.post(f"{BASE}/plan/", json=plan).status_code == 201
         do_resp = c.post(f"{BASE}/do/{plan_id}")
-        assert do_resp.status_code == 202      # ★ 202
+        assert do_resp.status_code == 202  # ★ 202
         do_id = do_resp.json()["do_id"]
 
     assert asyncio.run(_wait_done(do_id)), "Do job did not finish in time"

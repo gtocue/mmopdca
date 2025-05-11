@@ -40,11 +40,10 @@ _FREQUENCY_MAP: dict[str, str] = {
 def _try_import_yf():
     try:
         import yfinance as yf  # type: ignore
+
         return yf
     except ModuleNotFoundError as e:  # pragma: no cover
-        msg = (
-            "yfinance が見つかりません。`pip install yfinance` を実行してください。"
-        )
+        msg = "yfinance が見つかりません。`pip install yfinance` を実行してください。"
         raise RuntimeError(msg) from e
 
 

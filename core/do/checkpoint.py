@@ -48,9 +48,7 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     _h = logging.StreamHandler()
-    _h.setFormatter(
-        logging.Formatter("[%(levelname)s] %(name)s: %(message)s")
-    )
+    _h.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
     logger.addHandler(_h)
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
 
@@ -101,7 +99,9 @@ def load_latest_ckpt(plan_id: str, epoch_idx: int) -> Optional[Dict[str, Any]]:
     1 件も無い場合は None を返す。
     """
     pattern = f"{plan_id}__{epoch_idx:04d}_*.json"
-    ckpts = sorted(CKPT_DIR.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
+    ckpts = sorted(
+        CKPT_DIR.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True
+    )
     if not ckpts:
         logger.debug("no checkpoint found for %s epoch %d", plan_id, epoch_idx)
         return None
@@ -109,7 +109,11 @@ def load_latest_ckpt(plan_id: str, epoch_idx: int) -> Optional[Dict[str, Any]]:
     fp = ckpts[0]
     try:
         data = json.loads(fp.read_text())
-        logger.info("checkpoint loaded %s (%s)", fp.name, datetime.fromtimestamp(fp.stat().st_mtime))
+        logger.info(
+            "checkpoint loaded %s (%s)",
+            fp.name,
+            datetime.fromtimestamp(fp.stat().st_mtime),
+        )
         return data
     except json.JSONDecodeError as exc:
         logger.error("corrupted checkpoint %s: %s", fp, exc)
@@ -144,7 +148,7 @@ if __name__ == "__main__":
     _save = sub.add_parser("save")
     _save.add_argument("plan_id")
     _save.add_argument("epoch", type=int)
-    _save.add_argument("json_str", help='state as JSON string')
+    _save.add_argument("json_str", help="state as JSON string")
 
     _load = sub.add_parser("load")
     _load.add_argument("plan_id")

@@ -17,15 +17,16 @@ import os
 from typing import Any, Dict, List, Optional
 
 try:
-    import psycopg                                   # type: ignore
-    from psycopg.rows import dict_row                # type: ignore
-except ModuleNotFoundError:                          # pragma: no cover
-    psycopg = None                                   # type: ignore
-    dict_row = None                                  # type: ignore
+    import psycopg  # type: ignore
+    from psycopg.rows import dict_row  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    psycopg = None  # type: ignore
+    dict_row = None  # type: ignore
 
 from .base import BaseRepository
 
 logger = logging.getLogger(__name__)
+
 
 # --------------------------------------------------------------------- #
 # DSN helper
@@ -36,7 +37,7 @@ def _env(primary: str, fallback: str, default: str = "") -> str:
 
 def _make_dsn() -> dict[str, Any] | str:
     if dsn := os.getenv("PG_DSN"):
-        return dsn                              # 完全 DSN
+        return dsn  # 完全 DSN
     return dict(
         host=_env("PG_HOST", "POSTGRES_HOST", "db"),
         port=int(_env("PG_PORT", "POSTGRES_PORT", "5432")),
@@ -55,7 +56,7 @@ _CX: Optional["psycopg.Connection[Any]"] = None
 def _cx():
     global _CX
     if _CX is None or _CX.closed:
-        if psycopg is None:       # psycopg 未インストール
+        if psycopg is None:  # psycopg 未インストール
             raise RuntimeError(
                 "psycopg がインストールされていません。 "
                 "DB_BACKEND を memory/sqlite/redis にするか "
@@ -83,7 +84,7 @@ class PostgresRepository(BaseRepository):
         *,
         table: str,
         schema: str = "public",
-        eager: bool = False,          # ★ デフォルトを遅延へ変更
+        eager: bool = False,  # ★ デフォルトを遅延へ変更
     ) -> None:
         super().__init__(table=table)  # type: ignore[arg-type]
         self.table = table

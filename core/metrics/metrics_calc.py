@@ -21,16 +21,16 @@
 #       ・pdca_data/<run_id>/pred.parquet 等 (ストレージ仕様 TBD)
 #
 # 【ルール遵守】
-#   1) メイン銘柄 "Close_main" / "Open_main" は直接扱わない   
-#   2) 市場名は "Close_Nikkei_225" / "Open_SP500" のように suffix で区別   
-#   3) **全体コード** を返却（スニペットではなくファイルの完成形）   
-#   4) ファイル冒頭に必ず本ヘッダーを残すこと   
-#   5) 機能削除や breaking change は事前相談（原則 “追加” のみ）   
+#   1) メイン銘柄 "Close_main" / "Open_main" は直接扱わない
+#   2) 市場名は "Close_Nikkei_225" / "Open_SP500" のように suffix で区別
+#   3) **全体コード** を返却（スニペットではなくファイルの完成形）
+#   4) ファイル冒頭に必ず本ヘッダーを残すこと
+#   5) 機能削除や breaking change は事前相談（原則 “追加” のみ）
 #   6) pdca_data[...] キーに統一し、グローバル変数直書き禁止
 #
 # 【注意事項】
-#   - ハードコード値を見つけたら「TODO: 外部設定へ」のコメントを添付   
-#   - インターフェース変更時は docs/ARCH.md を必ず更新   
+#   - ハードコード値を見つけたら「TODO: 外部設定へ」のコメントを添付
+#   - インターフェース変更時は docs/ARCH.md を必ず更新
 #   - 型安全重視 (Pydantic / typing)・ハルシネーション厳禁
 # ---------------------------------------------------------
 
@@ -71,7 +71,10 @@ __all__ = [
 # Public API
 # ---------------------------------------------------------------------------
 
-def calc_metrics(df: pd.DataFrame, *, actual_col: str = "actual", pred_col: str = "pred") -> Dict[str, float]:
+
+def calc_metrics(
+    df: pd.DataFrame, *, actual_col: str = "actual", pred_col: str = "pred"
+) -> Dict[str, float]:
     """Calculate evaluation metrics for regression models.
 
     Parameters
@@ -120,5 +123,7 @@ def calc_metrics(df: pd.DataFrame, *, actual_col: str = "actual", pred_col: str 
         "mape": round(float(mape * 100), 2),  # [%]
     }
 
-    logger.info("[MetricsCalc] r2=%.4f mae=%.4f rmse=%.4f mape=%.2f%%", *metrics.values())
+    logger.info(
+        "[MetricsCalc] r2=%.4f mae=%.4f rmse=%.4f mape=%.2f%%", *metrics.values()
+    )
     return metrics

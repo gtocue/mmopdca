@@ -79,7 +79,9 @@ def train(
     # 1. 取得 & split
     # -----------------------------------------------------------------
     df_raw = load(symbol, start, end)
-    train_df, valid_df, test_df = split_ts(df_raw, train_ratio=train_ratio, val_ratio=val_ratio)
+    train_df, valid_df, test_df = split_ts(
+        df_raw, train_ratio=train_ratio, val_ratio=val_ratio
+    )
 
     # -----------------------------------------------------------------
     # 2. 特徴量生成
@@ -110,6 +112,8 @@ def train(
     repo = get_repo("metrics")  # MemoryRepository / Redis … に差し替え可
     repo[run_id] = json.dumps(metrics)  # メモリ repo は JSON 文字列で格納
 
-    logger.info("[trainer] %s  metrics=%s", run_id, {k: round(v, 4) for k, v in metrics.items()})
+    logger.info(
+        "[trainer] %s  metrics=%s", run_id, {k: round(v, 4) for k, v in metrics.items()}
+    )
 
     return {"run_id": run_id, **metrics}

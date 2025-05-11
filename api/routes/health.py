@@ -6,10 +6,12 @@ from fastapi import APIRouter, Response, status
 
 router = APIRouter(tags=["meta"])
 
+
 @router.get("/health", include_in_schema=False)
 def health() -> dict[str, str]:
     """アプリケーションの生存確認 (JSON)"""
     return {"status": "ok"}
+
 
 @router.get(
     "/healthz",

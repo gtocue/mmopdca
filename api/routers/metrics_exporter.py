@@ -40,8 +40,8 @@ logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
 # Prometheus Gauges
 # --------------------------------------------------------------------------- #
 _METRIC_GAUGES: Dict[str, Gauge] = {
-    "r2":   Gauge("pdca_r2",   "R-squared of latest run"),
-    "mae":  Gauge("pdca_mae",  "Mean Absolute Error of latest run"),
+    "r2": Gauge("pdca_r2", "R-squared of latest run"),
+    "mae": Gauge("pdca_mae", "Mean Absolute Error of latest run"),
     "rmse": Gauge("pdca_rmse", "Root Mean Squared Error of latest run"),
     "mape": Gauge("pdca_mape", "Mean Absolute Percentage Error (pct)"),
 }

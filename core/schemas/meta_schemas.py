@@ -30,6 +30,7 @@ class MetricSpec(BaseModel):
     """
     評価指標と閾値のペア。
     """
+
     name: str = Field(..., examples=["mape", "rmse", "r2"])
     threshold: float = Field(
         ...,
@@ -44,6 +45,7 @@ class MetaInfo(BaseModel):
     """
     Plan/Do ランの設定値と、Check が参照する評価閾値をまとめたメタ。
     """
+
     plan_id: str
     run_id: str
 

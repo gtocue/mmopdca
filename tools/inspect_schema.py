@@ -19,6 +19,7 @@ import sys
 
 DB_FILE = "mmopdca.db"
 
+
 def main():
     try:
         conn = sqlite3.connect(DB_FILE)
@@ -32,6 +33,7 @@ def main():
         print(f"{tbl}: {cols}")
 
     conn.close()
+
 
 if __name__ == "__main__":
     main()

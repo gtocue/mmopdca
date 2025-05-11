@@ -51,9 +51,9 @@ class RedisRepository:
         self,
         table: str | None = None,
         *,
-        key_prefix: str | None = None,   # ← v1 互換
+        key_prefix: str | None = None,  # ← v1 互換
         url: str | None = None,
-        db: int = 1,                     # FIXME: .env へ切り出し検討
+        db: int = 1,  # FIXME: .env へ切り出し検討
         **redis_opts: Any,
     ) -> None:
         """
@@ -78,7 +78,7 @@ class RedisRepository:
         # --------------------------------------------------
         redis_url = (
             url
-            or os.getenv("REDIS_URL")          # .env / シェルで与えられた値
+            or os.getenv("REDIS_URL")  # .env / シェルで与えられた値
             or f"redis://127.0.0.1:6379/{db}"  # フォールバック
         )
 

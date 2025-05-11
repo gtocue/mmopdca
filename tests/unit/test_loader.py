@@ -4,6 +4,7 @@ from core.dsl.loader import PlanLoader
 
 SAMPLE_YAML = Path("samples/plan_mvp.yaml")
 
+
 def test_loader_roundtrip():
     loader = PlanLoader(validate=True)
     plan_dict = yaml.safe_load(SAMPLE_YAML.read_text(encoding="utf-8"))

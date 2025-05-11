@@ -23,20 +23,21 @@ from .validator import DSLValidator
 
 try:
     import jsonschema  # type: ignore
-except ModuleNotFoundError:          # バリデーションを強制しない
-    jsonschema = None                # type: ignore
+except ModuleNotFoundError:  # バリデーションを強制しない
+    jsonschema = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------
 # ディレクトリ設定（.env で上書き可）
 # ------------------------------------------------------------------
-DSL_ROOT     = Path(os.getenv("DSL_ROOT", Path(__file__).parent)).resolve()
+DSL_ROOT = Path(os.getenv("DSL_ROOT", Path(__file__).parent)).resolve()
 DEFAULTS_DIR = DSL_ROOT / "defaults"
-SCHEMAS_DIR  = DSL_ROOT / "schemas"
+SCHEMAS_DIR = DSL_ROOT / "schemas"
 
-_STORE     = FSStore(DSL_ROOT)
+_STORE = FSStore(DSL_ROOT)
 _VALIDATOR = DSLValidator(SCHEMAS_DIR)
+
 
 # ==================================================================
 # public  API
@@ -54,7 +55,7 @@ class PlanLoader:
         self._validate = validate and jsonschema is not None
 
         # キャッシュ
-        self._defaults: Dict[str, Any]   = _load_defaults()
+        self._defaults: Dict[str, Any] = _load_defaults()
         self._market_map: dict[str, str] = _load_market_mapping()
 
     # -------------------------------------------------------------
@@ -75,7 +76,7 @@ class PlanLoader:
     def load(self, plan_path: str | Path) -> Dict[str, Any]:
         logger.info("Loading plan: %s", plan_path)
         plan_dict = _load_yaml_or_json(plan_path)
-        return self.load_dict(plan_dict)          # ← 共通処理へ集約
+        return self.load_dict(plan_dict)  # ← 共通処理へ集約
 
     # -------------------------------------------------------------
     # legacy 互換フック
@@ -95,7 +96,7 @@ class PlanLoader:
         # start / end = train_start / train_end
         dates = plan.get("dates", {})
         legacy.setdefault("start", dates.get("train_start"))
-        legacy.setdefault("end",   dates.get("train_end"))
+        legacy.setdefault("end", dates.get("train_end"))
 
         return legacy
 
@@ -108,7 +109,11 @@ def _load_yaml_or_json(path: str | Path) -> Dict[str, Any]:
     if not p.exists():
         raise FileNotFoundError(p)
     txt = _STORE.read_text(p)
-    return yaml.safe_load(txt) if p.suffix.lower() in (".yml", ".yaml") else json.loads(txt)
+    return (
+        yaml.safe_load(txt)
+        if p.suffix.lower() in (".yml", ".yaml")
+        else json.loads(txt)
+    )
 
 
 def _load_defaults() -> Dict[str, Any]:
@@ -164,6 +169,8 @@ def _validate_by_schemas(plan: Dict[str, Any]) -> None:
 #   poetry run python -m core.dsl.loader samples/plan_mvp.yaml
 # -----------------------------------------------------------------
 if __name__ == "__main__":  # pragma: no cover
-    import sys, pprint
+    import sys
+    import pprint
+
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("samples/plan_mvp.yaml")
     pprint.pp(PlanLoader(validate=False).load(path), depth=2, compact=True)

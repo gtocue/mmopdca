@@ -75,6 +75,7 @@ class MetricValue(MetricMeta):
 # Helpers
 # ────────────────────────────────
 
+
 def _get_meta(name: str) -> Dict[str, Any]:
     spec = _CATALOG.get(name)
     if not spec:
@@ -85,6 +86,7 @@ def _get_meta(name: str) -> Dict[str, Any]:
 # ────────────────────────────────
 # Routes
 # ────────────────────────────────
+
 
 @router.get("/{name}", response_model=MetricValue, summary="Get instant metric value")
 def get_metric_value(name: str) -> MetricValue:  # noqa: D401

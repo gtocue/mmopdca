@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 import requests
 
+
 def _wait_for_health(base_url: str, timeout: int = 30):
     """Block until GET /health returns 200 or timeout (s) expires."""
     deadline = time.time() + timeout
@@ -36,7 +37,10 @@ def test_do_flow(tmp_path):
 
     # 3. Register Plan
     resp = requests.post(
-        f"{base_url}/plan-dsl/", data=yaml_txt, headers={"Content-Type": "application/x-yaml"}, timeout=10
+        f"{base_url}/plan-dsl/",
+        data=yaml_txt,
+        headers={"Content-Type": "application/x-yaml"},
+        timeout=10,
     )
     assert resp.status_code == 201, resp.text
 

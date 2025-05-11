@@ -29,5 +29,6 @@ def main():
         elapsed = time.time() - start
         print(f"run_do raised exception after {elapsed:.2f}s: {e}")
 
+
 if __name__ == "__main__":
     main()

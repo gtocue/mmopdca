@@ -45,8 +45,8 @@ class IndicatorParam(BaseModel):
 class DoStatus(str, Enum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
-    DONE    = "DONE"
-    FAILED  = "FAILED"
+    DONE = "DONE"
+    FAILED = "FAILED"
 
 
 # ----------------------------------------------------------------------
@@ -70,14 +70,12 @@ class DoCreateRequest(BaseModel):
         description="学習開始日 (YYYY-MM-DD)",
         examples=["2025-01-01"],
     )
-    end:   Optional[date] = Field(
+    end: Optional[date] = Field(
         default=None,
         description="学習終了日 (YYYY-MM-DD)",
         examples=["2025-12-31"],
     )
-    indicators: Optional[
-        Annotated[List[IndicatorParam], Field(min_length=0)]
-    ] = Field(
+    indicators: Optional[Annotated[List[IndicatorParam], Field(min_length=0)]] = Field(
         default=None,
         description="追加テクニカル指標リスト（空 list で『追加なし』）",
     )
@@ -89,7 +87,7 @@ class DoCreateRequest(BaseModel):
         description="連番 (1,2,3 …)。未指定なら `seq` をフォールバック",
         examples=[1, 2],
     )
-    seq: Optional[int] = Field(           # ← 旧フィールド (互換のため残置)
+    seq: Optional[int] = Field(  # ← 旧フィールド (互換のため残置)
         default=None,
         ge=1,
         description="※ deprecated – `run_no` に自動コピーされる",
@@ -103,7 +101,7 @@ class DoCreateRequest(BaseModel):
     )
 
     # ---- 後処理: 互換フォールバック ---------------------------------
-    def model_post_init(self, __context: Any) -> None:     # noqa: D401
+    def model_post_init(self, __context: Any) -> None:  # noqa: D401
         # `seq` → `run_no` への移行をシームレスに
         if self.run_no is None and self.seq is not None:
             object.__setattr__(self, "run_no", self.seq)
@@ -120,7 +118,7 @@ class DoResponse(BaseModel):
     """
 
     # ----- 識別子 -----------------------------------------------------
-    do_id:   str = Field(..., description="Do 実行 ID (`do-xxxx` 形式)")
+    do_id: str = Field(..., description="Do 実行 ID (`do-xxxx` 形式)")
     plan_id: str = Field(..., description="紐づく Plan ID")
 
     # ----- 実行メタ ---------------------------------------------------
@@ -150,7 +148,7 @@ class DoResponse(BaseModel):
     )
 
     # ----- 付加情報 ---------------------------------------------------
-    artifact_uri: Optional[str] = Field(          # ★ 追加
+    artifact_uri: Optional[str] = Field(  # ★ 追加
         default=None,
         description="Parquet 予測ファイルの保存 URI",
     )
@@ -158,4 +156,3 @@ class DoResponse(BaseModel):
         default=None,
         description="Superset 等に自動生成された可視化 URL（任意）",
     )
-    

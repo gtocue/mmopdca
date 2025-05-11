@@ -43,7 +43,7 @@ def test_do_flow() -> None:
 
     # 2) Do enqueue
     do_resp = client.post(f"/do/{plan_id}")
-    assert do_resp.status_code == 202          # ★ 202
+    assert do_resp.status_code == 202  # ★ 202
     payload = do_resp.json()
     do_id = payload["do_id"]
     assert "task_id" in payload

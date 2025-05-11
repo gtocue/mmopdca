@@ -1,152 +1,61 @@
-# =========================================================
-# ASSIST_KEY: 【core/celery_app.py】
-# =========================================================
-# * broker / backend : .env or OS 環境変数で指定
-#                      （未設定なら **redis://redis:6379/0** を既定値に）
-# * すべて JSON シリアライズ
-# * core.tasks.* を autodiscover
-# * Do-phase 用 run_do_task を “run_do” エイリアスでも公開
-# =========================================================
-from __future__ import annotations
+# ----------------------------------------------------------------------
+# File: core/celery_app.py
+# Name: Celery アプリ定義
+# Summary: broker/backend と Eager モード設定を環境変数から読み込む
+# ----------------------------------------------------------------------
 
-import logging
 import os
-import urllib.parse
-from datetime import datetime, timedelta
-from typing import Any, Dict
+from pathlib import Path
 
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
+from celery import Celery
 
-# .env → os.environ にロード（存在しなくても OK）
-load_dotenv(find_dotenv())
+# ----------------------------------------------------------------------
+# .env ファイルを読み込む（ローカル開発用／CI 用どちらにも対応）
+# ----------------------------------------------------------------------
+BASE_DIR = Path(__file__).resolve().parent.parent
+dotenv_path = BASE_DIR / (os.getenv("ENV_FILE", ".env"))
+load_dotenv(dotenv_path=dotenv_path)
 
-from celery import Celery  # noqa: E402
+# ----------------------------------------------------------------------
+# Celery ブローカー／バックエンド設定
+# ----------------------------------------------------------------------
+# REDIS_URL を優先的に読み込み。未設定時は REDIS_PASSWORD／REDIS_HOST から組み立てる
+REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
+REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
+broker_url = os.environ.get(
+    "REDIS_URL",
+    f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
+)
 
-# ───────────────────────────── logger
-logger = logging.getLogger(__name__)
-if not logger.handlers:
-    _h = logging.StreamHandler()
-    _h.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
-    logger.addHandler(_h)
-logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
+# CELERY_RESULT_BACKEND を優先的に読み込み。未設定時は broker_url の別データベースにする
+result_backend = os.environ.get("CELERY_RESULT_BACKEND", broker_url.replace("/0", "/1"))
 
-# ───────────────────────────── Redis URL helper
-def _redis_url() -> str:
-    """
-    Redis 接続 URL を決定する。
-
-    1) `CELERY_BROKER_URL` があればそれをそのまま採用
-    2) 個別の REDIS_* 系環境変数から組み立て
-       * 未指定時の host 既定値は **redis** （Compose service 名）
-       * パスワード空なら auth 句は省略
-    """
-    direct = os.getenv("CELERY_BROKER_URL")
-    if direct:
-        return direct
-
-    host = os.getenv("REDIS_HOST", "redis")
-    port = os.getenv("REDIS_PORT", "6379")
-
-    raw_pw = os.getenv("REDIS_PASSWORD", "")
-    # 既に URL エンコード済みを優先、無ければ raw をエンコード
-    enc_pw = os.getenv("REDIS_PASSWORD_ENC") or urllib.parse.quote_plus(raw_pw)
-    auth = f"default:{enc_pw}@" if enc_pw else ""
-
-    return f"redis://{auth}{host}:{port}/0"
-
-
-BROKER_URL: str = _redis_url()
-RESULT_BACKEND_URL: str = os.getenv("CELERY_RESULT_BACKEND", BROKER_URL)
-
-logger.info("[Celery] bootstrap  broker=%s  backend=%s", BROKER_URL, RESULT_BACKEND_URL)
-
-# ───────────────────────────── Celery app
+# Celery アプリケーションのインスタンス化
 celery_app = Celery(
     "mmopdca",
-    broker=BROKER_URL,
-    backend=RESULT_BACKEND_URL,
-    include=[
-        "core.tasks.do_tasks",
-        "core.tasks.check_tasks",
-    ],
+    broker=broker_url,
+    backend=result_backend,
 )
+
+# ----------------------------------------------------------------------
+# Eager モード設定（同期実行・例外伝播）
+# ----------------------------------------------------------------------
+# CI／テスト環境では .env.ci から以下の環境変数を渡す想定
+always_eager = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "false").lower() in ("1", "true", "yes")
+eager_propagates = os.environ.get("CELERY_TASK_EAGER_PROPAGATES", "false").lower() in ("1", "true", "yes")
 
 celery_app.conf.update(
-    task_serializer="json",
-    result_serializer="json",
-    accept_content=["json"],
-    timezone=os.getenv("TZ", "UTC"),
-    enable_utc=True,
-    task_acks_late=True,                # Worker 落下時に再キュー
-    worker_max_tasks_per_child=100,     # メモリリーク予防
-    soft_time_limit=int(os.getenv("DO_SOFT_TL", "890")),
+    # タスクを同期実行するかどうか
+    task_always_eager=always_eager,
+    # Eager モードで例外を即座にアプリ側に伝播させる
+    task_eager_propagates=eager_propagates,
+    # Eager モード実行時にも結果をバックエンドに保存する
+    task_store_eager_result=always_eager,
 )
 
-# core.tasks.* を自動検出（上記 include と重複しても OK）
-celery_app.autodiscover_tasks(["core.tasks"])
-
-# ───────────────────────────── Do-phase shard task
-_TOTAL_SHARDS = int(os.getenv("DO_TOTAL_SHARDS", "12"))
-
-
-@celery_app.task(
-    name="run_do",                       # Celery タスク名のエイリアス
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_backoff=5,
-    retry_kwargs={"max_retries": 3},
-)
-def run_do_task(                         # noqa: D401 – task function
-    self,                                # type: ignore[override]
-    plan_id: str,
-    params: Dict[str, Any],
-    *,
-    shard_idx: int = 0,
-    total_shards: int = _TOTAL_SHARDS,
-) -> Dict[str, Any]:
-    """
-    1 つの shard (= epoch) を実行し、続きの shard を自動スケジュールする。
-    最終 shard のみ core.do.coredo_executor.run_do の戻り値を返す。
-    """
-    logger.info(
-        "[Celery] run_do shard %d/%d  plan=%s", shard_idx, total_shards, plan_id
-    )
-
-    # 遅延 import で循環依存を回避
-    from core.do import checkpoint as ckpt  # noqa: WPS433
-    from core.do.coredo_executor import run_do  # noqa: WPS433
-
-    run_tag = params.get("run_no", 0)
-    run_id = f"{plan_id}__{run_tag:04d}"
-    if ckpt.is_done(run_id, shard_idx):
-        logger.warning("[Celery] shard %d already done – skip", shard_idx)
-        return {
-            "plan_id": plan_id,
-            "shard": shard_idx,
-            "status": "SKIPPED_DUPLICATE",
-        }
-
-    # 実処理
-    result: Dict[str, Any] = run_do(
-        plan_id,
-        params,
-        epoch_idx=shard_idx,
-        epoch_cnt=total_shards,
-    )
-
-    # 次 shard を予約
-    if shard_idx + 1 < total_shards:
-        eta_dt = datetime.utcnow() + timedelta(seconds=1)
-        self.apply_async(  # type: ignore[arg-type]
-            args=[plan_id, params],
-            kwargs={
-                "shard_idx": shard_idx + 1,
-                "total_shards": total_shards,
-            },
-            eta=eta_dt,
-        )
-
-    return result
-
-
-__all__ = ["celery_app", "run_do_task"]
+# ----------------------------------------------------------------------
+# タスク定義の自動読み込み
+# core/tasks/do_tasks.py 内の @shared_task デコレータ付きタスクを登録
+# ----------------------------------------------------------------------
+celery_app.autodiscover_tasks(["core.tasks.do_tasks"], related_name="tasks", force=True)

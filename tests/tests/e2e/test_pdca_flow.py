@@ -14,7 +14,6 @@ from core.common.io_utils import (
     save_meta,
     load_predictions,
 )
-from core.schemas.artifact_schemas import PredictionRecord, PredictionArtifact
 from core.schemas.meta_schemas import MetaInfo, MetricSpec
 from core.check.check_executor import CheckExecutor
 from core.constants import ensure_directories

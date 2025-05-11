@@ -50,7 +50,9 @@ def predict(
     try:
         horizons: List[int] = [int(h) for h in horizon.split(",") if h.strip()]
     except ValueError:
-        typer.secho("❌ horizon は整数カンマ区切りで渡してください", fg=typer.colors.RED)
+        typer.secho(
+            "❌ horizon は整数カンマ区切りで渡してください", fg=typer.colors.RED
+        )
         raise typer.Exit(1)
 
     predictor = GarchProphetPredictor(ticker)

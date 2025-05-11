@@ -52,7 +52,7 @@ class PlanResponse(BaseModel):
     id: str
     symbol: str
     start: Optional[date] = None
-    end: Optional[date]   = None
+    end: Optional[date] = None
     created_at: str
 
     # ★ 未定義フィールドを許可してそのまま返す

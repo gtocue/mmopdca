@@ -39,9 +39,9 @@ from typing import Dict, List, TypedDict
 class HorizonResult(TypedDict):
     """単一ホライズンの予測結果型"""
 
-    p5: float      # 下側 5 % 信頼区間
-    p50: float     # 中央値（point forecast）
-    p95: float     # 上側 95 % 信頼区間
+    p5: float  # 下側 5 % 信頼区間
+    p50: float  # 中央値（point forecast）
+    p95: float  # 上側 95 % 信頼区間
     vector: float  # 現在値に対する上昇率 (p50/current - 1)
 
 

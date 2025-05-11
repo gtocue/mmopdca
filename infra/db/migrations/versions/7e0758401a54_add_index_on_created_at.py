@@ -45,7 +45,7 @@ def upgrade() -> None:  # noqa: D401
     """Apply index additions."""
     for tbl in _TABLES:
         op.execute(
-            f'CREATE INDEX IF NOT EXISTS idx_{tbl}__created_at '
+            f"CREATE INDEX IF NOT EXISTS idx_{tbl}__created_at "
             f'ON "{tbl}" (created_at DESC);'
         )
 
@@ -53,4 +53,4 @@ def upgrade() -> None:  # noqa: D401
 def downgrade() -> None:  # noqa: D401
     """Revert index additions."""
     for tbl in _TABLES:
-        op.execute(f'DROP INDEX IF EXISTS idx_{tbl}__created_at;')
+        op.execute(f"DROP INDEX IF EXISTS idx_{tbl}__created_at;")

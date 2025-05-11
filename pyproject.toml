@@ -1,10 +1,11 @@
-# =====================================================================
-# pyproject.toml — mmopdca root 〈Poetry-ready 完全版〉
-#   ✱ 依存定義は **[tool.poetry.dependencies]** にまとめること
-#   ✱ PEP-621 の [project] テーブルだけでは Poetry は解釈しません
-# =====================================================================
+# ----------------------------------------------------------------------
+# Name:       pyproject.toml (Poetry)
+# Summary:    プロジェクト依存管理定義 — Poetry 用
+#             - psycopg, alembic をトップレベルの依存に移動
+#             - pyarrow を dev グループに追加し、Parquet 書き出しをサポート
+# ----------------------------------------------------------------------
 
-[tool.poetry]                # ← Poetry が読むトップレベル
+[tool.poetry]
 name        = "mmopdca"
 version     = "0.1.0"
 description = "Command-DSL-driven forecasting SaaS (MVP)"
@@ -16,66 +17,43 @@ packages    = [
   { include = "core"        },
   { include = "plugins"     }
 ]
-package-mode = false          # site-packages 直下に展開
+package-mode = false
 
-# ---------------------------------------------------------------------
-# Runtime dependencies
-# ---------------------------------------------------------------------
 [tool.poetry.dependencies]
-python               = ">=3.11,<3.13"
+python            = ">=3.11,<3.13"
+fastapi           = ">=0.111,<0.117"
+uvicorn           = { version = ">=0.29,<0.32", extras = ["standard"] }
+python-multipart  = "^0.0.8"
+pydantic          = "^2.7.2"
+python-dotenv     = "^1.0"
+fastjsonschema    = "^2.21.0"
+cachetools        = "^5.3"
+requests          = "^2.32"
+prometheus-client = "^0.20"
+pandas            = "^2.2"
+numpy             = "^2.2"
+scikit-learn      = "^1.6"
+yfinance          = ">=0.2,<0.3"
+plotly            = "^6.0"
+celery            = { version = "^5.3", extras = ["redis"] }
+redis             = "^5.0"
 
-# ── Web / API ───────────────────────────────────────────────────────
-fastapi              = ">=0.111,<0.117"     # 0.116.* は RC。安定帯を維持
-uvicorn              = { version = ">=0.29,<0.32", extras = ["standard"] }
-python-multipart     = "^0.0.8"
+# ← ここに移動
+psycopg           = { version = ">=3.1,<4.0", extras = ["binary"] }
+alembic           = "^1.15"
 
-# ── Core / Utility ─────────────────────────────────────────────────
-pydantic             = "^2.7.2"
-python-dotenv        = "^1.0"
-fastjsonschema       = "^2.21.0"
-cachetools           = "^5.3"
-requests             = "^2.32"
-prometheus-client    = "^0.20"
-
-# ── Data / ML ──────────────────────────────────────────────────────
-pandas               = "^2.2"
-numpy                = "^2.2"
-scikit-learn         = "^1.6"
-yfinance             = ">=0.2,<0.3"
-plotly               = "^6.0"
-
-# ── Queue / Broker ─────────────────────────────────────────────────
-celery               = { version = "^5.3", extras = ["redis"] }
-redis                = "^5.0"
-
-# ---------------------------------------------------------------------
-# Optional: DB 依存（名前付きグループ）
-#   docker-compose.yml で Postgres を使う場合のみインストール
-# ---------------------------------------------------------------------
-[tool.poetry.group.db.dependencies]
-psycopg = { version = ">=3.1,<4.0", extras = ["binary"] }
-alembic = "^1.15"
-
-# ---------------------------------------------------------------------
-# Dev / CI tools
-# ---------------------------------------------------------------------
 [tool.poetry.group.dev.dependencies]
-pytest  = "^8.3"
-black   = "^24.4"
-isort   = "^6.0"
-ruff    = "^0.4"
-mypy    = "^1.10"
-httpx   = "^0.27"
+pytest    = "^8.3"
+black     = "^24.4"
+isort     = "^6.0"
+ruff      = "^0.4"
+mypy      = "^1.10"
+httpx     = "^0.27"
+pyarrow   = "^12.0"   # Parquet 書き出し用エンジン
 
-# ---------------------------------------------------------------------
-# Plugin (adapter) エントリポイント
-# ---------------------------------------------------------------------
 [tool.poetry.plugins."mmopdca_adapters"]
 stock_us = "plugins.stock_us.adapter:StockUSAdapter"
 
-# ---------------------------------------------------------------------
-# Poe the Poet — task runner
-# ---------------------------------------------------------------------
 [tool.poe.tasks]
 test      = "pytest -q"
 lint      = "ruff ."
@@ -83,9 +61,6 @@ format    = "ruff format . && isort . && black ."
 typecheck = "mypy ."
 migrate   = "alembic upgrade head"
 
-# ---------------------------------------------------------------------
-# Build backend
-# ---------------------------------------------------------------------
 [build-system]
 requires      = ["poetry-core>=2.0,<3.0"]
 build-backend = "poetry.core.masonry.api"

@@ -1,10 +1,14 @@
 """
-  /health   : GET -> 200/503 + JSON
-  /healthz  : GET or HEAD -> 204/503 (Kubernetes probe)
+/health   : GET -> 200/503 + JSON
+/healthz  : GET or HEAD -> 204/503 (Kubernetes probe)
 """
+
 from __future__ import annotations
 
-import contextlib, os, socket, time
+import contextlib
+import os
+import socket
+import time
 from typing import Any, Callable, Dict, Tuple
 
 import psycopg2
@@ -25,6 +29,7 @@ _REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 _REDIS_TIMEOUT = 2  # sec
 # ────────────────────────────────────────────────────────
 
+
 def _check_postgres() -> Tuple[str, bool, float]:
     t0 = time.perf_counter()
     try:
@@ -36,6 +41,7 @@ def _check_postgres() -> Tuple[str, bool, float]:
     except Exception:
         ok = False
     return "postgres", ok, round(time.perf_counter() - t0, 4)
+
 
 def _check_redis() -> Tuple[str, bool, float]:
     t0 = time.perf_counter()
@@ -50,11 +56,13 @@ def _check_redis() -> Tuple[str, bool, float]:
         sock.close()
     return "redis", ok, round(time.perf_counter() - t0, 4)
 
+
 router = APIRouter(tags=["meta"])
 _HEALTH_CHECKS: list[Callable[[], Tuple[str, bool, float]]] = [
     _check_postgres,
     _check_redis,
 ]
+
 
 def _run_checks() -> dict[str, Any]:
     t0 = time.perf_counter()
@@ -67,11 +75,17 @@ def _run_checks() -> dict[str, Any]:
     payload["duration"] = round(time.perf_counter() - t0, 4)
     return payload
 
+
 @router.get("/health", include_in_schema=False)
 def health() -> JSONResponse:
     data = _run_checks()
-    code = status.HTTP_200_OK if data["status"] == "ok" else status.HTTP_503_SERVICE_UNAVAILABLE
+    code = (
+        status.HTTP_200_OK
+        if data["status"] == "ok"
+        else status.HTTP_503_SERVICE_UNAVAILABLE
+    )
     return JSONResponse(data, code)
+
 
 @router.api_route(
     "/healthz",
@@ -82,5 +96,7 @@ def health() -> JSONResponse:
 def healthz(request: Request) -> Response:
     ok = _run_checks()["status"] == "ok"
     return Response(
-        status_code=status.HTTP_204_NO_CONTENT if ok else status.HTTP_503_SERVICE_UNAVAILABLE
+        status_code=status.HTTP_204_NO_CONTENT
+        if ok
+        else status.HTTP_503_SERVICE_UNAVAILABLE
     )

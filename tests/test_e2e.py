@@ -1,14 +1,17 @@
-import time, requests, pytest
+import time
+import requests
+import pytest
 
 API = "http://127.0.0.1:8000"
 
-def test_plan_do_check():
-    plan = requests.post(f"{API}/plan/",
-                         json={"symbol":"AAPL",
-                               "start":"2024-01-01",
-                               "end":"2024-12-31"}).json()
 
-    do   = requests.post(f"{API}/do/{plan['id']}", json={}).json()
+def test_plan_do_check():
+    plan = requests.post(
+        f"{API}/plan/",
+        json={"symbol": "AAPL", "start": "2024-01-01", "end": "2024-12-31"},
+    ).json()
+
+    do = requests.post(f"{API}/do/{plan['id']}", json={}).json()
 
     # --- wait Do ---
     for _ in range(120):

@@ -14,9 +14,7 @@ def test_create_and_get_plan(client):
     # ---------- Create (multipart/file) ----------
     res = client.post(
         "/plan-dsl/",
-        files={
-            "file": ("plan_mvp.yaml", SAMPLE_BYTES, "application/x-yaml")
-        },
+        files={"file": ("plan_mvp.yaml", SAMPLE_BYTES, "application/x-yaml")},
     )
     assert res.status_code == 201
     body = res.json()

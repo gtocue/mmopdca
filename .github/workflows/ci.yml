@@ -1,9 +1,11 @@
+# .github/workflows/ci.yml
 # -------------------------------------------------------------------------
-# Name:       CI (Poetry)
+# Name:       CI (Poetry + E2E)
 # Summary:    Poetry で依存管理 → Ruff で Lint → Pytest でユニットテスト →
-#             Docker イメージをビルド＆GHCR にプッシュするワークフロー
+#             Docker イメージをビルド＆GHCR にプッシュ → フルスタック起動 →
+#             E2E テスト実行
 # -------------------------------------------------------------------------
-name: CI (Poetry)
+name: CI (Poetry + E2E)
 
 on:
   push:
@@ -12,9 +14,8 @@ on:
     branches: [ main ]
 
 env:
-  # Dockerイメージのレジストリ＆ベース名設定
   REGISTRY: ghcr.io
-  IMAGE_BASE: ${{ github.repository }}   # ghcr.io/<owner>/<repo>
+  IMAGE_BASE: ${{ github.repository }}
   PYTHON_VERSION: '3.11'
 
 jobs:
@@ -25,15 +26,14 @@ jobs:
     name: Lint & Test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout コード
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Python セットアップ
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Poetry と pip キャッシュ
+      - name: Cache Poetry & pip
         uses: actions/cache@v3
         with:
           path: |
@@ -43,23 +43,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-poetry-
 
-      - name: Poetry をインストール
+      - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
-      - name: 依存パッケージを Poetry でインストール
+      - name: Install dependencies
         run: |
           poetry config virtualenvs.create false
           poetry install --no-interaction --no-ansi
 
-      - name: Lint（Ruff）
-        run: |
-          poetry run ruff check .
+      - name: Lint (Ruff)
+        run: poetry run ruff check .
 
-      - name: ユニットテスト（pytest）
-        run: |
-          poetry run pytest --maxfail=1 --disable-warnings -v
+      - name: Unit tests (pytest)
+        run: poetry run pytest --maxfail=1 --disable-warnings -v
 
   # ──────────────────────────────────────────
   # 2) Docker イメージのビルド＆プッシュ
@@ -68,35 +66,33 @@ jobs:
     name: Build & Push Docker Images
     needs: test
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         include:
           - component: api
             dockerfile: docker/Dockerfile.main_api
-            target: ''       # FastAPI はマルチステージターゲット不要
+            target: ''
           - component: worker
             dockerfile: docker/Dockerfile
-            target: runtime  # Celery Worker
+            target: runtime
           - component: beat
             dockerfile: docker/Dockerfile
-            target: runtime  # Celery Beat
+            target: runtime
 
     steps:
-      - name: Checkout コード
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Docker Buildx セットアップ
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: GHCR にログイン
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & Push ${{ matrix.component }}
+      - name: Build & push ${{ matrix.component }}
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -106,3 +102,82 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:${{ matrix.component }}-latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:${{ matrix.component }}-${{ github.sha }}
+
+  # ──────────────────────────────────────────
+  # 3) フルスタック起動 → E2E テスト
+  # ──────────────────────────────────────────
+  e2e:
+    name: E2E テスト
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1) .env を用意
+      - name: Create .env for CI
+        run: |
+          cat > .env <<EOF
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD_RAW }}
+          REDIS_PASSWORD_ENC=${{ secrets.REDIS_PASSWORD_URL }}
+          POSTGRES_DB=mmopdca
+          POSTGRES_USER=mmop_user
+          POSTGRES_PASSWORD=${{ secrets.PG_PASSWORD }}
+          DSL_ROOT=/mnt/data/dsl
+          LOG_LEVEL=INFO
+          TZ=UTC
+          # Celery タスクを同期実行に切り替え
+          CELERY_TASK_ALWAYS_EAGER=true
+          CELERY_TASK_EAGER_PROPAGATES=true
+          EOF
+
+      # 2) Docker Compose で CI 用スタックを起動
+      - name: Docker Compose up
+        run: |
+          docker compose \
+            --env-file .env \
+            -f docker/compose.ci.yml \
+            up -d --build
+          if [ $? -ne 0 ]; then
+            echo "🚨 Docker Compose build failed"
+            exit 1
+          fi
+          docker compose ps
+
+      # 3) 各サービスのヘルスチェック待機
+      - name: Wait for services
+        run: |
+          set -e
+          echo "⏳ Waiting for services..."
+          for port in 8001 9090 9121 9808; do
+            for i in $(seq 1 30); do
+              if curl -fsSL "http://localhost:${port}${port==8001?'/docs':''}" > /dev/null; then
+                break
+              fi
+              sleep 4
+              if [ $i -eq 30 ]; then
+                echo "❌ Service on port $port did not become healthy"
+                docker compose logs --tail=50
+                exit 1
+              fi
+            done
+          done
+
+      # 4) E2E テスト実行
+      - name: Install dependencies (for tests)
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+          poetry config virtualenvs.create false
+          poetry install --no-interaction --no-ansi
+
+      - name: Run E2E tests
+        run: poetry run pytest tests/it --maxfail=1 --disable-warnings -v
+
+      # 5) Tear down
+      - name: Docker Compose down
+        if: always()
+        run: docker compose \
+          --env-file .env \
+          -f docker/compose.ci.yml \
+          down -v --remove-orphans

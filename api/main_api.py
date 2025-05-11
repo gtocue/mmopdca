@@ -33,12 +33,18 @@ logger: Final = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # ----------------------------------------------------------------------
+# Celery タスクモジュールを必ずインポート（Eager モードでも登録されるよう）
+# ----------------------------------------------------------------------
+import core.tasks.do_tasks  # 追加: run_do_task を登録
+
+# ----------------------------------------------------------------------
 # Core Routers（必須）
 # ----------------------------------------------------------------------
-from api.routers.plan_api import router as plan_router          # type: ignore
+from api.routers.plan_api import router as plan_router  # type: ignore
 from api.routers.plan_dsl_api import router as plan_dsl_router  # type: ignore
-from api.routers.do_api import router as do_router              # type: ignore
-from api.routers.check_api import router as check_router        # type: ignore
+from api.routers.do_api import router as do_router  # type: ignore
+from api.routers.check_api import router as check_router  # type: ignore
+
 
 # ----------------------------------------------------------------------
 # Optional Routers（存在しなければ stub）
@@ -76,6 +82,7 @@ metrics_router = _import_optional("api.routers.metrics", "/metrics-api", "metric
 # Prometheus Exporter (/metrics) – サブアプリ扱い
 try:
     from api.routers.metrics_exporter import create_metrics_exporter
+
     exporter_app = create_metrics_exporter()
 except (ModuleNotFoundError, FileNotFoundError):
     exporter_app = None
@@ -107,11 +114,11 @@ app.include_router(meta_router)
 # Business Routers
 # ----------------------------------------------------------------------
 app.include_router(plan_router)        # /plan
-app.include_router(plan_dsl_router)    # /plan-dsl
-app.include_router(do_router)          # /do
-app.include_router(check_router)       # /check
-app.include_router(act_router)         # /act
-app.include_router(metrics_router)     # /metrics-api
+app.include_router(plan_dsl_router)   # /plan-dsl
+app.include_router(do_router)         # /do
+app.include_router(check_router)      # /check
+app.include_router(act_router)        # /act
+app.include_router(metrics_router)    # /metrics-api
 
 # Prometheus Exporter (/metrics)
 if exporter_app:
@@ -121,4 +128,4 @@ if exporter_app:
 # NOTE:
 #   • 認証 / CORS / 共通エラーハンドラは別ユニットで追加予定
 #   • /metrics (exporter) と /metrics-api (CRUD) を分離
-# ---------------------------------------------------------------------
+# ----------------------------------------------------------------------

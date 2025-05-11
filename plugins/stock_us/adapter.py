@@ -1,14 +1,16 @@
+# plugins/stock_us/adapter.py
 import yfinance as yf
-import pandas as pd
 from datetime import datetime
+from core.adapters.base import BaseAdapter  # 適切な import パスに置き換えてください
+
 
 class StockUSAdapter(BaseAdapter):
     # …load/plan は後回し …
 
     def do(self, plan: dict) -> dict:
         symbol = plan["symbol"]
-        start  = plan["start"]
-        end    = plan["end"]
+        start = plan["start"]
+        end = plan["end"]
 
         df = yf.download(symbol, start=start, end=end, progress=False)
 
@@ -20,5 +22,5 @@ class StockUSAdapter(BaseAdapter):
             "symbol": symbol,
             "as_of": datetime.utcnow().isoformat(),
             "close": float(latest["Close"]),
-            "sma":   float(latest["SMA"]),
+            "sma": float(latest["SMA"]),
         }

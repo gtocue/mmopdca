@@ -38,7 +38,6 @@
 # =========================================================
 from __future__ import annotations
 
-import json
 import logging
 import os
 from datetime import datetime
@@ -53,6 +52,7 @@ if not logger.handlers:
     logger.addHandler(_h)
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
 
+
 # ---------------------------------------------------------------------------
 # Event Envelope Schema (stable API)
 # ---------------------------------------------------------------------------
@@ -61,7 +61,9 @@ class EventEnvelope(BaseModel):
 
     event_id: str = Field(..., description="UUIDv4 など一意ID")
     event_type: str = Field(..., description="ドメイン + 動詞 例: PLAN.APPROVED")
-    occurred_at: datetime = Field(default_factory=datetime.utcnow, description="UTC now")
+    occurred_at: datetime = Field(
+        default_factory=datetime.utcnow, description="UTC now"
+    )
     payload: dict[str, Any] = Field(default_factory=dict, description="Event body")
     version: int = Field(1, description="イベントスキーマバージョン")
 
@@ -108,6 +110,7 @@ def publish(event: EventEnvelope | dict[str, Any]) -> None:  # noqa: D401
 # ---------------------------------------------------------------------------
 # Internal back‑ends – MVP はダミー
 # ---------------------------------------------------------------------------
+
 
 def _publish_outbox(envelope: EventEnvelope) -> None:  # noqa: D401
     """P1 で Postgres outbox テーブルに INSERT 予定。"""

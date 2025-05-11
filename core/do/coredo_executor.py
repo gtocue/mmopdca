@@ -1,17 +1,12 @@
 # ======================================================================
-#  core/do/coredo_executor.py
+# File:       core/do/coredo_executor.py
+# Name:       Do-phase Executor ― Spot-Checkpoint × Shard 拡張版
+# Summary:    1. 価格データ取得 (IDataSource → fallback: yfinance)
+#             2. テクニカル指標計算 SMA / EMA / RSI
+#             3. 線形回帰で翌営業日 Close を予測
+#             4. shard(epoch) 毎にチェックポイント保存して再開保証
+#             最終 shard の戻り値には status / r2 / threshold / passed を含む
 # ======================================================================
-#
-# Do-phase Executor  ― Spot-Checkpoint × Shard 拡張版
-#
-# 1. 価格データ取得      (IDataSource → fallback: yfinance)
-# 2. テクニカル指標計算  SMA / EMA / RSI
-# 3. 線形回帰で翌営業日 Close を予測
-# 4. shard(epoch) 毎にチェックポイント保存して再開保証
-#
-# Check-phase へ返すインターフェース
-#   └ 最終 shard の return に **status / r2 / threshold / passed** を含める
-# ----------------------------------------------------------------------
 
 from __future__ import annotations
 
@@ -40,7 +35,7 @@ if not logger.handlers:
 logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
 
 # ───────────────────────────── env & const
-TOTAL_EPOCHS: int   = int(os.getenv("DO_TOTAL_SHARDS", "12"))
+TOTAL_EPOCHS: int = int(os.getenv("DO_TOTAL_SHARDS", "12"))
 METRIC_THRESHOLD: float = float(os.getenv("CHECK_R2_THRESHOLD", "0.80"))
 
 # ───────────────────────────── datasource
@@ -53,6 +48,7 @@ except Exception:  # noqa: BLE001
     import yfinance as yf  # type: ignore
 
     logger.warning("[Do] datasource fallback to yfinance")
+
 
 # ======================================================================
 # public API
@@ -107,7 +103,9 @@ def run_do(
         # 直近 30 business-day 予測
         bday = _make_bday_offset(holidays)
         dates = (df.index + bday).strftime("%Y-%m-%d")[-30:]
-        last30 = [{"date": d, "price": float(round(p, 4))} for d, p in zip(dates, preds[-30:])]
+        last30 = [
+            {"date": d, "price": float(round(p, 4))} for d, p in zip(dates, preds[-30:])
+        ]
 
         # Parquet artifact
         artifact_uri = _save_prediction_artifact(df, preds, plan_id, run_id)
@@ -123,7 +121,7 @@ def run_do(
         }
 
         return {
-            "status": "SUCCESS",          # ★ Check が参照
+            "status": "SUCCESS",  # ★ Check が参照
             "run_id": run_id,
             "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "summary": {
@@ -152,7 +150,9 @@ def _train_one_epoch(epoch: int) -> None:
         time.sleep(0.5)
 
 
-def _parse_params(params: Dict[str, Any]) -> Tuple[str, str, str, List[Dict[str, Any]], int, List[str]]:
+def _parse_params(
+    params: Dict[str, Any],
+) -> Tuple[str, str, str, List[Dict[str, Any]], int, List[str]]:
     def _req(k: str) -> Any:
         if k not in params:
             raise RuntimeError(f"missing param '{k}'")
@@ -178,7 +178,12 @@ def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
         df = _DS.fetch_ohlcv(symbol=symbol, start=start, end=end)
     else:
         df = yf.download(  # type: ignore
-            symbol, start=start, end=end, progress=False, auto_adjust=False, group_by="column"
+            symbol,
+            start=start,
+            end=end,
+            progress=False,
+            auto_adjust=False,
+            group_by="column",
         )
 
     if df.empty:
@@ -191,7 +196,8 @@ def _download_prices(symbol: str, start: str, end: str) -> pd.DataFrame:
     req: Sequence[str] = ["Open", "High", "Low", "Close", "Volume"]
     if "Adj close" in df.columns:
         df = df.rename(columns={"Adj close": "Adj Close"})
-        req = list(req); req.insert(4, "Adj Close")
+        req = list(req)
+        req.insert(4, "Adj Close")
 
     miss = [c for c in req if c not in df.columns]
     if miss:

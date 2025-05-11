@@ -34,14 +34,14 @@ from typing import Final
 PROJECT_ROOT: Final[Path] = Path(os.getenv("PDCA_ROOT", ".")).resolve()
 
 # 保存物 (Parquet) 置き場
-ARTIFACT_ROOT: Final[Path] = (
-    Path(os.getenv("ARTIFACT_ROOT", PROJECT_ROOT / "artifacts")).resolve()
-)
+ARTIFACT_ROOT: Final[Path] = Path(
+    os.getenv("ARTIFACT_ROOT", PROJECT_ROOT / "artifacts")
+).resolve()
 
 # Plan / Do / Check の補助 JSON 等
-PDCA_META_ROOT: Final[Path] = (
-    Path(os.getenv("PDCA_META_ROOT", PROJECT_ROOT / "pdca_data")).resolve()
-)
+PDCA_META_ROOT: Final[Path] = Path(
+    os.getenv("PDCA_META_ROOT", PROJECT_ROOT / "pdca_data")
+).resolve()
 
 # ----------------------------------------------------------------------
 # 2) 共通ファイル名 / サブフォルダ規約
@@ -63,6 +63,7 @@ SUPPORTED_METRICS: Final[tuple[str, ...]] = (
 # ----------------------------------------------------------------------
 DEFAULT_PARQUET_COMPRESSION: Final[str] = "zstd"  # FIXME: ハードコード
 PARQUET_VERSION: Final[str] = "2.6"
+
 
 # ----------------------------------------------------------------------
 # 5) 便利関数

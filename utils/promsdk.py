@@ -1,25 +1,25 @@
 # =========================================================
 # ASSIST_KEY: 【utils/promsdk.py】
 # =========================================================
-# 
+#
 # 【概要】
 #   Prometheus クエリ・ヘルパ SDK。
 #   UI / API からメトリクスを単数・時系列で安全に取得します。
-# 
+#
 # 【主な役割】
 #   - Prometheus HTTP API v1/query, v1/query_range 呼び出し
 #   - 30 秒 TTL キャッシュによる負荷削減
 #   - 例外 → 専用エラー型 (PromQueryError) 変換
-# 
+#
 # 【連携先・依存関係】
 #   - api/routers/metrics.py : /metrics/ ルータが本 SDK を直接利用
 #   - metrics/signal_catalog.yml : expr 定義を外部化し、SDK で評価
-# 
+#
 # 【ルール遵守】
 #   1) グローバル直書き禁止。環境変数 → pdca_data or os.getenv 経由
 #   2) タイムアウトは 2 秒。可観測性重視で logging
 #   3) 全体コード返却（完成形）。このヘッダーは残す
-# 
+#
 # ---------------------------------------------------------
 
 from __future__ import annotations
@@ -27,7 +27,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import time
 from typing import Dict, Literal, Sequence
 
 import cachetools
@@ -51,6 +50,7 @@ logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
 # ────────────────────────────────
 # 型定義
 # ────────────────────────────────
+
 
 class PromQueryError(RuntimeError):
     """Prometheus からのエラー応答 / ネットワーク障害を統一的に表現"""
