@@ -1,4 +1,9 @@
-docker-compose.override.yml
+# Python キャッシュ類
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
 
-# local secrets
+# 環境変数ファイル
 .env
+.env.ci
