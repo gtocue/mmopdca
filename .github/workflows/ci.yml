@@ -1,4 +1,9 @@
-name: CI
+# -----------------------------------------------------------------------------
+# Name:       CI (Poetry)
+# Summary:    Poetry で依存管理 → Ruff で Lint → Pytest でユニットテスト →
+#             Docker イメージをビルド＆GHCR にプッシュするワークフロー
+# -----------------------------------------------------------------------------
+name: CI (Poetry)
 
 on:
   push:
@@ -8,50 +13,77 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BASE: ${{ github.repository }}      # ghcr.io/<owner>/<repo>
-  PYTHON_VERSION: "3.11"
+  IMAGE_BASE: ${{ github.repository }}   # ghcr.io/<owner>/<repo>
+  PYTHON_VERSION: '3.11'
 
 jobs:
-  # ───────────────────────────────  lint & unit-test
+  # ──────────────────────────────────────────
+  # Lint & Unit Tests
+  # ──────────────────────────────────────────
   test:
+    name: Lint & Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - name: Cache Poetry & pip
+        uses: actions/cache@v3
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
-          restore-keys: ${{ runner.os }}-pip-
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
 
-      - name: Install deps
+      - name: Install Poetry
         run: |
-          pip install -U pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
-      - name: Lint (ruff)
-        run: ruff check .
+      - name: Install dependencies via Poetry
+        run: |
+          poetry config virtualenvs.create false
+          poetry install --no-interaction --no-ansi
 
-      - name: Unit tests (pytest)
-        run: pytest -q
+      - name: Lint with Ruff
+        run: |
+          poetry run ruff check .
 
-  # ───────────────────────────────  build & push   (api / worker / beat)
+      - name: Run unit tests
+        run: |
+          poetry run pytest --maxfail=1 --disable-warnings -v
+
+  # ──────────────────────────────────────────
+  # Build & Push Docker Images
+  # ──────────────────────────────────────────
   build-and-push:
+    name: Build & Push Docker Images
     needs: test
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        # Dockerfile.<component> が存在するものを列挙
-        component: [api, worker, beat]
+        include:
+          - component: api
+            dockerfile: docker/Dockerfile.main_api
+            target: ''
+          - component: worker
+            dockerfile: docker/Dockerfile
+            target: runtime
+          - component: beat
+            dockerfile: docker/Dockerfile
+            target: runtime
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -67,16 +99,21 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/Dockerfile.${{ matrix.component == 'api' && 'main_api' || 'runtime' }}
+          file: ${{ matrix.dockerfile }}
+          # API 以外は target: runtime を指定
+          target: ${{ matrix.target }}
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:${{ matrix.component }}-latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:${{ matrix.component }}-${{ github.sha }}
 
-  # ───────────────────────────────  (optional) deploy
-  # deploy-staging:
+  # ──────────────────────────────────────────
+  # (Optional) Deploy
+  # ──────────────────────────────────────────
+  # deploy:
+  #   name: Deploy to Staging
   #   needs: build-and-push
   #   runs-on: ubuntu-latest
   #   steps:
   #     - name: Trigger deploy
-  #       run: echo "Deploy step here"
+  #       run: echo "デプロイ処理をここに記述"
