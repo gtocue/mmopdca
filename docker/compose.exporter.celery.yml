@@ -1,13 +1,14 @@
+# ファイル: docker/compose.exporter.celery.yml
+# 目的: Celery-Exporter を単独サービスとして起動し、ポート公開は ports.yml で一元管理
+
 services:
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
-    env_file: [ ../.env ]
+    env_file:
+      - ../.env
     environment:
-      CE_BROKER_URL: "redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0"
-      CE_PORT: "9808"
+      - CE_BROKER_URL=redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0
+      - CE_PORT=9808
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "wget", "-qO-", "http://localhost:9808/metrics" ]
-      interval: 5s
-      timeout: 3s
-      retries: 12
+      disable: true

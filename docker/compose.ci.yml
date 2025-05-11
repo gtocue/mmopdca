@@ -1,4 +1,8 @@
-# docker/compose.ci.yml  version: '3.9'
+# -----------------------------------------------------------------------------
+# File:      docker/compose.ci.yml
+# Summary:   CI 用 Docker スタック（FastAPI, Celery, Redis, PostgreSQL,
+#            Exporters, Prometheus）を一発で立ち上げるための Compose 定義
+# -----------------------------------------------------------------------------
 services:
 
   ########################################################################
@@ -9,8 +13,7 @@ services:
       context: ..
       dockerfile: Dockerfile.main_api
     command: >
-      python -m uvicorn api.main_api:app
-      --host 0.0.0.0 --port 8001 --proxy-headers
+      python -m uvicorn api.main_api:app --host 0.0.0.0 --port 8001 --proxy-headers
     env_file: [ ../.env ]
     tmpfs:
       - /mnt/data/dsl
@@ -23,13 +26,13 @@ services:
     ports:
       - "8001:8001"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8001/docs || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://localhost:8001/docs || exit 1" ]
       interval: 5s
       timeout: 3s
       retries: 12
 
   ########################################################################
-  # Celery Worker
+  # Celery Worker & Beat
   ########################################################################
   worker:
     build:
@@ -42,18 +45,13 @@ services:
       redis:
         condition: service_started
 
-  ########################################################################
-  # Celery Beat
-  ########################################################################
   beat:
     build:
       context: ..
       dockerfile: Dockerfile
       target: runtime
     command: >
-      celery -A core.celery_app:celery_app
-      beat --loglevel=info
-      --schedule=/mnt/checkpoints/celerybeat-schedule
+      celery -A core.celery_app:celery_app beat --loglevel=info --schedule=/mnt/checkpoints/celerybeat-schedule
     env_file: [ ../.env ]
     depends_on:
       redis:
@@ -65,10 +63,9 @@ services:
   redis:
     image: redis:7-alpine
     command: >
-      redis-server --requirepass ${REDIS_PASSWORD}
-      --maxmemory 128mb --maxmemory-policy allkeys-lru
+      redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 128mb --maxmemory-policy allkeys-lru
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -80,52 +77,65 @@ services:
     image: postgres:16-alpine
     env_file: [ ../.env ]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       interval: 5s
       timeout: 3s
       retries: 10
 
   ########################################################################
-  # Exporters & Prometheus
+  # Redis-Exporter
   ########################################################################
   redis-exporter:
     image: oliver006/redis_exporter:v1.60.0
+    env_file: [ ../.env ]
     command:
-      - "--redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379"
+      - "--redis.addr=redis://default:${REDIS_PASSWORD}@redis:6379"
     depends_on:
       redis:
         condition: service_started
     ports:
       - "9121:9121"
     healthcheck:
-      test: ["CMD", "curl -f http://localhost:9121/metrics"]
+      test: [ "CMD", "curl -f http://localhost:9121/metrics" ]
       interval: 5s
       timeout: 3s
       retries: 12
 
+  ########################################################################
+  # Celery-Exporter
+  ########################################################################
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
+    env_file: [ ../.env ]
     environment:
-      CE_BROKER_URL: redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0
+      CE_BROKER_URL: redis://default:${REDIS_PASSWORD}@redis:6379/0
       CE_PORT: 9808
-    ports:
-      - "9808:9808"
     depends_on:
       redis:
         condition: service_started
+    ports:
+      - "9808:9808"
     healthcheck:
-      test: ["CMD", "curl -f http://localhost:9808/metrics"]
+      test: [ "CMD", "curl -f http://localhost:9808/metrics" ]
       interval: 5s
       timeout: 3s
       retries: 12
 
+  ########################################################################
+  # Prometheus
+  ########################################################################
   prom:
     image: prom/prometheus:v2.52.0
+    # 既存の entrypoint は /bin/prometheus なので、command はフラグだけ！
     command:
-      - --web.enable-lifecycle
+      - --config.file=/etc/prometheus/prometheus.yml # ← 追加
+      - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=24h
+      - --web.enable-lifecycle
     volumes:
       - ../prom/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # （オプション）TSDB データ用に永続化ボリュームを切るなら
+      # - prom-data:/prometheus
     depends_on:
       redis-exporter:
         condition: service_started
@@ -134,7 +144,13 @@ services:
     ports:
       - "9090:9090"
     healthcheck:
-      test: ["CMD", "curl -f http://localhost:9090/-/ready"]
+      test: [ "CMD", "curl -f http://localhost:9090/-/ready" ]
       interval: 5s
       timeout: 3s
       retries: 12
+
+# -----------------------------------------------------------------------------
+# （オプション）TSDB 永続化を使う場合
+# -----------------------------------------------------------------------------
+# volumes:
+#   prom-data:

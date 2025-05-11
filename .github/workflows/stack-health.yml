@@ -3,7 +3,7 @@ name: CI - Docker Stack Health
 
 on:
   push:
-    branches: [ main, develop ]   # プッシュ対象ブランチ
+    branches: [ main, develop ]
   pull_request:
 
 jobs:
@@ -11,14 +11,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 0) リポジトリをチェックアウト
       - uses: actions/checkout@v4
 
-      # 1) Docker Buildx をセットアップ
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 2) .env ファイルを Secrets から生成
       - name: Create .env for CI
         run: |
           cat > .env <<'EOF'
@@ -31,21 +28,16 @@ jobs:
           LOG_LEVEL=INFO
           TZ=UTC
           EOF
-          # 先頭 10 行だけ表示して「隠しておきたい値」が出ていないか確認
           sed -n '1,10p' .env
 
-      # 3) Docker Stack を起動
       - name: Docker Compose up
         run: |
           docker compose \
             --env-file .env \
-            -f docker/compose.core.yml \
-            -f docker/compose.db.yml \
-            -f docker/compose.ports.yml \
+            -f docker/compose.ci.yml \
             up -d --build
           docker compose ps
 
-      # 4) 各エンドポイントが HTTP 200 を返すまで待機
       - name: Wait until all endpoints respond 200
         run: |
           set -e
@@ -62,17 +54,11 @@ jobs:
           docker compose logs --tail=50
           exit 1
 
-      # 5) オプション：ユニットテストを実行したい場合
-      # - name: Run unit tests
-      #   run: pytest
-
-      # 6) 最後にクリーンアップ
       - name: Docker Compose down
         if: always()
         run: |
           docker compose \
             --env-file .env \
-            -f docker/compose.core.yml \
-            -f docker/compose.db.yml \
-            -f docker/compose.ports.yml \
+            -f docker/compose.ci.yml \
             down -v --remove-orphans
+

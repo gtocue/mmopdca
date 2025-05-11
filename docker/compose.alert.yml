@@ -1,4 +1,6 @@
-version: "3.8"
+# ファイル: docker/compose.alert.yml
+# 目的: Alertmanager を SMTP 設定付きで起動し、ポート公開は ports.yml で一元管理
+
 services:
   alertmanager:
     build:
@@ -13,12 +15,6 @@ services:
       - ALERTMAIL_TO
       - SG_USER
       - SG_PASS
-    ports:
-      - "9093:9093"
-    networks:
-      - mmopdca_default
     restart: unless-stopped
-
-networks:
-  mmopdca_default:
-    external: true
+    healthcheck:
+      disable: true

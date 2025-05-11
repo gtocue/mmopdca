@@ -1,3 +1,6 @@
+# ファイル名: docker/compose.core.yml
+# 用途: API/Worker/Beat/Exporter/Prometheus/Grafana のコア構成
+
 version: "3.9"
 
 services:
@@ -12,12 +15,17 @@ services:
       - DSL_ROOT
       - CELERY_BROKER_URL
       - CELERY_RESULT_BACKEND
-    entrypoint: [ /usr/local/bin/docker-entrypoint-init-dsl.sh ]
-    command: >
-      python -m uvicorn api.main_api:app
-        --host 0.0.0.0
-        --port 8001
-        --proxy-headers
+    entrypoint: [ "/usr/local/bin/docker-entrypoint-init-dsl.sh" ]
+    command:
+      - python
+      - -m
+      - uvicorn
+      - api.main_api:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8001"
+      - --proxy-headers
     volumes:
       - dsl_data:/mnt/data/dsl
       - checkpoints_data:/mnt/checkpoints
@@ -25,7 +33,7 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     networks:
       - mmopdca_default
     restart: unless-stopped
@@ -42,9 +50,13 @@ services:
       - DSL_ROOT
       - CELERY_BROKER_URL
       - CELERY_RESULT_BACKEND
-    entrypoint: [ /usr/local/bin/docker-entrypoint-init-dsl.sh ]
-    command: >
-      celery -A core.celery_app:celery_app worker --loglevel=info
+    entrypoint: [ "/usr/local/bin/docker-entrypoint-init-dsl.sh" ]
+    command:
+      - celery
+      - -A
+      - core.celery_app:celery_app
+      - worker
+      - --loglevel=info
     volumes:
       - dsl_data:/mnt/data/dsl
       - checkpoints_data:/mnt/checkpoints
@@ -52,7 +64,7 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     networks:
       - mmopdca_default
     restart: on-failure
@@ -62,7 +74,8 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: runtime
-    user: "1000:1000"
+    # ── １）ここは root（デフォルト）で OK。UID1000でも書き込み可能に chown 済み
+    #user: "1000:1000"    ← 削除
     env_file:
       - ../.env
     environment:
@@ -70,11 +83,16 @@ services:
       - CELERY_BROKER_URL
       - CELERY_RESULT_BACKEND
       - DO_TOTAL_SHARDS
-    entrypoint: [ /usr/local/bin/docker-entrypoint-init-dsl.sh ]
-    command: >
-      celery -A core.celery_app:celery_app
-        beat --loglevel=info
-        --schedule=/mnt/checkpoints/celerybeat-schedule
+    # ── ２）Entrypoint script にコマンドをそのまま渡す
+    entrypoint:
+      - /usr/local/bin/docker-entrypoint-init-dsl.sh
+      - celery
+      - -A
+      - core.celery_app:celery_app
+      - beat
+      - --loglevel=info
+      - --schedule=/mnt/checkpoints/celerybeat-schedule
+    # command: を使わない
     volumes:
       - dsl_data:/mnt/data/dsl
       - checkpoints_data:/mnt/checkpoints
@@ -82,7 +100,7 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     networks:
       - mmopdca_default
     restart: on-failure
@@ -91,13 +109,54 @@ services:
     image: redis:7.2
     env_file:
       - ../.env
+    command:
+      - redis-server
+      - --requirepass
+      - "${REDIS_PASSWORD}"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 3
+    networks:
+      - mmopdca_default
+    restart: unless-stopped
+
+  celery-exporter:
+    image: danihodovic/celery-exporter:0.9.1
+    env_file:
+      - ../.env
+    environment:
+      CE_BROKER_URL: ${CELERY_BROKER_URL}
+      CE_PORT: "9808"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9808/metrics || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - mmopdca_default
+    restart: unless-stopped
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.60.0
+    env_file:
+      - ../.env
+    command:
+      - '--redis.addr=${CELERY_BROKER_URL}'
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9121/metrics || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - mmopdca_default
     restart: unless-stopped
@@ -114,11 +173,11 @@ services:
       - prom_data:/prometheus
     depends_on:
       celery-exporter:
-        condition: service_started
+        condition: service_healthy
       redis-exporter:
-        condition: service_started
+        condition: service_healthy
       alertmanager:
-        condition: service_started
+        condition: service_healthy
     networks:
       - mmopdca_default
     restart: unless-stopped
@@ -135,34 +194,7 @@ services:
       - ../grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       prom:
-        condition: service_started
-    networks:
-      - mmopdca_default
-    restart: unless-stopped
-
-  celery-exporter:
-    image: danihodovic/celery-exporter:0.9.1
-    env_file:
-      - ../.env
-    environment:
-      CE_BROKER_URL: ${CELERY_BROKER_URL}
-      CE_PORT: "9808"
-    depends_on:
-      redis:
-        condition: service_started
-    networks:
-      - mmopdca_default
-    restart: unless-stopped
-
-  redis-exporter:
-    image: oliver006/redis_exporter:v1.60.0
-    env_file:
-      - ../.env
-    command:
-      - '--redis.addr=${CELERY_BROKER_URL}'
-    depends_on:
-      redis:
-        condition: service_started
+        condition: service_healthy
     networks:
       - mmopdca_default
     restart: unless-stopped
