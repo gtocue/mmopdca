@@ -1,4 +1,3 @@
-docker-compose.override.yml
-
-# local secrets
+# 環境変数ファイルは追跡しない
 .env
+.env.ci
