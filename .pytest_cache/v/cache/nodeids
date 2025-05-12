@@ -1,0 +1,17 @@
+[
+  "gateway/tests/test_router.py::test_forecast_success",
+  "gateway/tests/test_router.py::test_forecast_unauthorized",
+  "tests/adapters/test_base.py::test_base_import",
+  "tests/api/test_do_api.py::test_do_flow",
+  "tests/api/test_plan_dsl.py::test_create_and_get_plan",
+  "tests/it/test_plan_do.py::test_plan_do_flow",
+  "tests/test_e2e.py::test_plan_do_check",
+  "tests/test_e2e_do_flow.py::test_do_flow",
+  "tests/test_factory.py::test_crud_roundtrip",
+  "tests/test_factory.py::test_get_repo_switch[memory-MemoryRepository]",
+  "tests/test_factory.py::test_get_repo_switch[postgres-PostgresRepository]",
+  "tests/test_factory.py::test_get_repo_switch[redis-RedisRepository]",
+  "tests/tests/e2e/test_pdca_flow.py::test_pdca_min_cycle",
+  "tests/tests/schemas/test_artifact.py::test_artifact_roundtrip",
+  "tests/unit/test_loader.py::test_loader_roundtrip"
+]

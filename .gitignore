@@ -1,9 +1,37 @@
-# Python キャッシュ類
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.ruff_cache/
-
-# 環境変数ファイル
+# ────────────── 環境変数 ──────────────
 .env
 .env.ci
+
+# ────────────── Python ──────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# pytest / ruff / isort キャッシュ
+.pytest_cache/
+.ruff_cache/
+.isort.cfg
+.ipynb_checkpoints/
+
+# Poetry / venv
+poetry.lock
+.venv/
+.env.*.local
+
+# ────────────── Docker ──────────────
+docker-compose.yml
+docker/compose.ci.yml
+docker/compose.flower.yml
+ops/init-*.sh
+
+# ────────────── アーカイブ・ログ ──────────────
+*.zip
+*.tar.gz
+*.log
+
+# ────────────── IDE / エディタ ──────────────
+.vscode/
+.idea/
+*.sublime-workspace
