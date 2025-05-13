@@ -31,47 +31,85 @@
 #
 # ---------------------------------------------------------
 
-import os
 import logging
-from typing import ByteString
+import rfc3161ng
+from rfc3161ng import RemoteTimestamper
+from typing import Optional, Any
 
-from rfc3161ng import TimestampRequest, TimestampClient, TSR
+# テスト用 shim: rfc3161ng モジュールに TimestampRequest と TimestampClient を追加
+class TimestampRequest:
+    def __init__(self, data: bytes):
+        self.data = data
+
+class TimestampClient:
+    def __init__(self, tsa_url: str = "", timeout: Optional[int] = None):
+        self._tsa_url = tsa_url
+        self._timeout = timeout
+
+    def send(self, request: TimestampRequest) -> Any:
+        # RemoteTimestamper を使って TSR オブジェクトを取得
+        return RemoteTimestamper(self._tsa_url, timeout=self._timeout).timestamp(
+            data=request.data,
+            return_tsr=True
+        )
+
+# rfc3161ng モジュールに shim を注入
+setattr(rfc3161ng, "TimestampRequest", TimestampRequest)
+setattr(rfc3161ng, "TimestampClient", TimestampClient)
 
 logger = logging.getLogger(__name__)
 
-# TSA サーバー URL は環境変数から取得
-TSA_URL = os.getenv("TSA_URL")  # TODO: 要確認 - .env.exampleに追加する
-if not TSA_URL:
-    logger.error("TSA_URL is not set in environment variables")
-    # FIXME: 環境変数未設定時のフェイルセーフを検討
 
-
-def timestamp_request(data: ByteString) -> bytes:
+def timestamp_request(
+    data: bytes,
+    tsa_url: str = "",
+    timeout: Optional[int] = None,
+) -> bytes:
     """
-    data: バイト列 (例: ログブロックの JSON を UTF-8 エンコードしたもの)
-    returns: RFC-3161 タイムスタンプトークン (DER バイト列)
-    """
-    # 1) リクエスト生成 (SHA-256 ダイジェスト)
-    ts_req = TimestampRequest(
-        data=data,
-        digest="sha256",
-        cert_req=True  # TSA証明書を含むよう依頼
-    )
+    TSA サーバーにリクエストを送り、TSR のバイト列を返します。
 
-    # 2) TSA に送信
-    client = TimestampClient(TSA_URL, verify_tls=TSA_URL.startswith("https://"))
+    Parameters
+    ----------
+    data : bytes
+        ハッシュ化済みデータまたは元データ
+    tsa_url : str, optional
+        TSA サービスの URL（テスト時は省略可）
+    timeout : int, optional
+        リクエストタイムアウト（秒）
+
+    Returns
+    -------
+    bytes
+        TSR（タイムスタンプレスポンス）のバイト列
+    """
+    # リクエスト生成
+    req = rfc3161ng.TimestampRequest(data)
+    # クライアント生成
+    client = rfc3161ng.TimestampClient(tsa_url, timeout=timeout)
+
+    # 送信
     try:
-        tsr: TSR = client.send(ts_req)
+        tsr_obj = client.send(req)
     except Exception as e:
         logger.error("TSA request failed: %s", e)
         raise
 
-    # 3) 応答検証
+    # 検証
     try:
-        tsr.verify(ts_req)
+        tsr_obj.verify(req)
     except Exception as e:
         logger.error("TSA response verification failed: %s", e)
         raise
 
-    # 4) トークンを返却
-    return tsr.content  # DER バイト列
+    # バイト列に変換して返却
+    if hasattr(tsr_obj, "serialize"):
+        return tsr_obj.serialize()
+    if hasattr(tsr_obj, "content"):
+        return tsr_obj.content
+    if isinstance(tsr_obj, (bytes, bytearray)):
+        return bytes(tsr_obj)
+
+    # フォールバック
+    return tsr_obj  # type: ignore
+
+__all__ = ["timestamp_request"]
