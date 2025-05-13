@@ -1,6 +1,5 @@
 # ASSIST_KEY: このファイルは【utils/__init__.py】に位置するユニットです
 
-import copy
 import datetime
 import decimal
 from typing import Any
@@ -17,8 +16,7 @@ def sanitize_for_serialization(obj: Any) -> Any:
     """
     # Pydantic モデル対応
     try:
-        # type: ignore
-        from pydantic import BaseModel
+        from pydantic import BaseModel  # type: ignore
         if isinstance(obj, BaseModel):
             return sanitize_for_serialization(obj.dict())
     except ImportError:

@@ -20,6 +20,8 @@
 # ---------------------------------------------------------------------
 # api/main_api.py
 
+# api/main_api.py
+
 from __future__ import annotations
 
 import logging
@@ -29,7 +31,12 @@ from typing import Final
 from dotenv import load_dotenv, find_dotenv
 from fastapi import APIRouter, FastAPI
 
-# Celery タスクモジュールを必ずインポート（Eager モードでも登録されるよう）
+# 環境変数 & ロガー設定は最初に
+load_dotenv(find_dotenv())  # .env をロード
+logger: Final = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Celery タスクモジュール（Eager モード登録用）
 import core.tasks.do_tasks  # noqa: F401
 
 # Core Routers（必須）
@@ -38,13 +45,13 @@ from api.routers.plan_dsl_api import router as plan_dsl_router  # type: ignore
 from api.routers.do_api import router as do_router  # type: ignore
 from api.routers.check_api import router as check_router  # type: ignore
 
-# Optional Routers（存在しなければ 501 Stub で代替）
+# Optional Routers（未実装なら 501 stub）
 def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
     try:
         module = import_module(path)
         return getattr(module, "router")
     except (ModuleNotFoundError, FileNotFoundError):
-        logging.getLogger(__name__).warning("[main_api] %s unavailable – 501 stub で代替", path)
+        logger.warning("[main_api] %s unavailable – 501 stub で代替", path)
         stub = APIRouter(prefix=prefix, tags=[tag])
 
         @stub.get("/", status_code=501)
@@ -56,22 +63,15 @@ def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
 act_router = _import_optional("api.routers.act_api", "/act", "act")
 metrics_router = _import_optional("api.routers.metrics", "/metrics-api", "metrics")
 
-# Prometheus Exporter (/metrics) – サブアプリ扱い
+# Prometheus Exporter (/metrics)
 try:
     from api.routers.metrics_exporter import create_metrics_exporter
     exporter_app = create_metrics_exporter()
 except (ModuleNotFoundError, FileNotFoundError):
     exporter_app = None
-    logging.getLogger(__name__).warning("[main_api] metrics_exporter unavailable – skip mount")
+    logger.warning("[main_api] metrics_exporter unavailable – skip mount")
 
-# ─────────────────────────── env / logger
-load_dotenv(find_dotenv())  # *.env を再帰探索して環境変数に投入
-logger: Final = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# ----------------------------------------------------------------------
-# FastAPI Application
-# ----------------------------------------------------------------------
+# FastAPI アプリケーション本体
 app = FastAPI(
     title="mmopdca MVP",
     version="0.3.0",
@@ -79,18 +79,14 @@ app = FastAPI(
     contact={"name": "gtocue", "email": "gtocue510@gmail.com"},
 )
 
-# ----------------------------------------------------------------------
-# Health / Meta Routers
-# ----------------------------------------------------------------------
+# Health / Meta
 from api.routes.health import router as health_router  # type: ignore
 app.include_router(health_router)  # /healthz
 
 meta_router = APIRouter(prefix="/meta", tags=["meta"])
 app.include_router(meta_router)
 
-# ----------------------------------------------------------------------
 # Business Routers
-# ----------------------------------------------------------------------
 app.include_router(plan_router)      # /plan
 app.include_router(plan_dsl_router) # /plan-dsl
 app.include_router(do_router)       # /do
@@ -98,6 +94,6 @@ app.include_router(check_router)    # /check
 app.include_router(act_router)      # /act
 app.include_router(metrics_router)  # /metrics-api
 
-# Prometheus Exporter (/metrics)
+# Prometheus Exporter mount
 if exporter_app:
     app.mount("/metrics", exporter_app, name="metrics-exporter")

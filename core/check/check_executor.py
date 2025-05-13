@@ -37,11 +37,10 @@ from core.constants import SUPPORTED_METRICS
 logger = logging.getLogger(__name__)
 
 # --------------------------------------------------
-# データフレームライブラリ (polars > pandas 優先)
+# データフレームライブラリ検出のみ（polars > pandas 優先）
 # --------------------------------------------------
 try:
-    import polars as pl  # type: ignore
-
+    import polars  # noqa: F401
     _DF_LIB = "polars"
 except ModuleNotFoundError:  # pragma: no cover
     _DF_LIB = "pandas"
@@ -86,6 +85,7 @@ class CheckExecutor:
         予測 Parquet と meta.json を読み込み、各指標を計算して
         CheckResult を返す。
         """
+        # データ読み込み
         df = load_predictions(plan_id, run_id)
         meta_dict: Dict[str, Any] = load_meta(plan_id, run_id)
         meta = MetaInfo.model_validate(meta_dict)
@@ -93,7 +93,7 @@ class CheckExecutor:
         logger.debug("Loaded predictions rows=%d", len(df))
         logger.debug("Loaded meta: %s", meta)
 
-        # --- 真値 / 予測値 Series 取得 ---------------------------------
+        # 真値 / 予測値取得
         if _DF_LIB == "polars":
             y_true = df["y_true"]
             y_pred = df["y_pred"]
@@ -101,7 +101,7 @@ class CheckExecutor:
             y_true = df["y_true"]
             y_pred = df["y_pred"]
 
-        # --- メトリクス計算 & 閾値チェック ------------------------------
+        # メトリクス計算 & 判定
         report_dict: Dict[str, Any] = {}
         for spec in meta.metrics:
             if spec.name not in SUPPORTED_METRICS:
@@ -119,19 +119,23 @@ class CheckExecutor:
             report_dict[f"{spec.name}_threshold"] = spec.threshold
             report_dict[f"{spec.name}_passed"] = passed
 
-        # --- 合否 (全指標をクリアしたら PASS) ---------------------------
-        overall_passed = all(v for k, v in report_dict.items() if k.endswith("_passed"))
+        # 全指標クリアで PASS
+        overall_passed = all(
+            v for k, v in report_dict.items() if k.endswith("_passed")
+        )
 
+        # R² をベースにした Report
         check_report = CheckReport(
             r2=report_dict.get("r2", 0.0),
             threshold=report_dict.get("r2_threshold", 0.0),
             passed=report_dict.get("r2_passed", overall_passed),
         )
 
+        # CheckResult の生成
         check_result = CheckResult(
             id=f"check_{uuid.uuid4().hex[:8]}",
             do_id=run_id,
-            created_at=meta.created_at,  # メタ生成時刻を流用
+            created_at=meta.created_at,
             report=check_report,
         )
 
@@ -139,5 +143,4 @@ class CheckExecutor:
         return check_result
 
 
-# 公開シンボル
 __all__ = ["CheckExecutor"]
