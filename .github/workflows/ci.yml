@@ -1,9 +1,9 @@
 # .github/workflows/ci.yml
 # -------------------------------------------------------------------------
 # Name:       CI (Poetry + E2E)
-# Summary:    Poetry で依存管理 → Ruff で Lint → Pytest でユニットテスト →
-#             Docker イメージをビルド＆GHCR にプッシュ → フルスタック起動 →
-#             E2E テスト実行
+# Summary:    1) Poetry で依存管理 → Ruff で Lint → pytest でユニットテスト
+#             2) Docker イメージをビルド＆GHCR にプッシュ
+#             3) フルスタック起動 → E2E テスト実行
 # -------------------------------------------------------------------------
 name: CI (Poetry + E2E)
 
@@ -25,15 +25,17 @@ jobs:
   test:
     name: Lint & Test
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Set up Python
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python をセットアップ
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache Poetry & pip
+      - name: Poetry & pip キャッシュ
         uses: actions/cache@v3
         with:
           path: |
@@ -43,21 +45,22 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-poetry-
 
-      - name: Install Poetry
+      - name: Poetry をインストール
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
-      - name: Install dependencies
+      - name: 依存関係をインストール
         run: |
           poetry config virtualenvs.create false
           poetry install --no-interaction --no-ansi
 
       - name: Lint (Ruff)
-        run: poetry run ruff check .
+        run: poetry run ruff .
 
       - name: Unit tests (pytest)
         run: poetry run pytest --maxfail=1 --disable-warnings -v
+
 
   # ──────────────────────────────────────────
   # 2) Docker イメージのビルド＆プッシュ
@@ -66,6 +69,7 @@ jobs:
     name: Build & Push Docker Images
     needs: test
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
         include:
@@ -80,12 +84,13 @@ jobs:
             target: runtime
 
     steps:
-      - uses: actions/checkout@v4
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
+      - name: Docker Buildx をセットアップ
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
+      - name: GHCR にログイン
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -103,6 +108,7 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:${{ matrix.component }}-latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:${{ matrix.component }}-${{ github.sha }}
 
+
   # ──────────────────────────────────────────
   # 3) フルスタック起動 → E2E テスト
   # ──────────────────────────────────────────
@@ -112,10 +118,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
 
-      # 1) .env を用意
-      - name: Create .env for CI
+      - name: CI 用 .env ファイルを作成
         run: |
           cat > .env <<EOF
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD_RAW }}
@@ -126,36 +132,36 @@ jobs:
           DSL_ROOT=/mnt/data/dsl
           LOG_LEVEL=INFO
           TZ=UTC
-          # Celery タスクを同期実行に切り替え
+          # Celery を同期実行モードに切り替え
           CELERY_TASK_ALWAYS_EAGER=true
           CELERY_TASK_EAGER_PROPAGATES=true
           EOF
 
-      # 2) Docker Compose で CI 用スタックを起動
-      - name: Docker Compose up
+      - name: Docker Compose で CI スタックを起動
         run: |
           docker compose \
             --env-file .env \
             -f docker/compose.ci.yml \
             up -d --build
-          if [ $? -ne 0 ]; then
-            echo "🚨 Docker Compose build failed"
-            exit 1
-          fi
-          docker compose ps
 
-      # 3) 各サービスのヘルスチェック待機
-      - name: Wait for services
+      - name: サービスのヘルスチェック待機
         run: |
-          set -e
+          set -euo pipefail
           echo "⏳ Waiting for services..."
           for port in 8001 9090 9121 9808; do
+            echo "⏳ Checking port $port"
             for i in $(seq 1 30); do
-              if curl -fsSL "http://localhost:${port}${port==8001?'/docs':''}" > /dev/null; then
+              if [ "$port" -eq 8001 ]; then
+                url="http://localhost:${port}/docs"
+              else
+                url="http://localhost:${port}"
+              fi
+              if curl -fsSL "$url" > /dev/null; then
+                echo "✅ Service healthy at $url"
                 break
               fi
               sleep 4
-              if [ $i -eq 30 ]; then
+              if [ "$i" -eq 30 ]; then
                 echo "❌ Service on port $port did not become healthy"
                 docker compose logs --tail=50
                 exit 1
@@ -163,8 +169,7 @@ jobs:
             done
           done
 
-      # 4) E2E テスト実行
-      - name: Install dependencies (for tests)
+      - name: E2E テスト用 依存関係をインストール
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
@@ -174,10 +179,10 @@ jobs:
       - name: Run E2E tests
         run: poetry run pytest tests/it --maxfail=1 --disable-warnings -v
 
-      # 5) Tear down
       - name: Docker Compose down
         if: always()
-        run: docker compose \
-          --env-file .env \
-          -f docker/compose.ci.yml \
-          down -v --remove-orphans
+        run: |
+          docker compose \
+            --env-file .env \
+            -f docker/compose.ci.yml \
+            down -v --remove-orphans
