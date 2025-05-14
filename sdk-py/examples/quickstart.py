@@ -1,38 +1,34 @@
-import os
-from datetime import date
+# examples/quickstart.py
 
+from mmopdca_sdk import Configuration, ApiClient
 from mmopdca_sdk.api.plan_api import PlanApi
-from mmopdca_sdk.models import PlanCreateRequest, Expression
-from mmopdca_sdk.configuration import Configuration
-
+from mmopdca_sdk.models.plan_create_request import PlanCreateRequest
 
 def main():
-    # API キーを環境変数から取得
-    api_key = os.getenv("API_KEY", "your-api-key-here")
-
-    # クライアント設定
-    config = Configuration()
-    config.api_key["x-api-key"] = api_key
-    client = PlanApi(configuration=config)
-
-    # PlanCreateRequest に必須フィールドをすべて渡す
-    request = PlanCreateRequest(
-        symbol="AAPL",                      # 銘柄シンボル
-        name="my-first-plan",               # プラン名
-        start=date(2021, 1, 1),              # 開始日 (YYYY, M, D)
-        end=date(2021, 12, 31),              # 終了日
-        expressions=[                        # 式リスト
-            Expression(
-                name="moving_average",    # 指標名
-                expression="average(window=3)"
-            )
-        ]
+    # 1) 実際に動かしている API のベース URL を指定
+    config = Configuration(
+        host="http://localhost:8000"   # ← 適宜書き換えてください
     )
 
-    # プランを作成
-    response = client.create_plan(request)
-    print("Created plan:", response)
+    # 2) ApiClient → PlanApi を初期化
+    api_client = ApiClient(configuration=config)
+    plan_api = PlanApi(api_client)
 
+    # 3) リクエスト用モデルを作成
+    req = PlanCreateRequest(
+        symbol="AAPL",
+        start="2025-05-01",
+        end="2025-06-01"
+    )
+
+    # 4) 正しい呼び出し方
+    #    ─ positionally ─
+    resp1 = plan_api.create_plan_plan_post(req)
+
+    #    ─ or keyword ─
+    # resp2 = plan_api.create_plan_plan_post(plan_create_request=req)
+
+    print("レスポンス:", resp1)
 
 if __name__ == "__main__":
     main()
