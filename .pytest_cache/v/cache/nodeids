@@ -4,6 +4,7 @@
   "tests/adapters/test_base.py::test_base_import",
   "tests/api/test_do_api.py::test_do_flow",
   "tests/api/test_plan_dsl.py::test_create_and_get_plan",
+  "tests/e2e_ws.py::test_ws_progress_events",
   "tests/it/test_plan_do.py::test_plan_do_flow",
   "tests/test_e2e.py::test_plan_do_check",
   "tests/test_e2e_do_flow.py::test_do_flow",
