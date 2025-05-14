@@ -89,40 +89,64 @@ except (ModuleNotFoundError, FileNotFoundError):
     logger.warning("[main_api] metrics_exporter unavailable – skip mount")
 
 # ----------------------------------------------------------------------
-# FastAPI Application
+# Legacy サブアプリ: 旧 HTML/ドキュメントルートを /v1 にまとめる
+# ----------------------------------------------------------------------
+legacy_app = FastAPI(
+    title="mmopdca Legacy",
+    version="0.3.0",
+    description="Legacy HTML UI & Swagger",
+    openapi_prefix="/v1",
+    docs_url="/v1/docs",
+    redoc_url="/v1/redoc",
+)
+
+# Health / Meta for legacy (例として同じ health)
+from api.routes.health import router as health_router  # type: ignore
+legacy_app.include_router(health_router)
+
+# 旧 UI 用ルータ（存在すれば）
+try:
+    from api.routers.ui import router as ui_router
+    legacy_app.include_router(ui_router)
+except (ModuleNotFoundError, FileNotFoundError):
+    logger.info("[main_api] ui router not found – skipping legacy UI mount")
+
+
+# ----------------------------------------------------------------------
+# FastAPI Application (API-Only)
 # ----------------------------------------------------------------------
 app = FastAPI(
-    title="mmopdca MVP",
-    version="0.3.0",
-    description="Command-DSL-driven forecasting micro-service (Plan / Do / Check)",
+    title="mmopdca API",
+    version="0.4.0",
+    description="Command-DSL-driven forecasting micro-service API only",
     contact={"name": "gtocue", "email": "gtocue510@gmail.com"},
 )
 
 # ----------------------------------------------------------------------
 # Health / Meta Routers
 # ----------------------------------------------------------------------
-# /healthz → api/routes/health.py で実装（HTTP 204 No Content）
-from api.routes.health import router as health_router  # type: ignore
-
 app.include_router(health_router)  # /healthz
-
-# 追加メタ情報用 (例: /info) – 現状は空
 meta_router = APIRouter(prefix="/meta", tags=["meta"])
 app.include_router(meta_router)
 
 # ----------------------------------------------------------------------
 # Business Routers
 # ----------------------------------------------------------------------
-app.include_router(plan_router)        # /plan
-app.include_router(plan_dsl_router)   # /plan-dsl
-app.include_router(do_router)         # /do
-app.include_router(check_router)      # /check
-app.include_router(act_router)        # /act
-app.include_router(metrics_router)    # /metrics-api
+app.include_router(plan_router)      # /plan
+app.include_router(plan_dsl_router) # /plan-dsl
+app.include_router(do_router)       # /do
+app.include_router(check_router)    # /check
+app.include_router(act_router)      # /act
+app.include_router(metrics_router)  # /metrics-api
 
 # Prometheus Exporter (/metrics)
 if exporter_app:
     app.mount("/metrics", exporter_app, name="metrics-exporter")
+
+# ----------------------------------------------------------------------
+# マウント: Legacy を /v1 に配置
+# ----------------------------------------------------------------------
+app.mount("/v1", legacy_app)
 
 # ----------------------------------------------------------------------
 # NOTE:
