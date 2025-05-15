@@ -1,10 +1,12 @@
-# docker/compose.nginx.yml  ── エッジで HTTPS(443) のみを晒す最小構成
+version: "3.9"
+
 services:
   nginx:
+    image: nginx:alpine
     ports:
       - "443:443"
-    # 追加の vhost / 静的サイトをマウントしたい場合は以下を有効化
+    # 追加の vhost / 静的ファイルを載せるならコメント解除
     # volumes:
     #   - ./ops/extra-site.conf:/etc/nginx/conf.d/extra-site.conf:ro
-
-
+    networks: [ mmopdca_default ]
+    restart: unless-stopped

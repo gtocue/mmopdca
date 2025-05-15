@@ -1,5 +1,4 @@
-# ファイル: docker/compose.alert.yml
-# 目的: Alertmanager を SMTP 設定付きで起動し、ポート公開は ports.yml で一元管理
+version: "3.9"
 
 services:
   alertmanager:
@@ -7,8 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile.alertmanager
     image: mmopdca_alertmanager:latest
-    env_file:
-      - ../.env
+    env_file: [ ../.env ]
     environment:
       - SMTP_SMARTHOST
       - SMTP_FROM

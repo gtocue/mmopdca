@@ -1,11 +1,9 @@
-# docker/compose.api.yml  – open only API’s additional settings
-# FastAPI サービスだけ上書き
-# API サービスだけに追加したい設定を上書き
+version: "3.9"
+
 services:
   api:
-    # ── ログレベル切替（DEBUG / INFO / WARNING ...）
     environment:
       LOG_LEVEL: DEBUG
-    # ポートを直接公開したい場合はコメント解除
+    # 例: ポートを直接ホスト公開したいなら
     # ports:
     #   - "8001:8001"

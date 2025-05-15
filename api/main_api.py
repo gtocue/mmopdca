@@ -27,6 +27,7 @@ from fastapi import (
     WebSocket,
 )
 from fastapi.security.api_key import APIKeyHeader
+from fastapi.responses import StreamingResponse
 
 # ─────────────────────────── env / logger
 load_dotenv(find_dotenv())  # *.env を再帰探索して環境変数に投入
@@ -44,6 +45,7 @@ import core.tasks.do_tasks  # type: ignore  # run_do_task を登録
 API_KEY_NAME = "x-api-key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
+
 def verify_api_key(x_api_key: str = Depends(api_key_header)) -> None:
     """
     HTTP ヘッダ x-api-key による簡易認証。
@@ -53,6 +55,7 @@ def verify_api_key(x_api_key: str = Depends(api_key_header)) -> None:
     if expected:
         if not x_api_key or x_api_key != expected:
             raise HTTPException(status_code=401, detail="Invalid or missing API Key")
+
 
 # ----------------------------------------------------------------------
 # Core Routers（必須）
@@ -70,7 +73,7 @@ def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
         module = import_module(path)
         return getattr(module, "router")
     except (ModuleNotFoundError, FileNotFoundError):
-        logger.warning("[main_api] %s unavailable – 501 stub で代替", path)
+        logger.warning("[main_api] %s unavailable – 501 stub", path)
         stub = APIRouter(prefix=prefix, tags=[tag])
 
         @stub.get("/", status_code=501)
@@ -79,12 +82,21 @@ def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
 
         return stub
 
-act_router = _import_optional("api.routers.act_api", "/act", "act")
-metrics_router = _import_optional("api.routers.metrics", "/metrics-api", "metrics")
 
+act_router = _import_optional("api.routers.act_api", "/act", "act")
+metrics_router = _import_optional("api.routers.metrics_api", "/metrics-api", "metrics")
+
+# ----------------------------------------------------------------------
+# Trace API (イベントストリーミング)
+# ----------------------------------------------------------------------
+from api.routers.events_api import router as events_router  # type: ignore
+
+# ----------------------------------------------------------------------
 # Prometheus Exporter (/metrics) – サブアプリ扱い
+# ----------------------------------------------------------------------
 try:
     from api.routers.metrics_exporter import create_metrics_exporter  # type: ignore
+
     exporter_app = create_metrics_exporter()
 except (ModuleNotFoundError, FileNotFoundError):
     exporter_app = None
@@ -93,6 +105,8 @@ except (ModuleNotFoundError, FileNotFoundError):
 # ----------------------------------------------------------------------
 # Legacy サブアプリ: 旧 HTML/UI ルートを /v1 にまとめる
 # ----------------------------------------------------------------------
+from api.routes.health import router as health_router  # type: ignore
+
 legacy_app = FastAPI(
     title="mmopdca Legacy",
     version="0.3.0",
@@ -103,12 +117,12 @@ legacy_app = FastAPI(
 )
 
 # Health
-from api.routes.health import router as health_router  # type: ignore
 legacy_app.include_router(health_router)
 
 # 旧 UI 用ルータ（存在すれば）
 try:
     from api.routers.ui import router as ui_router  # type: ignore
+
     legacy_app.include_router(ui_router)
 except (ModuleNotFoundError, FileNotFoundError):
     logger.info("[main_api] ui router not found – skipping legacy UI mount")
@@ -127,21 +141,23 @@ app = FastAPI(
 app.include_router(
     health_router,
     dependencies=[Depends(verify_api_key)],
+    include_in_schema=False,
 )
 meta_router = APIRouter(
     prefix="/meta",
     tags=["meta"],
-    dependencies=[Depends(verify_api_key)]
+    dependencies=[Depends(verify_api_key)],
 )
 app.include_router(meta_router)
 
 # Business Routers (認証必須)
-app.include_router(plan_router,      dependencies=[Depends(verify_api_key)])
-app.include_router(plan_dsl_router,  dependencies=[Depends(verify_api_key)])
-app.include_router(do_router,        dependencies=[Depends(verify_api_key)])
-app.include_router(check_router,     dependencies=[Depends(verify_api_key)])
-app.include_router(act_router,       dependencies=[Depends(verify_api_key)])
-app.include_router(metrics_router,   dependencies=[Depends(verify_api_key)])
+app.include_router(plan_router,     dependencies=[Depends(verify_api_key)])
+app.include_router(plan_dsl_router, dependencies=[Depends(verify_api_key)])
+app.include_router(do_router,       dependencies=[Depends(verify_api_key)])
+app.include_router(check_router,    dependencies=[Depends(verify_api_key)])
+app.include_router(act_router,      dependencies=[Depends(verify_api_key)])
+app.include_router(metrics_router,  dependencies=[Depends(verify_api_key)])
+app.include_router(events_router,   dependencies=[Depends(verify_api_key)])
 
 # Prometheus Exporter (/metrics) – 認証不要
 if exporter_app:
@@ -159,7 +175,6 @@ async def ws_progress(
     run_id に対応する進捗を 1 から 5 まで順番に JSON 送信後、切断します。
     x-api-key ヘッダを設定している場合は認証を行い、不正ならクローズ(1008)。
     """
-    # APIキー認証（WebSocketではDependsが動かないため手動で）
     expected = os.getenv("API_KEY")
     if expected:
         key = websocket.headers.get(API_KEY_NAME)
