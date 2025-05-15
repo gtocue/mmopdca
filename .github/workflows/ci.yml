@@ -1,184 +1,35 @@
-# .github/workflows/ci.yml
-# -------------------------------------------------------------------------
-# Name:       CI (Poetry + E2E)
-# Summary:    Poetry で依存管理 → Ruff で Lint → Pytest でユニットテスト →
-#             Docker イメージをビルド＆GHCR にプッシュ → フルスタック起動 →
-#             E2E テスト実行 (HTTP + WebSocket)
-# -------------------------------------------------------------------------
-name: CI (Poetry + E2E)
+name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feature/api-only-day1 ]
   pull_request:
     branches: [ main ]
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_BASE: ${{ github.repository }}
-  PYTHON_VERSION: '3.11'
-
 jobs:
-  # ──────────────────────────────────────────
-  # 1) Lint & ユニットテスト
-  # ──────────────────────────────────────────
   test:
-    name: Lint & Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Cache Poetry & pip
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/pypoetry
-            ~/.cache/pip
-          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-
-
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+          python-version: 3.11
 
       - name: Install dependencies
         run: |
-          poetry config virtualenvs.create false
-          poetry install --no-interaction --no-ansi
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install -e sdk-py
+          pip install pytest pyyaml
 
-      - name: Lint (Ruff)
-        run: poetry run ruff check .
-
-      - name: Unit tests (pytest)
-        run: poetry run pytest --maxfail=1 --disable-warnings -v
-
-  # ──────────────────────────────────────────
-  # 2) Docker イメージのビルド＆プッシュ
-  # ──────────────────────────────────────────
-  build-and-push:
-    name: Build & Push Docker Images
-    needs: test
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - component: api
-            dockerfile: docker/Dockerfile.main_api
-            target: ''
-          - component: worker
-            dockerfile: docker/Dockerfile
-            target: runtime
-          - component: beat
-            dockerfile: docker/Dockerfile
-            target: runtime
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build & push ${{ matrix.component }}
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ matrix.dockerfile }}
-          target: ${{ matrix.target }}
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:${{ matrix.component }}-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}:${{ matrix.component }}-${{ github.sha }}
-
-  # ──────────────────────────────────────────
-  # 3) フルスタック起動 → E2E テスト (HTTP + WebSocket)
-  # ──────────────────────────────────────────
-  e2e:
-    name: E2E テスト
-    needs: build-and-push
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      # 1) .env を用意
-      - name: Create .env for CI
+      - name: Run Quickstart example
         run: |
-          cat > .env <<EOF
-          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD_RAW }}
-          REDIS_PASSWORD_ENC=${{ secrets.REDIS_PASSWORD_URL }}
-          POSTGRES_DB=mmopdca
-          POSTGRES_USER=mmop_user
-          POSTGRES_PASSWORD=${{ secrets.PG_PASSWORD }}
-          DSL_ROOT=/mnt/data/dsl
-          LOG_LEVEL=INFO
-          TZ=UTC
-          # Celery タスクを同期実行に切り替え
-          CELERY_TASK_ALWAYS_EAGER=true
-          CELERY_TASK_EAGER_PROPAGATES=true
-          EOF
+          . .venv/bin/activate
+          python sdk-py/examples/quickstart.py
 
-      # 2) Docker Compose で CI 用スタックを起動
-      - name: Docker Compose up
+      - name: Run pytest
         run: |
-          docker compose \
-            --env-file .env \
-            -f docker/compose.ci.yml \
-            up -d --build
-          docker compose ps
-
-      # 3) 各サービスのヘルスチェック待機
-      - name: Wait for services
-        run: |
-          set -e
-          echo "⏳ Waiting for services..."
-          for port in 8001 9090 9121 9808; do
-            for i in $(seq 1 30); do
-              if curl -fsSL "http://localhost:${port}${port==8001?'/docs':''}" > /dev/null; then
-                break
-              fi
-              sleep 4
-              if [ $i -eq 30 ]; then
-                echo "❌ Service on port $port did not become healthy"
-                docker compose logs --tail=50
-                exit 1
-              fi
-            done
-          done
-
-      # 4) テスト用依存インストール
-      - name: Install dependencies (for tests)
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "${HOME}/.local/bin" >> $GITHUB_PATH
-          poetry config virtualenvs.create false
-          poetry install --no-interaction --no-ansi
-
-      # 5) HTTP E2E テスト実行
-      - name: Run HTTP E2E tests
-        run: poetry run pytest tests/it --maxfail=1 --disable-warnings -v
-
-      # 6) WebSocket E2E テスト実行
-      - name: Run WebSocket E2E tests
-        run: poetry run pytest tests/e2e_ws.py --maxfail=1 -q
-
-      # 7) Tear down
-      - name: Docker Compose down
-        if: always()
-        run: docker compose \
-          --env-file .env \
-          -f docker/compose.ci.yml \
-          down -v --remove-orphans
+          . .venv/bin/activate
+          pytest -q
