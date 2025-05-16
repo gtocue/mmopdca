@@ -2,8 +2,9 @@ version: "3.9"
 
 services:
   api:
+    env_file:
+      - ../.env
     environment:
       LOG_LEVEL: DEBUG
-    # 例: ポートを直接ホスト公開したいなら
-    # ports:
-    #   - "8001:8001"
+    networks:
+      - mmopdca_default

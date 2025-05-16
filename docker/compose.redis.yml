@@ -3,26 +3,32 @@ version: "3.9"
 services:
   redis:
     image: redis:7-alpine
-    env_file: [ ../.env ]
+    env_file:
+      - ../.env
 
-    # $${VAR} で **ホスト側展開を回避**（Compose ⩾v2.20 対応）
+    # 認証を切ってシンプル起動
     command: >
-      redis-server --requirepass $${REDIS_PASSWORD}
+      redis-server
 
-    environment:
-      - REDIS_PASSWORD # そのまま渡すだけ
-
-    volumes:
-      - redis_data:/data
-
+    # PING だけチェックすれば OK
     healthcheck:
-      test: [ CMD-SHELL, "redis-cli -a $${REDIS_PASSWORD} ping" ]
+      test: [ "CMD-SHELL", "redis-cli ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-    networks: [ mmopdca_default ]
+    volumes:
+      - redis_data:/data
+
+    networks:
+      - mmopdca_default
+
     restart: unless-stopped
 
 volumes:
   redis_data:
+
+
+networks:
+  mmopdca_default:
+    external: true

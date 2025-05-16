@@ -6,7 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile.alertmanager
     image: mmopdca_alertmanager:latest
-    env_file: [ ../.env ]
+    env_file:
+      - ../.env
     environment:
       - SMTP_SMARTHOST
       - SMTP_FROM
@@ -16,3 +17,9 @@ services:
     restart: unless-stopped
     healthcheck:
       disable: true
+    networks:
+      - mmopdca_default
+
+networks:
+  mmopdca_default:
+    external: true

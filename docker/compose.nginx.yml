@@ -8,5 +8,10 @@ services:
     # 追加の vhost / 静的ファイルを載せるならコメント解除
     # volumes:
     #   - ./ops/extra-site.conf:/etc/nginx/conf.d/extra-site.conf:ro
-    networks: [ mmopdca_default ]
+    networks:
+      - mmopdca_default
     restart: unless-stopped
+
+networks:
+  mmopdca_default:
+    external: true
