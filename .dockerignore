@@ -1,19 +1,36 @@
-# ビルドコンテキストを最小化
-.git
-.gitignore
-__pycache__
+#######################
+# 1. まるごと除外したい物
+#######################
+.git/
+__pycache__/
+tests/
+notebooks/
+infra/k8s/
+infra/terraform/
+.idea/
+.vscode/
+
+#######################
+# 2. 拡張子・ファイル単位で除外
+#######################
 *.pyc
 *.pyo
 *.pyd
 *.sqlite*
 *.db
 *.log
-tests
-notebooks
-infra/k8s
-infra/terraform
-.idea
-.vscode
+
+# ビルド不要なトップレベル設定
+.gitignore
+
+#######################
+# 3. ここより下は「例外」で拾い直す
+#######################
+!pyproject.toml      # Poetry メタ
+!poetry.lock         # 依存バージョン固定
+!ops/**              # init-dsl.sh を含む ops フォルダ全部
+
+# -- CI exceptions --
 !pyproject.toml
 !poetry.lock
-!ops/init-dsl.sh
+!ops/**
