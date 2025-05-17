@@ -1,1 +1,39 @@
-<ここに先ほど提示した ci-sdk-tests.yml の全文を貼り付け>
+name: CI – SDK tests
+
+on:
+  push:
+    branches: [main, feature/api-only-day1]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: { python: ["3.11"] }
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v4
+      with: { python-version: "${{ matrix.python }}" }
+
+    - name: Cache pip
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('sdk-py/setup.py', 'sdk-py/pyproject.toml') }}
+
+    - name: Install deps & SDK
+      run: |
+        python -m venv .venv
+        . .venv/bin/activate
+        pip install --upgrade pip
+        pip install -e "$GITHUB_WORKSPACE/sdk-py"
+        pip install pytest pyyaml
+
+    - name: Quickstart example
+      run: . .venv/bin/activate && python sdk-py/examples/quickstart.py
+
+    - name: Run pytest
+      run: . .venv/bin/activate && pytest -q

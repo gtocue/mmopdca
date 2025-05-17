@@ -54,3 +54,11 @@ openapitools.json
 
 # allow CI compose
 !docker/compose.ci.yml
+
+# --- allow SDK -------------------------------------------------
+!sdk-py/
+!sdk-py/**
+
+# allow SDK
+!sdk-py/
+!sdk-py/**

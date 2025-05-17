@@ -1,1 +1,48 @@
-<ここに stack-health.yml の全文を貼り付け>
+name: CI – Docker Stack Health
+
+on:
+  push: { branches: [main, develop] }
+  pull_request: {}
+
+jobs:
+  compose-health:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: docker/setup-buildx-action@v3
+
+    - name: Create .env
+      run: |
+        cat > .env <<'EOF'
+        POSTGRES_DB=mmopdca
+        POSTGRES_USER=mmop_user
+        POSTGRES_PASSWORD=password
+        REDIS_PASSWORD=
+        DSL_ROOT=/mnt/data/dsl
+        TZ=UTC
+        EOF
+        head -n 10 .env
+
+    - name: Docker Compose up
+      run: |
+        docker compose \
+          --env-file .env \
+          -f docker/compose.ci.yml \
+          up -d --build
+        docker compose ps
+
+    - name: Wait for endpoints
+      run: |
+        set -eu
+        for i in {1..30}; do
+          curl -fs http://localhost:8001/docs      && \
+          curl -fs http://localhost:9090/          && \
+          curl -fs http://localhost:9121/metrics   && \
+          curl -fs http://localhost:9808/metrics && break
+          sleep 4
+        done
+
+    - name: Docker Compose down
+      if: always()
+      run: docker compose -f docker/compose.ci.yml down -v --remove-orphans
