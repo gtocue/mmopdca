@@ -1,24 +1,30 @@
 name: CI
 
 on:
-  push:
-    branches: [ main, feature/api-only-day1 ]
-  pull_request:
-    branches: [ main ]
+  push:        { branches: [ main, feature/api-only-day1 ] }
+  pull_request: { branches: [ main ] }
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ "3.11" ]
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
-      # optional ─ 確認用にツリー一覧を出す
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
+
       - name: Show workspace tree (debug)
         run: |
           echo "::group::tree"
@@ -30,8 +36,8 @@ jobs:
           python -m venv .venv
           . .venv/bin/activate
           pip install --upgrade pip
-          pip install -e ./sdk-py         # ← ここは必ず / 無し
-          pip install pytest pyyaml
+          pip install -e ./sdk-py       # ← スラッシュ無し
+          pip install -r requirements-ci.txt
 
       - name: Run Quickstart example
         run: |
@@ -41,4 +47,4 @@ jobs:
       - name: Run pytest
         run: |
           . .venv/bin/activate
-          pytest -q
+          pytest -q -x
