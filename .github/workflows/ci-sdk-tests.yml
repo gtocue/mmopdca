@@ -1,4 +1,5 @@
-name: CI – SDK tests
+# GitHub Actions – SDK unit-tests
+name: sdk-tests
 
 on:
   push:
@@ -10,30 +11,32 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
-      matrix: { python: ["3.11"] }
+      matrix:
+        python: ['3.11']
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - uses: actions/setup-python@v4
-      with: { python-version: "${{ matrix.python }}" }
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
 
-    - name: Cache pip
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('sdk-py/setup.py', 'sdk-py/pyproject.toml') }}
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('sdk-py/setup.py') }}
 
-    - name: Install deps & SDK
-      run: |
-        python -m venv .venv
-        . .venv/bin/activate
-        pip install --upgrade pip
-        pip install -e "$GITHUB_WORKSPACE/sdk-py"
-        pip install pytest pyyaml
+      - name: Install deps & SDK
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install --upgrade pip
+          pip install -e "$GITHUB_WORKSPACE/sdk-py"
+          pip install pytest pyyaml
 
-    - name: Quickstart example
-      run: . .venv/bin/activate && python sdk-py/examples/quickstart.py
+      - name: Quickstart example
+        run: . .venv/bin/activate && python sdk-py/examples/quickstart.py
 
-    - name: Run pytest
-      run: . .venv/bin/activate && pytest -q
+      - name: Run pytest
+        run: . .venv/bin/activate && pytest -q

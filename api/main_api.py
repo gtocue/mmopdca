@@ -60,10 +60,11 @@ def verify_api_key(x_api_key: str = Depends(api_key_header)) -> None:
 # ----------------------------------------------------------------------
 # Core Routers（必須）
 # ----------------------------------------------------------------------
-from api.routers.plan_api import router as plan_router       # type: ignore
+from api.routers.plan_api import router as plan_router  # type: ignore
 from api.routers.plan_dsl_api import router as plan_dsl_router  # type: ignore
-from api.routers.do_api import router as do_router           # type: ignore
-from api.routers.check_api import router as check_router     # type: ignore
+from api.routers.do_api import router as do_router  # type: ignore
+from api.routers.check_api import router as check_router  # type: ignore
+
 
 # ----------------------------------------------------------------------
 # Optional Routers（存在しなければ 501 Stub）
@@ -151,17 +152,18 @@ meta_router = APIRouter(
 app.include_router(meta_router)
 
 # Business Routers (認証必須)
-app.include_router(plan_router,     dependencies=[Depends(verify_api_key)])
+app.include_router(plan_router, dependencies=[Depends(verify_api_key)])
 app.include_router(plan_dsl_router, dependencies=[Depends(verify_api_key)])
-app.include_router(do_router,       dependencies=[Depends(verify_api_key)])
-app.include_router(check_router,    dependencies=[Depends(verify_api_key)])
-app.include_router(act_router,      dependencies=[Depends(verify_api_key)])
-app.include_router(metrics_router,  dependencies=[Depends(verify_api_key)])
-app.include_router(events_router,   dependencies=[Depends(verify_api_key)])
+app.include_router(do_router, dependencies=[Depends(verify_api_key)])
+app.include_router(check_router, dependencies=[Depends(verify_api_key)])
+app.include_router(act_router, dependencies=[Depends(verify_api_key)])
+app.include_router(metrics_router, dependencies=[Depends(verify_api_key)])
+app.include_router(events_router, dependencies=[Depends(verify_api_key)])
 
 # Prometheus Exporter (/metrics) – 認証不要
 if exporter_app:
     app.mount("/metrics", exporter_app, name="metrics-exporter")
+
 
 # ----------------------------------------------------------------------
 # WebSocket 進捗ストリーミングエンドポイント
@@ -186,6 +188,7 @@ async def ws_progress(
     for i in range(1, 6):
         await websocket.send_json({"progress": i})
     await websocket.close()
+
 
 # ----------------------------------------------------------------------
 # マウント: Legacy を /v1 に配置

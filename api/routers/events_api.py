@@ -34,13 +34,12 @@ from fastapi.responses import StreamingResponse
 from utils.redis_client import get_redis
 from utils.event_serializer import serialize_event
 
-router = APIRouter(
-    prefix="/run/{run_id}/events",
-    tags=["events"]
-)
+router = APIRouter(prefix="/run/{run_id}/events", tags=["events"])
 
 
-async def event_stream_generator(run_id: str, tail: int, redis) -> AsyncGenerator[str, None]:
+async def event_stream_generator(
+    run_id: str, tail: int, redis
+) -> AsyncGenerator[str, None]:
     """
     指定 run_id のイベントを Redis Stream から取得し、SSEフォーマットでストリーミング。
     tail: 最新 n 件を最初に送信後、新着を待機して送信する。
@@ -60,7 +59,9 @@ async def event_stream_generator(run_id: str, tail: int, redis) -> AsyncGenerato
     # 新着を待機して配信
     while True:
         try:
-            results = redis.xread({f"run_events:{run_id}": last_id}, block=60000, count=10)
+            results = redis.xread(
+                {f"run_events:{run_id}": last_id}, block=60000, count=10
+            )
         except Exception:
             await asyncio.sleep(1)
             continue
@@ -77,8 +78,10 @@ async def event_stream_generator(run_id: str, tail: int, redis) -> AsyncGenerato
 @router.get("/", summary="Trace events for a run", response_class=StreamingResponse)
 async def trace_events(
     run_id: str,
-    tail: int = Query(100, ge=1, le=1000, description="Number of recent events to fetch initially"),
-    redis=Depends(get_redis)
+    tail: int = Query(
+        100, ge=1, le=1000, description="Number of recent events to fetch initially"
+    ),
+    redis=Depends(get_redis),
 ):
     """
     GET /run/{run_id}/events?tail=n

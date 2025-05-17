@@ -1,45 +1,44 @@
 version: "3.9"
 
-# --------------------------------------------------
-# 共通オプション
-# --------------------------------------------------
+# ─── 共通設定 ──────────────────────────────────────────────
+# ・Compose ファイルは  docker/compose.ci.yml
+# ・リポジトリ直下に置く .env を読むため相対パスを「../.env」に固定
+#   └─ GH-Actions では `--env-file .env` を CLI で渡すので実運用でも問題なし
+# ---------------------------------------------------------
 x-env: &default-env
-  env_file: [ ../.env ] # CI がリポジトリ直下に生成する .env
+  env_file: [ "../.env" ]
 
 x-retry: &retry
   interval: 10s
   timeout: 3s
   retries: 3
 
-# --------------------------------------------------
-# Services
-# --------------------------------------------------
+# ─── services ─────────────────────────────────────────────
 services:
-  # ---------- Core ----------
   redis:
     image: redis:7-alpine
     <<: *default-env
     command: [ "redis-server", "--requirepass=" ]
-    healthcheck: { test: [ "CMD-SHELL", "redis-cli ping" ], <<: *retry }
+    healthcheck: { <<: *retry, test: [ "CMD-SHELL", "redis-cli ping" ] }
     ports: [ "6379:6379" ]
 
   db:
     image: postgres:16-alpine
     <<: *default-env
     healthcheck:
-      test: [ "CMD-SHELL", "PGPASSWORD=${POSTGRES_PASSWORD} pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
       <<: *retry
+      test: [ "CMD-SHELL", "PGPASSWORD=${POSTGRES_PASSWORD} pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
     ports: [ "5432:5432" ]
 
   api:
-    build: { context: .., dockerfile: Dockerfile.main_api }
+    build: { context: "..", dockerfile: Dockerfile.main_api }
     <<: *default-env
     environment: { DSL_ROOT: /mnt/data/dsl }
     depends_on: [ redis, db ]
+    healthcheck: { <<: *retry, test: [ "CMD", "curl", "-fsS", "http://localhost:8001/docs" ] }
     ports: [ "8001:8001" ]
-    healthcheck: { test: [ "CMD", "curl", "-fsS", "http://localhost:8001/docs" ], <<: *retry }
 
-  # ---------- Exporters ----------
+  # ── Exporters ───────────────────────────────────────────
   redis-exporter:
     image: oliver006/redis_exporter:v1.60.0
     command: [ "--redis.addr=redis://redis:6379/0" ]
@@ -55,15 +54,14 @@ services:
     depends_on: [ redis ]
     ports: [ "9808:9808" ]
 
-  # ---------- Prometheus ----------
+  # ── Prometheus ──────────────────────────────────────────
   prom:
     image: prom/prometheus:v2.52.0
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=14d"
-    # docker/ の 1 つ上にある prom/ ディレクトリをマウント
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=14d
     volumes:
-      - ../prom:/etc/prometheus:ro
+      - ./prom:/etc/prometheus:ro
     depends_on: [ redis-exporter, celery-exporter ]
     ports: [ "9090:9090" ]
 

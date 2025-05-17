@@ -25,6 +25,7 @@ import os
 from redis import Redis
 from fastapi import HTTPException
 
+
 def get_redis() -> Redis:
     """
     FastAPI 依存注入用に Redis クライアントを生成して返します。

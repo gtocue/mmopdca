@@ -19,7 +19,9 @@ class IDataSource(ABC):
     """外部データソースの取得インターフェース"""
 
     @abstractmethod
-    def fetch_ohlcv(self, *, symbol: str, start: str, end: str) -> pd.DataFrame:  # noqa: D401
+    def fetch_ohlcv(
+        self, *, symbol: str, start: str, end: str
+    ) -> pd.DataFrame:  # noqa: D401
         """
         Parameters
         ----------

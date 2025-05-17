@@ -24,8 +24,7 @@ load_dotenv(dotenv_path=dotenv_path)
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
 REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
 broker_url = os.environ.get(
-    "REDIS_URL",
-    f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
+    "REDIS_URL", f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
 )
 
 # CELERY_RESULT_BACKEND を優先的に読み込み。未設定時は broker_url の別データベースにする
@@ -42,8 +41,16 @@ celery_app = Celery(
 # Eager モード設定（同期実行・例外伝播）
 # ----------------------------------------------------------------------
 # CI／テスト環境では .env.ci から以下の環境変数を渡す想定
-always_eager = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "false").lower() in ("1", "true", "yes")
-eager_propagates = os.environ.get("CELERY_TASK_EAGER_PROPAGATES", "false").lower() in ("1", "true", "yes")
+always_eager = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+eager_propagates = os.environ.get("CELERY_TASK_EAGER_PROPAGATES", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 celery_app.conf.update(
     # タスクを同期実行するかどうか

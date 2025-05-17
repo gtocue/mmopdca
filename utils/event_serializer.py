@@ -22,7 +22,9 @@ import json
 from typing import Any, Dict, Union
 
 
-def serialize_event(entry_id: Union[str, bytes], data: Dict[Union[str, bytes], Any]) -> Dict[str, Any]:
+def serialize_event(
+    entry_id: Union[str, bytes], data: Dict[Union[str, bytes], Any]
+) -> Dict[str, Any]:
     """
     Redis Stream のエントリを JSON 形式で返却する。
 
@@ -35,23 +37,23 @@ def serialize_event(entry_id: Union[str, bytes], data: Dict[Union[str, bytes], A
     """
     # ID を文字列化
     if isinstance(entry_id, bytes):
-        id_str = entry_id.decode('utf-8', errors='ignore')
+        id_str = entry_id.decode("utf-8", errors="ignore")
     else:
         id_str = str(entry_id)
 
-    payload: Dict[str, Any] = {'id': id_str}
+    payload: Dict[str, Any] = {"id": id_str}
 
     # 各フィールドをデコード
     for key, value in data.items():
         # key
         if isinstance(key, bytes):
-            k = key.decode('utf-8', errors='ignore')
+            k = key.decode("utf-8", errors="ignore")
         else:
             k = str(key)
 
         # value
         if isinstance(value, bytes):
-            v_decoded = value.decode('utf-8', errors='ignore')
+            v_decoded = value.decode("utf-8", errors="ignore")
             # 値が JSON 文字列ならロードを試みる
             try:
                 v = json.loads(v_decoded)

@@ -78,7 +78,9 @@ def enqueue_do(plan_id: str, body: Optional[DoCreateRequest] = None) -> JSONResp
     plan_raw = _plan_repo.get(plan_id)
     if plan_raw is None:
         logger.error("Plan '%s' not found", plan_id)
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"Plan '{plan_id}' not found")
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, detail=f"Plan '{plan_id}' not found"
+        )
     plan = PlanResponse(**plan_raw)
 
     # 2) リクエストボディを標準化

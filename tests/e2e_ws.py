@@ -31,6 +31,8 @@ def test_ws_progress_events():
         for expected in range(1, 6):
             data = ws.receive_json()
             assert "progress" in data, f"no progress in {data}"
-            assert data["progress"] == expected, f"expected {expected}, got {data['progress']}"
+            assert (
+                data["progress"] == expected
+            ), f"expected {expected}, got {data['progress']}"
 
     # 到達すれば OK

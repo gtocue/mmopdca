@@ -34,7 +34,9 @@ class PremiumDataSource(IDataSource):
     # -----------------------------------------------------
     # IDataSource
     # -----------------------------------------------------
-    def fetch_ohlcv(self, *, symbol: str, start: str, end: str) -> pd.DataFrame:  # noqa: D401
+    def fetch_ohlcv(
+        self, *, symbol: str, start: str, end: str
+    ) -> pd.DataFrame:  # noqa: D401
         raise NotImplementedError(
             "PremiumDataSource is a stub. Implement SDK call here."
         )

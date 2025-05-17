@@ -96,7 +96,7 @@ def health() -> JSONResponse:
 def healthz(request: Request) -> Response:
     ok = _run_checks()["status"] == "ok"
     return Response(
-        status_code=status.HTTP_204_NO_CONTENT
-        if ok
-        else status.HTTP_503_SERVICE_UNAVAILABLE
+        status_code=(
+            status.HTTP_204_NO_CONTENT if ok else status.HTTP_503_SERVICE_UNAVAILABLE
+        )
     )
