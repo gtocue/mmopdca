@@ -1,8 +1,14 @@
-version: "3.9"
+# docker/compose.ci.yml
+# ──────────────────────────────────────────────────────────────
+# GitHub Actions “stack-health” ワークフロー専用
+# ・redis / postgres / api（FastAPI）＋3 Exporters＋Prometheus
+# ・`.env` は CI ステップでリポジトリ直下に動的生成されるため
+#   `env_file: [ ../.env ]` とする
+# ──────────────────────────────────────────────────────────────
 
 ##################### 共通オプション #####################
 x-env: &default-env
-  env_file: [ .env ] # ← CI ジョブで動的に生成される
+  env_file: [ ../.env ] # ← リポジトリ直下の .env を参照
 
 x-retry: &retry
   interval: 10s
@@ -11,7 +17,7 @@ x-retry: &retry
 
 ######################## services ########################
 services:
-  # --- コア ---
+  # ---------- Core ----------
   redis:
     image: redis:7-alpine
     <<: *default-env
@@ -42,7 +48,7 @@ services:
       test: [ "CMD", "curl", "-fsS", "http://localhost:8001/docs" ]
       <<: *retry
 
-  # --- Exporters & Prom ---
+  # ---------- Exporters ----------
   redis-exporter:
     image: oliver006/redis_exporter:v1.60.0
     command: [ "--redis.addr=redis://redis:6379/0" ]
@@ -58,11 +64,12 @@ services:
     depends_on: [ redis ]
     ports: [ "9808:9808" ]
 
+  # ---------- Prometheus ----------
   prom:
     image: prom/prometheus:v2.52.0
     command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.retention.time=14d
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=14d"
     volumes:
       - ../prom/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on: [ redis-exporter, celery-exporter ]
