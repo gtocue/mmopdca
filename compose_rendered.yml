@@ -1,0 +1,325 @@
+name: docker
+services:
+  api:
+    build:
+      context: C:\mmopdca
+      dockerfile: Dockerfile.main_api
+    command:
+      - python
+      - -m
+      - uvicorn
+      - api.main_api:app
+      - --host=0.0.0.0
+      - --port=8001
+      - --proxy-headers
+    depends_on:
+      db:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true
+    entrypoint:
+      - /usr/local/bin/docker-entrypoint-init-dsl.sh
+    environment:
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      CELERY_RESULT_BACKEND: null
+      DSL_ROOT: /mnt/data/dsl
+      POSTGRES_DB: mmopdca
+      POSTGRES_PASSWORD: SuperSafePgPassw0rd!
+      POSTGRES_USER: mmop_user
+      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+    networks:
+      mmopdca_default: null
+    restart: unless-stopped
+    user: 1000:1000
+    volumes:
+      - type: volume
+        source: dsl_data
+        target: /mnt/data/dsl
+        volume: {}
+      - type: volume
+        source: checkpoints_data
+        target: /mnt/checkpoints
+        volume: {}
+  beat:
+    build:
+      context: C:\mmopdca
+      dockerfile: Dockerfile
+      target: runtime
+    depends_on:
+      db:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true
+    entrypoint:
+      - sh
+      - -c
+      - |
+        mkdir -p /mnt/checkpoints
+        chmod 0777 /mnt/checkpoints
+        exec /usr/local/bin/docker-entrypoint-init-dsl.sh \
+          celery -A core.celery_app:celery_app \
+          beat --loglevel=info \
+               --schedule=/mnt/checkpoints/celerybeat-schedule
+    environment:
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      CELERY_RESULT_BACKEND: null
+      DO_TOTAL_SHARDS: null
+      DSL_ROOT: /mnt/data/dsl
+      POSTGRES_DB: mmopdca
+      POSTGRES_PASSWORD: SuperSafePgPassw0rd!
+      POSTGRES_USER: mmop_user
+      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+    networks:
+      mmopdca_default: null
+    restart: on-failure
+    user: root
+    volumes:
+      - type: volume
+        source: dsl_data
+        target: /mnt/data/dsl
+        volume: {}
+      - type: volume
+        source: checkpoints_data
+        target: /mnt/checkpoints
+        volume: {}
+  celery-exporter:
+    depends_on:
+      redis:
+        condition: service_started
+        required: true
+    environment:
+      CE_BACKEND_URL: redis://redis:6379/0
+      CE_BROKER_URL: redis://redis:6379/0
+      CE_PORT: "9808"
+      CE_RETRY_INTERVAL: "5"
+      DSL_ROOT: /mnt/data/dsl
+      POSTGRES_DB: mmopdca
+      POSTGRES_PASSWORD: SuperSafePgPassw0rd!
+      POSTGRES_USER: mmop_user
+      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -sf
+        - http://localhost:9808/metrics
+        - '||'
+        - exit
+        - "1"
+      timeout: 2s
+      interval: 10s
+      retries: 3
+    image: gtocue/celery-exporter:prod
+    networks:
+      mmopdca_default: null
+    restart: unless-stopped
+  db:
+    environment:
+      DSL_ROOT: /mnt/data/dsl
+      POSTGRES_DB: mmopdca
+      POSTGRES_PASSWORD: SuperSafePgPassw0rd!
+      POSTGRES_USER: mmop_user
+      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |
+          PGPASSWORD=SuperSafePgPassw0rd! pg_isready -U mmop_user -d mmopdca -q
+      timeout: 5s
+      interval: 10s
+      retries: 5
+      start_period: 20s
+    image: postgres:16-alpine
+    networks:
+      mmopdca_default: null
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: pg_data
+        target: /var/lib/postgresql/data
+        volume: {}
+  grafana:
+    depends_on:
+      prom:
+        condition: service_started
+        required: true
+    environment:
+      DSL_ROOT: /mnt/data/dsl
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+      POSTGRES_DB: mmopdca
+      POSTGRES_PASSWORD: SuperSafePgPassw0rd!
+      POSTGRES_USER: mmop_user
+      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+    image: grafana/grafana-oss:10.4.2
+    networks:
+      mmopdca_default: null
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: grafana_data
+        target: /var/lib/grafana
+        volume: {}
+      - type: bind
+        source: C:\mmopdca\grafana\provisioning
+        target: /etc/grafana/provisioning
+        read_only: true
+        bind:
+          create_host_path: true
+  prom:
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=14d
+    depends_on:
+      celery-exporter:
+        condition: service_started
+        required: true
+      redis-exporter:
+        condition: service_started
+        required: true
+    image: prom/prometheus:v2.52.0
+    networks:
+      mmopdca_default: null
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: C:\mmopdca\prom\prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+        bind:
+          create_host_path: true
+      - type: bind
+        source: C:\mmopdca\prom\rules_mmopdca.yml
+        target: /etc/prometheus/rules_mmopdca.yml
+        read_only: true
+        bind:
+          create_host_path: true
+      - type: volume
+        source: prom_data
+        target: /prometheus
+        volume: {}
+  redis:
+    command:
+      - redis-server
+    environment:
+      DSL_ROOT: /mnt/data/dsl
+      POSTGRES_DB: mmopdca
+      POSTGRES_PASSWORD: SuperSafePgPassw0rd!
+      POSTGRES_USER: mmop_user
+      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli ping
+      timeout: 5s
+      interval: 10s
+      retries: 5
+      start_period: 20s
+    image: redis:7-alpine
+    networks:
+      mmopdca_default: null
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: redis_data
+        target: /data
+        volume: {}
+  redis-exporter:
+    command:
+      - --redis.addr=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_started
+        required: true
+    environment:
+      DSL_ROOT: /mnt/data/dsl
+      POSTGRES_DB: mmopdca
+      POSTGRES_PASSWORD: SuperSafePgPassw0rd!
+      POSTGRES_USER: mmop_user
+      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -sf
+        - http://localhost:9121/metrics
+        - '||'
+        - exit
+        - "1"
+      timeout: 2s
+      interval: 10s
+      retries: 3
+    image: gtocue/redis-exporter:prod
+    networks:
+      mmopdca_default: null
+    restart: unless-stopped
+  worker:
+    build:
+      context: C:\mmopdca
+      dockerfile: Dockerfile
+      target: runtime
+    command:
+      - celery
+      - -A
+      - core.celery_app:celery_app
+      - worker
+      - --loglevel=info
+    depends_on:
+      db:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true
+    entrypoint:
+      - /usr/local/bin/docker-entrypoint-init-dsl.sh
+    environment:
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      CELERY_RESULT_BACKEND: null
+      DSL_ROOT: /mnt/data/dsl
+      POSTGRES_DB: mmopdca
+      POSTGRES_PASSWORD: SuperSafePgPassw0rd!
+      POSTGRES_USER: mmop_user
+      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+    networks:
+      mmopdca_default: null
+    restart: on-failure
+    user: 1000:1000
+    volumes:
+      - type: volume
+        source: dsl_data
+        target: /mnt/data/dsl
+        volume: {}
+      - type: volume
+        source: checkpoints_data
+        target: /mnt/checkpoints
+        volume: {}
+networks:
+  mmopdca_default:
+    name: mmopdca_default
+    external: true
+volumes:
+  checkpoints_data:
+    name: docker_checkpoints_data
+  dsl_data:
+    name: docker_dsl_data
+  grafana_data:
+    name: docker_grafana_data
+  pg_data:
+    name: docker_pg_data
+  prom_data:
+    name: docker_prom_data
+  redis_data:
+    name: docker_redis_data
+x-env:
+  env_file:
+    - ../.env
+x-retry:
+  interval: 10s
+  retries: 5
+  start_period: 20s
+  timeout: 5s

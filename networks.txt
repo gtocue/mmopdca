@@ -1,0 +1,5 @@
+NETWORK ID     NAME              DRIVER    SCOPE
+4436fe2f868a   bridge            bridge    local
+a2fd63ebf612   host              host      local
+ae1606f036fe   mmopdca_default   bridge    local
+3e26f35510bc   none              null      local
