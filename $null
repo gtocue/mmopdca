@@ -1,7 +1,7 @@
-CertUtil: ˆø”‚ª•s–¾‚Å‚·: -exportPvk
+CertUtil: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½sï¿½ï¿½ï¿½Å‚ï¿½: -exportPvk
 
 
-CertUtil -?              -- “®ŽŒ‚Ìˆê—— (ƒRƒ}ƒ“ƒh‚Ìˆê——) ‚ð•\Ž¦‚µ‚Ü‚·
-CertUtil -dump -?        -- "dump" “®ŽŒ‚Ìƒwƒ‹ƒv ƒeƒLƒXƒg‚ð•\Ž¦‚µ‚Ü‚·
-CertUtil -v -?           -- ‚·‚×‚Ä‚Ì“®ŽŒ‚Ìƒwƒ‹ƒv ƒeƒLƒXƒg‚ð‚·‚×‚Ä•\Ž¦‚µ‚Ü‚·
+CertUtil -?              -- ï¿½ï¿½ï¿½ï¿½ï¿½Ìˆê—— (ï¿½Rï¿½}ï¿½ï¿½ï¿½hï¿½Ìˆê——) ï¿½ï¿½\ï¿½ï¿½ï¿½ï¿½ï¿½Ü‚ï¿½
+CertUtil -dump -?        -- "dump" ï¿½ï¿½ï¿½ï¿½ï¿½Ìƒwï¿½ï¿½ï¿½v ï¿½eï¿½Lï¿½Xï¿½gï¿½ï¿½\ï¿½ï¿½ï¿½ï¿½ï¿½Ü‚ï¿½
+CertUtil -v -?           -- ï¿½ï¿½ï¿½×‚Ä‚Ì“ï¿½ï¿½ï¿½ï¿½Ìƒwï¿½ï¿½ï¿½v ï¿½eï¿½Lï¿½Xï¿½gï¿½ï¿½ï¿½ï¿½ï¿½×‚Ä•\ï¿½ï¿½ï¿½ï¿½ï¿½Ü‚ï¿½
 

@@ -1,4 +1,6 @@
-# ─── core/schemas/prediction.py ─────────────────────────────────────────
+"""
+PredictionArtifact / PredictionRecord ― 予測結果スキーマ
+"""
 from __future__ import annotations
 
 import uuid
@@ -7,14 +9,8 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
-__all__ = ["PredictionRecord", "PredictionArtifact"]
-
 
 class PredictionRecord(BaseModel):
-    """
-    1 本の予測レコード
-    """
-
     symbol: str
     ts: datetime
     horizon: int
@@ -24,15 +20,9 @@ class PredictionRecord(BaseModel):
 
 
 class PredictionArtifact(BaseModel):
-    """
-    予測ジョブ 1 回分の “成果物”。
-    plan_id / run_id はテストで省略できるようデフォルトを自動生成にする。
-    """
-
-    plan_id: str | None = Field(
-        default_factory=lambda: f"plan-{uuid.uuid4().hex[:8]}"
-    )
-    run_id: str | None = Field(
-        default_factory=lambda: f"run-{uuid.uuid4().hex[:8]}"
-    )
+    plan_id: str = Field(default_factory=lambda: f"plan-{uuid.uuid4().hex[:8]}")
+    run_id: str = Field(default_factory=lambda: f"run-{uuid.uuid4().hex[:8]}")
     records: List[PredictionRecord]
+
+
+__all__ = ["PredictionRecord", "PredictionArtifact"]

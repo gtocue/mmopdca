@@ -1,8 +1,5 @@
 # ──────────────────────────────────────────────────────────────
-# pyproject.toml  ―  “アプリ本体” を Poetry でビルドする完全版
-#   * ルートを 1 つの **Python パッケージ** として扱うため
-#     package-mode = true へ変更
-#   * tests／SDK は除外（SDK は sdk-py/ 側で独立管理）
+# pyproject.toml  ―  mmopdca アプリ本体（Poetry 用）
 # ──────────────────────────────────────────────────────────────
 [tool.poetry]
 name         = "mmopdca"
@@ -11,7 +8,7 @@ description  = "Command-DSL-driven forecasting SaaS (MVP)"
 authors      = ["gtocue <gtocue510@gmail.com>"]
 license      = "MIT"
 readme       = "README.md"
-package-mode = true            # ← Poetry に「パッケージ扱い」と宣言
+package-mode = true                  # ルート自体を “パッケージ” 扱い
 
 packages = [
   { include = "api"         },
@@ -20,46 +17,71 @@ packages = [
   { include = "common_core" }
 ]
 
+# ──────────────────────────────
+# ランタイム依存
+# ──────────────────────────────
 [tool.poetry.dependencies]
 python            = ">=3.11,<3.13"
+
+# --- Web API ---
 fastapi           = ">=0.111,<0.117"
 uvicorn           = { version = ">=0.29,<0.32", extras = ["standard"] }
 python-multipart  = "^0.0.8"
-pydantic          = "^2.7.2"
 python-dotenv     = "^1.0"
-fastjsonschema    = "^2.21.0"
-cachetools        = "^5.3"
 requests          = "^2.32"
-prometheus-client = "^0.20"
+
+# --- データ処理 ---
+numpy             = ">=1.26,<2.0"      # ★ NumPy 1.x 固定
 pandas            = "^2.2"
-numpy             = "^2.2"
+pyarrow           = "^12.0"             # ★ NumPy 1.x 対応ビルド
 scikit-learn      = "^1.6"
 yfinance          = ">=0.2,<0.3"
 plotly            = "^6.0"
+
+# --- その他ユーティリティ ---
+pydantic          = "^2.7.2"
+fastjsonschema    = "^2.21.0"
+cachetools        = "^5.3"
+prometheus-client = "^0.20"
+
+# --- ジョブ／DB ---
 celery            = { version = "^5.3", extras = ["redis"] }
 redis             = "^5.0"
 psycopg           = { version = ">=3.1,<4.0", extras = ["binary"] }
 alembic           = "^1.15"
 
+# ──────────────────────────────
+# 開発用依存
+# ──────────────────────────────
 [tool.poetry.group.dev.dependencies]
-pytest    = "^8.3"
-black     = "^25"
-isort     = "^6"
-ruff      = "^0.4"
-mypy      = "^1.10"
-httpx     = "^0.27"
-pyarrow   = "^12.0"
+pytest       = "^8.3"
+pytest-cov   = "^6.1"
+black        = "^25"
+isort        = "^6"
+ruff         = "^0.4"      # Poetry で pin 済み（CI と揃える）
+mypy         = "^1.10"
+httpx        = "^0.27"
+pyarrow      = "^12.0"     # dev でも本番と同一バージョンを保証
 
+# ──────────────────────────────
+# プラグイン（Adapter 自動登録）
+# ──────────────────────────────
 [tool.poetry.plugins."mmopdca_adapters"]
 stock_us = "plugins.stock_us.adapter:StockUSAdapter"
 
+# ──────────────────────────────
+# poe the poet - 開発用タスク
+# ──────────────────────────────
 [tool.poe.tasks]
-test      = "pytest -q"
+test      = "pytest -q -ra"
 lint      = "ruff ."
 format    = "ruff format . && isort . && black ."
 typecheck = "mypy ."
 migrate   = "alembic upgrade head"
 
+# ──────────────────────────────
+# PEP-517 build-backend
+# ──────────────────────────────
 [build-system]
 requires      = ["poetry-core>=2.0,<3.0"]
 build-backend = "poetry.core.masonry.api"
