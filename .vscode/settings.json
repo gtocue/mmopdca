@@ -58,5 +58,9 @@
     "[sh]": {
         "files.encoding": "utf8",
         "files.eol": "\n"
-    }
+    },
+    // 4) Dockerfile 追加時の Compose 自動生成を無効化
+    // ────────── 追加設定 ──────────
+    "python.analysis.typeCheckingMode": "off",
+    "docker.generateComposeFileOnAdd": false,
 }

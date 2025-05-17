@@ -1,4 +1,5 @@
-# docker/compose.grafana.yml  ── Grafana だけポート公開
+version: "3.9"
+
 services:
   grafana:
     ports:

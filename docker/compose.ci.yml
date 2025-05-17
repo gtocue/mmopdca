@@ -7,6 +7,14 @@
 # ----------------------------------------------------------------------
 version: "3.9"
 
+networks:
+  default:
+    name: docker_cicd_default
+
+volumes:
+  pg_data:
+
+
 services:
 
   ########################################################################
@@ -21,7 +29,6 @@ services:
     env_file:
       - ../.env
     environment:
-      # Celery Eager モード設定
       CELERY_TASK_ALWAYS_EAGER: "true"
       CELERY_TASK_EAGER_PROPAGATES: "true"
     tmpfs:
@@ -31,7 +38,7 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "8001:8001"
     healthcheck:
@@ -39,12 +46,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+    networks:
+      - default
 
   ########################################################################
   # Redis (Broker)
   ########################################################################
   redis:
     image: redis:7-alpine
+    env_file:
+      - ../.env
     command: >
       redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 128mb --maxmemory-policy allkeys-lru
     healthcheck:
@@ -52,6 +63,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - default
+    volumes:
+      - redis_data:/data
 
   ########################################################################
   # PostgreSQL
@@ -65,6 +80,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - default
+    volumes:
+      - pg_data:/var/lib/postgresql/data
 
   ########################################################################
   # Redis-Exporter（オプション）
@@ -74,10 +93,10 @@ services:
     env_file:
       - ../.env
     command:
-      - "--redis.addr=redis://default:${REDIS_PASSWORD}@redis:6379"
+      - "--redis.addr=redis://:${REDIS_PASSWORD}@redis:6379/0"
     depends_on:
       redis:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "9121:9121"
     healthcheck:
@@ -85,6 +104,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+    networks:
+      - default
 
   ########################################################################
   # Celery-Exporter（オプション）
@@ -94,11 +115,11 @@ services:
     env_file:
       - ../.env
     environment:
-      CE_BROKER_URL: "redis://default:${REDIS_PASSWORD}@redis:6379/0"
+      CE_BROKER_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       CE_PORT: "9808"
     depends_on:
       redis:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "9808:9808"
     healthcheck:
@@ -106,6 +127,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+    networks:
+      - default
 
   ########################################################################
   # Prometheus（オプション）
@@ -121,9 +144,9 @@ services:
       - ../prom/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:
       redis-exporter:
-        condition: service_started
+        condition: service_healthy
       celery-exporter:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "9090:9090"
     healthcheck:
@@ -131,7 +154,5 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
-
-networks:
-  default:
-    name: docker_cicd_default
+    networks:
+      - default

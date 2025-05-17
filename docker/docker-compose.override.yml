@@ -1,0 +1,11 @@
+# docker/compose.override.yml
+version: "3.9"
+
+services:
+  redis-exporter:
+    healthcheck:
+      disable: true
+
+  celery-exporter:
+    healthcheck:
+      disable: true

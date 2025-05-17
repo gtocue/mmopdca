@@ -1,5 +1,6 @@
-# docker/compose.prom.yml  ── Prometheus を単体で公開したいとき用
+version: "3.9"
+
 services:
   prom:
     ports:
-      - "9090:9090" # ← ホスト公開したい時だけ
+      - "9090:9090"

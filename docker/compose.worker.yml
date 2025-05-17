@@ -1,13 +1,33 @@
-# docker/dompose.worker.yml
 version: "3.9"
 
 services:
   beat:
-    # Celery Beat のみを起動
+    # ルートの .env を参照
+    env_file: [ ../.env ]
+
+    # checkpoint フォルダをワークディレクトリに
+    working_dir: /mnt/checkpoints
+
+    # Beat だけを foreground で動かす
     command:
       - celery
       - -A
       - core.celery_app:celery_app
       - beat
       - --loglevel=info
-      # スケジュールファイル配置先を変える場合はここに --schedule=... を追加
+      - --schedule=/mnt/checkpoints/celerybeat-schedule
+
+    volumes:
+      - checkpoints_data:/mnt/checkpoints
+      - dsl_data:/mnt/data/dsl
+
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+    networks: [ mmopdca_default ]
+    restart: on-failure
+
+volumes:
+  checkpoints_data:
+  dsl_data:
