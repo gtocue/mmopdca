@@ -1,14 +1,8 @@
-# docker/compose.ci.yml
-# ──────────────────────────────────────────────────────────────
-# GitHub Actions “stack-health” ワークフロー専用
-# ・redis / postgres / api（FastAPI）＋3 Exporters＋Prometheus
-# ・`.env` は CI ステップでリポジトリ直下に動的生成されるため
-#   `env_file: [ ../.env ]` とする
-# ──────────────────────────────────────────────────────────────
+version: "3.9"
 
 ##################### 共通オプション #####################
 x-env: &default-env
-  env_file: [ ../.env ] # ← リポジトリ直下の .env を参照
+  env_file: [ ../.env ] # ← CI がリポジトリ直下に生成する .env を読む
 
 x-retry: &retry
   interval: 10s
