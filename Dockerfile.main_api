@@ -12,14 +12,17 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-# Poetry で依存インストール（lock は使わない）
+# --- ① Poetry 依存 ---
 COPY pyproject.toml ./
 RUN pip install --upgrade pip poetry && \
     poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi --without dev
 
-# アプリ本体
+# --- ② アプリ本体 ---
 COPY . .
+
+# --- ③ ここで DSL_ROOT を必ず作成 ---
+RUN mkdir -p "${DSL_ROOT}"
 
 EXPOSE 8001
 CMD ["uvicorn", "api.main_api:app", "--host", "0.0.0.0", "--port", "8001", "--proxy-headers"]
