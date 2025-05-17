@@ -11,31 +11,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ① ソース取得
       - uses: actions/checkout@v3
 
-      # ② Python 3.11
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      # ③ 依存インストール
+      # optional ─ 確認用にツリー一覧を出す
+      - name: Show workspace tree (debug)
+        run: |
+          echo "::group::tree"
+          ls -R | head -100
+          echo "::endgroup::"
+
       - name: Install dependencies
         run: |
           python -m venv .venv
           . .venv/bin/activate
           pip install --upgrade pip
-          pip install -e ./sdk-py          # ← ./ を付与
+          pip install -e ./sdk-py/        # ← 末尾 / を追加
           pip install pytest pyyaml
 
-      # ④ Quickstart 実行
       - name: Run Quickstart example
         run: |
           . .venv/bin/activate
           python ./sdk-py/examples/quickstart.py
 
-      # ⑤ Pytest
       - name: Run pytest
         run: |
           . .venv/bin/activate
