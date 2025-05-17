@@ -1,3 +1,4 @@
+# ---------- ディレクトリ除外 ----------
 .git/
 __pycache__/
 tests/
@@ -6,6 +7,8 @@ infra/k8s/
 infra/terraform/
 .idea/
 .vscode/
+
+# ---------- ファイル除外 ----------
 *.pyc
 *.pyo
 *.pyd
@@ -13,6 +16,9 @@ infra/terraform/
 *.db
 *.log
 .gitignore
+
+# ---------- ⬇ ここから例外 ⬇ ----------
 !pyproject.toml
 !poetry.lock
 !ops/init-dsl.sh
+
