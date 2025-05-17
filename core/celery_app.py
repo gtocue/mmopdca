@@ -21,7 +21,7 @@ load_dotenv(dotenv_path=dotenv_path)
 # Celery ブローカー／バックエンド設定
 # ----------------------------------------------------------------------
 # REDIS_URL を優先的に読み込み。未設定時は REDIS_PASSWORD／REDIS_HOST から組み立てる
-REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
 REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
 broker_url = os.environ.get(
     "REDIS_URL",

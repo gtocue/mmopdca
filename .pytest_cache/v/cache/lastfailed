@@ -1,6 +1,0 @@
-{
-  "gateway凍結/tests/test_router.py": true,
-  "tests/tests/schemas/test_artifact.py::test_artifact_roundtrip": true,
-  "tests/test_e2e.py::test_plan_do_check": true,
-  "tests/tests/e2e/test_pdca_flow.py::test_pdca_min_cycle": true
-}

@@ -1,6 +1,15 @@
-# docker/compose.beat.yml
+version: "3.9"
+
 services:
   beat:
+    # プロジェクトルートの .env を読み込む
+    env_file:
+      - ../.env
+
+    # Celery Beat の作業ディレクトリをチェックポイント領域に切り替え
+    working_dir: /mnt/checkpoints
+
+    # Beat を foreground で動かす
     command:
       - celery
       - -A
@@ -8,3 +17,26 @@ services:
       - beat
       - --loglevel=info
       - --schedule=/mnt/checkpoints/celerybeat-schedule
+
+    volumes:
+      - checkpoints_data:/mnt/checkpoints
+      - dsl_data:/mnt/data/dsl
+
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    networks:
+      - mmopdca_default
+    restart: on-failure
+
+volumes:
+  checkpoints_data:
+  dsl_data:
+
+
+networks:
+  mmopdca_default:
+    external: true

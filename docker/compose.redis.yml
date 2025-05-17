@@ -1,23 +1,34 @@
-# ファイル: docker/compose.redis.yml
-# 目的: パスワード保護付き Redis サーバーを起動（ポート公開は ports.yml で管理）
+version: "3.9"
 
 services:
   redis:
     image: redis:7-alpine
     env_file:
       - ../.env
+
+    # 認証を切ってシンプル起動
     command: >
-      redis-server --requirepass ${REDIS_PASSWORD}
-    environment:
-      - REDIS_PASSWORD
-    volumes:
-      - redis_data:/data
+      redis-server
+
+    # PING だけチェックすれば OK
     healthcheck:
-      test: [ "CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping" ]
+      test: [ "CMD-SHELL", "redis-cli ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
+
+    volumes:
+      - redis_data:/data
+
+    networks:
+      - mmopdca_default
+
     restart: unless-stopped
 
 volumes:
   redis_data:
+
+
+networks:
+  mmopdca_default:
+    external: true

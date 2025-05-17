@@ -1,18 +1,24 @@
-version: "3.9"
+version: "3.9" # v3.9 警告は無害
 
 services:
   db:
-    image: postgres:15
+    image: postgres:16-alpine
     env_file:
       - ../.env
+
     volumes:
       - pg_data:/var/lib/postgresql/data
+
+    # コンテナ内で ${VAR} を評価するために CMD-SHELL を利用
     healthcheck:
-      # CMD-SHELL を正しく配列指定。シェル内で環境変数を評価。
-      test: [ "CMD-SHELL", "PGPASSWORD=$POSTGRES_PASSWORD pg_isready -U $POSTGRES_USER -d $POSTGRES_DB" ]
+      test:
+        - CMD-SHELL
+        - >
+          PGPASSWORD=${POSTGRES_PASSWORD} pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -q
       interval: 10s
       timeout: 5s
       retries: 5
+
     networks:
       - mmopdca_default
     restart: unless-stopped
