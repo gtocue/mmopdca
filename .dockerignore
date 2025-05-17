@@ -1,14 +1,13 @@
 #################### ディレクトリ除外 ####################
 .git/
 __pycache__/
-テスト/
-ノートブック/
-以下/k8s/
-インフラ/テラフォーム/
-。アイデア/
+tests/
+notebooks/
+k8s/
+infra/terraform/
+.idea/
 .vscode/
-ops/                    # ← init-dsl.sh が不要なので丸ごと除外
-ops/                    # init-dsl.sh 以外は不要なので除外
+ops/**                      # ← まず ops 配下をすべて除外
 
 #################### ファイル除外 ####################
 *.pyc
@@ -16,10 +15,10 @@ ops/                    # init-dsl.sh 以外は不要なので除外
 *.pyd
 *.sqlite*
 *.db
-*。ログ
-.gitignore
+*.log
+.gitignore                  # （誤って commit しないため明示）
 
 #################### 例外で拾い直す ####################
-!pyプロジェクト.toml
+!pyproject.toml
 !poetry.lock
-!ops/init-dsl.sh
+!ops/init-dsl.sh            # ← 必要なシェルだけ再包含
