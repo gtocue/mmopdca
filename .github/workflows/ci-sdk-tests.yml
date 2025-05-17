@@ -1,4 +1,5 @@
 name: sdk-tests
+
 on:
   push:          { branches: [main, feature/api-only-day1] }
   pull_request:  { branches: [main] }
@@ -6,38 +7,43 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy: { matrix: { python: ['3.11'] } }
+    strategy:
+      matrix:
+        python-version: ['3.11']          # 〃 matrix 形式で拡張しやすく
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v4
-      with: { python-version: '${{ matrix.python }}' }
+      # 1) ソース取得
+      - uses: actions/checkout@v4
 
-    - name: Cache pip
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: |
-          ${{ runner.os }}-pip-${{ hashFiles('sdk-py/setup.py') }}-${{ hashFiles('requirements-ci.txt') }}
+      # 2) Python + pip キャッシュ
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip                     # 自動で ~/.cache/pip をキャッシュ
 
-    - name: Install deps
-      run: |
-        python -m venv .venv
-        source .venv/bin/activate
-        pip install --upgrade pip
-        # ① ルート（api/ etc. を含む）を editable install
-        pip install -e .
-        # ② SDK を editable install
-        pip install -e sdk-py
-        # ③ CI 追加依存
-        pip install -r requirements-ci.txt
+      # 3) 依存インストール
+      - name: Install root + SDK (+dev) deps
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -e ".[dev]"          # ルート
+          pip install -e "sdk-py[dev]"     # SDK
+          if [ -f requirements-ci.txt ]; then pip install -r requirements-ci.txt; fi
 
-    - name: Run quickstart
-      run: |
-        source .venv/bin/activate && python sdk-py/examples/quickstart.py
-      env:
-        MMOP_BASE_URL: http://localhost:8001   # 必要なら
+      # 4) Quickstart 動作確認
+      - name: Run SDK quickstart example
+        run: |
+          source .venv/bin/activate
+          python sdk-py/examples/quickstart.py
+        env:
+          MMOP_BASE_URL: http://localhost:8001
+          CKPT_ROOT: ${{ runner.temp }}/mmop_ckpt   # ← チェックポイント権限対策
 
-    - name: Run pytest
-      run: |
-        source .venv/bin/activate && pytest -q
+      # 5) pytest
+      - name: Run pytest
+        env:
+          CKPT_ROOT: ${{ runner.temp }}/mmop_ckpt
+        run: |
+          source .venv/bin/activate
+          pytest -q

@@ -55,10 +55,40 @@ logger.setLevel(os.getenv("LOG_LEVEL", "INFO").upper())
 # ────────────────────────────────
 # 定数 / 環境変数
 # ────────────────────────────────
-CKPT_DIR = Path(os.getenv("CKPT_DIR", "/mnt/checkpoints"))
-CKPT_INT_MIN = int(os.getenv("CKPT_EVERY_N_MIN", "15"))  # TODO: 外部設定へ
 
-CKPT_DIR.mkdir(parents=True, exist_ok=True)
+
+def _resolve_ckpt_dir() -> Path:
+    """
+    チェックポイント保存先を決定する。
+
+    優先順位:
+    1. 環境変数 CKPT_DIR
+    2. ~/.cache/mmopdca/checkpoints
+    3. ./checkpoints  (プロジェクト直下 — 最終フォールバック)
+
+    どのディレクトリも作成可能になるまで優先順に試す。
+    """
+    # 1) 明示指定
+    env_dir = os.getenv("CKPT_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser().resolve()
+
+    # 2) ホーム配下 (GitHub Actions でも書き込み可能)
+    home_dir = Path.home() / ".cache" / "mmopdca" / "checkpoints"
+    try:
+        home_dir.mkdir(parents=True, exist_ok=True)
+        return home_dir
+    except PermissionError:
+        logger.warning("cannot write to %s; falling back to ./checkpoints", home_dir)
+
+    # 3) カレント直下
+    return (Path.cwd() / "checkpoints").resolve()
+
+
+CKPT_DIR: Path = _resolve_ckpt_dir()
+CKPT_DIR.mkdir(parents=True, exist_ok=True)  # idempotent, but ensure exists
+
+CKPT_INT_MIN = int(os.getenv("CKPT_EVERY_N_MIN", "15"))  # TODO: 外部設定へ
 
 # ────────────────────────────────
 # 内部ユーティリティ
@@ -117,7 +147,7 @@ def load_latest_ckpt(plan_id: str, epoch_idx: int) -> Optional[Dict[str, Any]]:
         return data
     except json.JSONDecodeError as exc:
         logger.error("corrupted checkpoint %s: %s", fp, exc)
-        return None  # NOTE: 壊れていても復帰を優先
+        return None  # 壊れていても復帰を優先
 
 
 def mark_done(plan_id: str, epoch_idx: int) -> None:

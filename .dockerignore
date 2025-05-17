@@ -1,13 +1,14 @@
 #################### ディレクトリ除外 ####################
 .git/
 __pycache__/
-tests/
-notebooks/
-infra/k8s/
-infra/terraform/
-.idea/
+テスト/
+ノートブック/
+以下/k8s/
+インフラ/テラフォーム/
+。アイデア/
 .vscode/
 ops/                    # ← init-dsl.sh が不要なので丸ごと除外
+ops/                    # init-dsl.sh 以外は不要なので除外
 
 #################### ファイル除外 ####################
 *.pyc
@@ -15,9 +16,10 @@ ops/                    # ← init-dsl.sh が不要なので丸ごと除外
 *.pyd
 *.sqlite*
 *.db
-*.log
+*。ログ
 .gitignore
 
 #################### 例外で拾い直す ####################
-!pyproject.toml
+!pyプロジェクト.toml
 !poetry.lock
+!ops/init-dsl.sh

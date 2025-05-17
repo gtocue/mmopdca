@@ -1,10 +1,8 @@
 name: CI
 
 on:
-  push:
-    branches: [ main, feature/api-only-day1 ]
-  pull_request:
-    branches: [ main ]
+  push:          { branches: [main, feature/api-only-day1] }
+  pull_request:  { branches: [main] }
 
 jobs:
   test:
@@ -12,45 +10,47 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ "3.11" ]
+        python-version: ['3.11']
 
     steps:
-      - uses: actions/checkout@v3
+      # 1) ソース取得
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v4
+      # 2) Python + pip キャッシュ
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
-      # pip キャッシュ
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
-
-      # ワークスペース確認 (tree が無くても失敗しない)
+      # 3) ワークスペース概要 (デバッグ用)
       - name: Show workspace tree (debug)
         run: |
-          echo "::group::tree"
+          echo "::group::workspace"
           (command -v tree >/dev/null && tree -L 2) || ls -R | head -100
           echo "::endgroup::"
 
-      # 依存インストール
-      - name: Install deps & SDK
+      # 4) 依存インストール
+      - name: Install root + SDK (+dev) deps
         run: |
           python -m venv .venv
           . .venv/bin/activate
           pip install --upgrade pip
-          # ★ file:// を付けると絶対パスで確実に解決される
-          pip install -e "file://$GITHUB_WORKSPACE/sdk-py"
-          pip install pytest pyyaml
+          pip install -e ".[dev]"
+          pip install -e "sdk-py[dev]"
 
-      - name: Run Quickstart example
+      # 5) Quickstart サンプル
+      - name: Run SDK quickstart example
+        env:
+          MMOP_BASE_URL: http://localhost:8001
+          CKPT_ROOT: ${{ runner.temp }}/mmop_ckpt
         run: |
           . .venv/bin/activate
-          python ./sdk-py/examples/quickstart.py
+          python sdk-py/examples/quickstart.py
 
+      # 6) pytest
       - name: Run pytest
+        env:
+          CKPT_ROOT: ${{ runner.temp }}/mmop_ckpt
         run: |
           . .venv/bin/activate
           pytest -q
