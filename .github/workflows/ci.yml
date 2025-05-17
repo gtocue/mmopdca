@@ -1,60 +1,46 @@
 name: CI
 
 on:
-  push:
-    branches: [ main, feature/api-only-day1 ]
-  pull_request:
-    branches: [ main ]
+  push:          { branches: [ main, feature/api-only-day1 ] }
+  pull_request:  { branches: [ main ] }
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        python-version: [ "3.11" ]
+      matrix: { python-version: [ "3.11" ] }
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+    - uses: actions/checkout@v3
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
+    - uses: actions/setup-python@v4
+      with: { python-version: "${{ matrix.python-version }}" }
 
-      # ---------- optional: pip キャッシュ ----------
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
+    - name: Cache pip
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
 
-      # ---------- デバッグ用にディレクトリツリー表示 ----------
-      - name: Show workspace tree (debug)
-        run: |
-          echo "::group::tree"
-          ls -R | head -100
-          echo "::endgroup::"
+    - name: Show tree (debug)
+      run: |
+        echo "::group::tree"; tree -L 2 || true; echo "::endgroup::"
 
-      # ---------- 依存インストール ----------
-      - name: Install dependencies
-        working-directory: ${{ github.workspace }}   # ★ ここを追加
-        run: |
-          python -m venv .venv
-          . .venv/bin/activate
-          pip install --upgrade pip
-          pip install -e ./sdk-py          # ← スラッシュ無し！
-          pip install -r requirements-ci.txt
+    - name: Install deps & SDK
+      run: |
+        python -m venv .venv
+        . .venv/bin/activate
+        pip install --upgrade pip
+        pip install -e "$GITHUB_WORKSPACE/sdk-py"          # ★絶対パス
+        pip install pytest pyyaml
 
-      # ---------- クイックスタート例実行 ----------
-      - name: Run Quickstart example
-        run: |
-          . .venv/bin/activate
-          python ./sdk-py/examples/quickstart.py
+    - name: Quickstart example
+      run: |
+        . .venv/bin/activate
+        python ./sdk-py/examples/quickstart.py
 
-      # ---------- テスト ----------
-      - name: Run pytest
-        run: |
-          . .venv/bin/activate
-          pytest -q -x
+    - name: Run pytest
+      run: |
+        . .venv/bin/activate
+        pytest -q
