@@ -1,4 +1,3 @@
-# --- .dockerignore (clean) ---
 .git/
 __pycache__/
 tests/
@@ -16,4 +15,4 @@ infra/terraform/
 .gitignore
 !pyproject.toml
 !poetry.lock
-!ops/**
+!ops/init-dsl.sh
