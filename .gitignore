@@ -1,64 +1,68 @@
-# ────────────── 環境変数 ──────────────
-.env
-.env.ci
-.env.bak      ← ここを追加
+# =========================================================
+#  mmopdca – .gitignore   (CI / SDK 用に最適化)
+# =========================================================
 
-# ────────────── Python ──────────────
+##########################
+# 1. 環境変数・バックアップ
+##########################
+.env*                    # .env, .env.ci など全部
+*.bak
+*.backup
+*.tmp
+
+##########################
+# 2. Python キャッシュ類
+##########################
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 .Python
-
-# pytest / ruff / isort キャッシュ
 .pytest_cache/
 .ruff_cache/
 .isort.cfg
 .ipynb_checkpoints/
 
-# Poetry / venv
+##########################
+# 3. Poetry / 仮想環境
+##########################
 poetry.lock
 .venv/
 .env.*.local
 
-# ────────────── Docker ──────────────
+##########################
+# 4. Docker 関連
+##########################
 docker-compose.yml
-docker/compose.ci.yml
 docker/compose.flower.yml
 ops/init-*.sh
+docker-compose.ym*       # 誤タイプ対策
 
-# ────────────── アーカイブ・ログ ──────────────
+# --- CI 用 compose は残す ---
+!docker/compose.ci.yml
+
+##########################
+# 5. アーカイブ・ログ
+##########################
 *.zip
 *.tar.gz
 *.log
 
-# ────────────── IDE / エディタ ──────────────
+##########################
+# 6. IDE / Editor
+##########################
 .vscode/
 .idea/
 *.sublime-workspace
-__pycache__/
-*.pyc
 
-.env
-.env.ci
-# --- 自動生成 & バックアップ ---
-*.bak
-*.backup
-*.tmp
-docker-compose.ym*
-# pytest
-# OpenAPI / SDK
-sdk-py/
+##########################
+# 7. OpenAPI / 自動生成物
+##########################
 openapi.json
 openapitools.json
 
-# allow CI compose
-!docker/compose.ci.yml
-
-# --- allow SDK -------------------------------------------------
-!sdk-py/
-!sdk-py/**
-
-# allow SDK
+############################################################
+# 8. SDK ― ここからは “除外を解除” して追跡対象に戻す
+############################################################
 !sdk-py/
 !sdk-py/**
