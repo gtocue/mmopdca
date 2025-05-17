@@ -1,32 +1,16 @@
-"""
-core.schemas package  ― サブモジュールの公開クラスをフラットに再エクスポートする
-===============================================================
-pytest などから `from core.schemas import PlanCreateRequest` と書けるようにする。
-"""
+"""Schema package exports."""
+from importlib import import_module
+from typing import List
 
-from __future__ import annotations
+__all__: List[str] = []
 
-# ① 個別インポート
-from .plan_schemas import PlanCreateRequest, PlanResponse
-from .do_schemas import (
-    IndicatorParam,
-    DoStatus,
-    DoCreateRequest,
-    DoResponse,
-)
-from .prediction import PredictionRecord, PredictionArtifact
+for _name in ("plan_schemas", "do_schemas", "prediction"):
+    try:
+        _module = import_module(f"{__name__}.{_name}")
+    except ModuleNotFoundError:
+        continue
+    for _sym in getattr(_module, "__all__", ()):  # skip modules without __all__
+        globals()[_sym] = getattr(_module, _sym)
+        __all__.append(_sym)
 
-# ② __all__ を一元管理
-__all__ = [
-    # plan
-    "PlanCreateRequest",
-    "PlanResponse",
-    # do
-    "IndicatorParam",
-    "DoStatus",
-    "DoCreateRequest",
-    "DoResponse",
-    # prediction
-    "PredictionRecord",
-    "PredictionArtifact",
-]
+del _module, _name, _sym

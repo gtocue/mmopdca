@@ -58,9 +58,4 @@ class DoResponse(BaseModel):
 # ────────────────────────────────────────────────
 # パッケージ公開シンボル
 # ────────────────────────────────────────────────
-__all__ = [
-    "IndicatorParam",
-    "DoStatus",
-    "DoCreateRequest",
-    "DoResponse",
-]
+__all__ = ["IndicatorParam", "DoStatus", "DoCreateRequest", "DoResponse"]

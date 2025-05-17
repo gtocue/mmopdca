@@ -39,7 +39,4 @@ class PlanResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-__all__ = [
-    "PlanCreateRequest",
-    "PlanResponse",
-]
+__all__ = ["PlanCreateRequest", "PlanResponse"]
