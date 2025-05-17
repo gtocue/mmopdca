@@ -3,8 +3,8 @@
 # ======================================================================
 
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 15s        # 各ターゲットの収集間隔
+  evaluation_interval: 15s    # ルール評価間隔
 
 alerting:
   alertmanagers:
@@ -12,15 +12,20 @@ alerting:
         - targets: ["alertmanager:9093"]
 
 rule_files:
-  - /etc/prometheus/rules_mmopdca.yml
+  - /etc/prometheus/rules_mmopdca.yml      # 既存ルール
   - /etc/prometheus/rules/celery_exporter.yml
 
 scrape_configs:
-  - job_name: celery-exporter
-    static_configs: [ { targets: ["celery-exporter:9808"] } ]
+  # --- Celery／Redis Exporter ---
+  - job_name: "celery-exporter"
+    static_configs:
+      - targets: ["celery-exporter:9808"]
 
-  - job_name: redis-exporter
-    static_configs: [ { targets: ["redis-exporter:9121"] } ]
+  - job_name: "redis-exporter"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
 
-  - job_name: prometheus
-    static_configs: [ { targets: ["localhost:9090"] } ]
+  # --- Prometheus 自身 ---
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

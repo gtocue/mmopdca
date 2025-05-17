@@ -1,24 +1,26 @@
 version: "3.9"
 
-##################### 共通オプション #####################
+# --------------------------------------------------
+# 共通オプション
+# --------------------------------------------------
 x-env: &default-env
-  env_file: [ ../.env ] # ← CI がリポジトリ直下に生成する .env を読む
+  env_file: [ ../.env ] # CI がリポジトリ直下に生成する .env
 
 x-retry: &retry
   interval: 10s
   timeout: 3s
   retries: 3
 
-######################## services ########################
+# --------------------------------------------------
+# Services
+# --------------------------------------------------
 services:
   # ---------- Core ----------
   redis:
     image: redis:7-alpine
     <<: *default-env
     command: [ "redis-server", "--requirepass=" ]
-    healthcheck:
-      test: [ "CMD-SHELL", "redis-cli ping" ]
-      <<: *retry
+    healthcheck: { test: [ "CMD-SHELL", "redis-cli ping" ], <<: *retry }
     ports: [ "6379:6379" ]
 
   db:
@@ -30,17 +32,12 @@ services:
     ports: [ "5432:5432" ]
 
   api:
-    build:
-      context: ..
-      dockerfile: Dockerfile.main_api
+    build: { context: .., dockerfile: Dockerfile.main_api }
     <<: *default-env
-    environment:
-      DSL_ROOT: /mnt/data/dsl
+    environment: { DSL_ROOT: /mnt/data/dsl }
     depends_on: [ redis, db ]
     ports: [ "8001:8001" ]
-    healthcheck:
-      test: [ "CMD", "curl", "-fsS", "http://localhost:8001/docs" ]
-      <<: *retry
+    healthcheck: { test: [ "CMD", "curl", "-fsS", "http://localhost:8001/docs" ], <<: *retry }
 
   # ---------- Exporters ----------
   redis-exporter:
@@ -64,10 +61,10 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=14d"
+    # docker/ の 1 つ上にある prom/ ディレクトリをマウント
     volumes:
-      - ../prom/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../prom:/etc/prometheus:ro
     depends_on: [ redis-exporter, celery-exporter ]
     ports: [ "9090:9090" ]
 
-######################## volumes ########################
 volumes: {}
