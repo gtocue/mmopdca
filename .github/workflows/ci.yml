@@ -30,7 +30,7 @@ jobs:
           python -m venv .venv
           . .venv/bin/activate
           pip install --upgrade pip
-          pip install -e ./sdk-py/        # ← 末尾 / を追加
+          pip install -e ./sdk-py         # ← ここは必ず / 無し
           pip install pytest pyyaml
 
       - name: Run Quickstart example
