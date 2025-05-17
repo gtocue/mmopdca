@@ -1,0 +1,5 @@
+# requirements-ci.txt  (ルートに置く)
+pytest>=8
+pyyaml>=6
+fastapi>=0.111,<0.117
+uvicorn[standard]>=0.29,<0.32
