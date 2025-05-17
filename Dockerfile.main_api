@@ -6,15 +6,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DSL_ROOT=/mnt/data/dsl \
     PIP_NO_CACHE_DIR=1
 
-# ネイティブモジュール用ビルドツール
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Poetry で依存インストール
-COPY pyproject.toml poetry.lock ./
+# Poetry で依存インストール（lock は使わない）
+COPY pyproject.toml ./
 RUN pip install --upgrade pip poetry && \
     poetry config virtualenvs.create false && \
     poetry install --no-interaction --no-ansi --without dev
