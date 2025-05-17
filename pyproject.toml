@@ -49,8 +49,8 @@ dev = [
   "isort",
   "ruff",
   "types-python-dateutil",
-  "uvicorn[standard]"
-]
+  "uvicorn"
+  ]
 
 # ───────────────────────────────────────────────
 [build-system]
