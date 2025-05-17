@@ -14,8 +14,9 @@ RUN apt-get update \
 RUN pip install --no-cache-dir --upgrade pip poetry
 
 WORKDIR /app
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml ./
 RUN poetry config virtualenvs.create false \
+    && poetry lock --no-update \
     && poetry install --no-interaction --no-ansi --without dev --no-root
 
 # DSL サンプルや defaults はイメージに含めておく

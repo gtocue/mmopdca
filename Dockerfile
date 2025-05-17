@@ -12,9 +12,10 @@ RUN apt-get update \
 WORKDIR /app
 
 # ---- Poetry + deps ----------------------------------------------
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml ./
 RUN pip install --no-cache-dir --upgrade pip poetry \
     && poetry config virtualenvs.create false \
+    && poetry lock --no-update \
     && poetry install --no-interaction --no-ansi --without dev --no-root
 
 # ---- アプリケーションコードをコピー & 初期化スクリプト設置 ------------
