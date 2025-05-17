@@ -36,6 +36,8 @@ ops/init-*.sh
 .idea/
 *.sublime-workspace
 
-# Python のバイトコードを無視
+# Python バイトコードとキャッシュ
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
