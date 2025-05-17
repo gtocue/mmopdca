@@ -39,6 +39,7 @@ jobs:
 
       # ---------- 依存インストール ----------
       - name: Install dependencies
+        working-directory: ${{ github.workspace }}   # ★ ここを追加
         run: |
           python -m venv .venv
           . .venv/bin/activate
