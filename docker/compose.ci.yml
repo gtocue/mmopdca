@@ -1,23 +1,72 @@
 version: "3.9"
 
+##################### 共通オプション #####################
+x-env: &default-env
+  env_file: [ .env ] # ← CI ジョブで動的に生成される
+
+x-retry: &retry
+  interval: 10s
+  timeout: 3s
+  retries: 3
+
+######################## services ########################
 services:
+  # --- コア ---
   redis:
     image: redis:7-alpine
+    <<: *default-env
+    command: [ "redis-server", "--requirepass=" ]
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli ping" ]
+      <<: *retry
+    ports: [ "6379:6379" ]
 
   db:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: test
-      POSTGRES_USER: test
-      POSTGRES_PASSWORD: test
+    <<: *default-env
+    healthcheck:
+      test: [ "CMD-SHELL", "PGPASSWORD=${POSTGRES_PASSWORD} pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      <<: *retry
+    ports: [ "5432:5432" ]
 
   api:
     build:
       context: ..
       dockerfile: Dockerfile.main_api
+    <<: *default-env
     environment:
-      DATABASE_URL: postgresql://test:test@db:5432/test
-      REDIS_URL: redis://redis:6379/0
-    depends_on:
-      - redis
-      - db
+      DSL_ROOT: /mnt/data/dsl
+    depends_on: [ redis, db ]
+    ports: [ "8001:8001" ]
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8001/docs" ]
+      <<: *retry
+
+  # --- Exporters & Prom ---
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.60.0
+    command: [ "--redis.addr=redis://redis:6379/0" ]
+    depends_on: [ redis ]
+    ports: [ "9121:9121" ]
+
+  celery-exporter:
+    image: danihodovic/celery-exporter:0.9.1
+    environment:
+      CE_BROKER_URL: redis://redis:6379/0
+      CE_BACKEND_URL: redis://redis:6379/0
+      CE_PORT: 9808
+    depends_on: [ redis ]
+    ports: [ "9808:9808" ]
+
+  prom:
+    image: prom/prometheus:v2.52.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=14d
+    volumes:
+      - ../prom/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on: [ redis-exporter, celery-exporter ]
+    ports: [ "9090:9090" ]
+
+######################## volumes ########################
+volumes: {}
