@@ -1,5 +1,4 @@
 name: sdk-tests
-
 on:
   push:          { branches: [main, feature/api-only-day1] }
   pull_request:  { branches: [main] }
@@ -11,7 +10,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-
     - uses: actions/setup-python@v4
       with: { python-version: '${{ matrix.python }}' }
 
@@ -22,16 +20,24 @@ jobs:
         key: |
           ${{ runner.os }}-pip-${{ hashFiles('sdk-py/setup.py') }}-${{ hashFiles('requirements-ci.txt') }}
 
-    - name: Install SDK & test deps
+    - name: Install deps
       run: |
         python -m venv .venv
-        . .venv/bin/activate
+        source .venv/bin/activate
         pip install --upgrade pip
-        pip install -e "$GITHUB_WORKSPACE/sdk-py"
+        # ① ルート（api/ etc. を含む）を editable install
+        pip install -e .
+        # ② SDK を editable install
+        pip install -e sdk-py
+        # ③ CI 追加依存
         pip install -r requirements-ci.txt
 
-    - name: Quickstart example
-      run: . .venv/bin/activate && python sdk-py/examples/quickstart.py
+    - name: Run quickstart
+      run: |
+        source .venv/bin/activate && python sdk-py/examples/quickstart.py
+      env:
+        MMOP_BASE_URL: http://localhost:8001   # 必要なら
 
     - name: Run pytest
-      run: . .venv/bin/activate && pytest -q
+      run: |
+        source .venv/bin/activate && pytest -q

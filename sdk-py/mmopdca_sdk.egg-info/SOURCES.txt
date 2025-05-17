@@ -1,7 +1,6 @@
 README.md
 pyproject.toml
 setup.cfg
-setup.py
 mmopdca_sdk/__init__.py
 mmopdca_sdk/api_client.py
 mmopdca_sdk/api_response.py
@@ -12,7 +11,6 @@ mmopdca_sdk/rest.py
 mmopdca_sdk.egg-info/PKG-INFO
 mmopdca_sdk.egg-info/SOURCES.txt
 mmopdca_sdk.egg-info/dependency_links.txt
-mmopdca_sdk.egg-info/requires.txt
 mmopdca_sdk.egg-info/top_level.txt
 mmopdca_sdk/api/__init__.py
 mmopdca_sdk/api/act_api.py
