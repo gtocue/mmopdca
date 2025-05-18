@@ -1,6 +1,4 @@
 # docker/compose.redis.yml
-version: "3.9"
-
 services:
   redis:
     image: redis:7-alpine
@@ -14,16 +12,10 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - redis_data:/data
+      - redis_data:/data # ← ここを追加
     networks:
       - mmopdca_default
     restart: unless-stopped
 
-# ここで必ずボリュームを定義
 volumes:
-  redis_data:
-
-
-networks:
-  mmopdca_default:
-    external: true
+  redis_data: # ← ここを定義
