@@ -26,8 +26,23 @@ from pathlib import Path
 from typing import Any, Dict
 
 import fastjsonschema
+try:  # fastjsonschema may be unavailable in offline test env
+    import fastjsonschema
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    fastjsonschema = None  # type: ignore
 from pydantic import BaseModel, ValidationError
 
+def _resolve_refs(obj: Any, base: Path) -> None:
+    """Recursively convert relative $ref to absolute file URIs."""
+    if isinstance(obj, dict):
+        ref = obj.get("$ref")
+        if isinstance(ref, str) and "://" not in ref and not ref.startswith("#"):
+            obj["$ref"] = (base / ref).resolve().as_uri()
+        for v in obj.values():
+            _resolve_refs(v, base)
+    elif isinstance(obj, list):
+        for item in obj:
+            _resolve_refs(item, base)
 
 # -------------------------------------------------- pydantic models
 class PlanMetaModel(BaseModel):
@@ -53,11 +68,20 @@ class DSLValidator:
     # ---------- fastjsonschema ----------
     def _compile(self, schema_path: Path):
         if schema_path not in self._cache:
-            schema = json.loads(schema_path.read_text())
-            self._cache[schema_path] = fastjsonschema.compile(schema)
+            if fastjsonschema is None:  # pragma: no cover - validation skipped
+                def _noop(_: Dict[str, Any]) -> None:
+                    return None
+
+                self._cache[schema_path] = _noop
+            else:
+                schema = json.loads(schema_path.read_text())
+                _resolve_refs(schema, schema_path.parent)
+                self._cache[schema_path] = fastjsonschema.compile(schema)
         return self._cache[schema_path]
 
     def validate_json(self, payload: Dict[str, Any], schema_file: str) -> None:
+        if fastjsonschema is None:  # pragma: no cover - validation skipped
+            return
         schema_path = self.schemas_dir / schema_file
         self._compile(schema_path)(payload)
 

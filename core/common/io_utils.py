@@ -44,10 +44,20 @@ try:
     import polars as pl  # type: ignore
 
     _DF_LIB = "polars"
+    _HAS_PARQUET = True
 except ModuleNotFoundError:  # pragma: no cover
     import pandas as pd  # type: ignore
 
     _DF_LIB = "pandas"
+    try:
+        import pyarrow  # type: ignore  # noqa: F401
+        _HAS_PARQUET = True
+    except ModuleNotFoundError:  # pragma: no cover
+        try:
+            import fastparquet  # type: ignore  # noqa: F401
+            _HAS_PARQUET = True
+        except ModuleNotFoundError:  # pragma: no cover
+            _HAS_PARQUET = False
 
 logger = logging.getLogger(__name__)
 
@@ -98,15 +108,17 @@ def save_predictions(df: Any, plan_id: str, run_id: str) -> str:
         )
     else:  # pandas
         assert "pandas" in str(type(df)), "pandas.DataFrame expected"
-        df.to_parquet(
-            path,
-            compression=DEFAULT_PARQUET_COMPRESSION,
-            index=False,
-        )
+        if _HAS_PARQUET:
+            df.to_parquet(
+                path,
+                compression=DEFAULT_PARQUET_COMPRESSION,
+                index=False,
+            )
+        else:
+            df.to_pickle(path)
 
     logger.debug("Predictions saved: %s", path)
     return str(path.resolve())
-
 
 def load_predictions(plan_id: str, run_id: str) -> Any:
     """
@@ -119,8 +131,9 @@ def load_predictions(plan_id: str, run_id: str) -> Any:
     if _DF_LIB == "polars":
         return pl.read_parquet(path)
     else:
-        return pd.read_parquet(path)  # type: ignore
-
+        if _HAS_PARQUET:
+            return pd.read_parquet(path)  # type: ignore
+        return pd.read_pickle(path)
 
 # --------------------------------------------------
 # Meta JSON 読み書き
