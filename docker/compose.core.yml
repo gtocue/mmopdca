@@ -116,7 +116,7 @@ services:
     image: gtocue/redis-exporter:prod
     <<: *default-env
     command:
-      - --redis.addr=redis://redis:6379/0
+      - --redis.addr=redis://redis:6379
     healthcheck:
       test: [ "CMD", "curl", "-sf", "http://localhost:9121/metrics", "||", "exit", "1" ]
       <<: *retry
