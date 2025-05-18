@@ -11,8 +11,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List
 
-from pydantic import BaseModel
-
+import uuid
+from pydantic import BaseModel, Field
 
 class PredictionRecord(BaseModel):
     """
@@ -29,10 +29,10 @@ class PredictionRecord(BaseModel):
 
 class PredictionArtifact(BaseModel):
     """
-    複数の PredictionRecord をまとめたアーティファクト。
-    plan_id/run_id と一緒に返却・保存されます。
+    複数の ``PredictionRecord`` をまとめたアーティファクト。
+    ``plan_id`` と ``run_id`` が指定されない場合は自動生成します。
     """
 
-    plan_id: str
-    run_id: str
+    plan_id: str = Field(default_factory=lambda: f"plan-{uuid.uuid4().hex[:8]}")
+    run_id: str = Field(default_factory=lambda: f"run-{uuid.uuid4().hex[:8]}")
     records: List[PredictionRecord]

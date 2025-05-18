@@ -1,7 +1,8 @@
-# core/tasks/do_tasks.py
 # =========================================================
-# Do フェーズの Celery タスク実装
+# File: core/tasks/do_tasks.py
+# Name: Do フェーズの Celery タスク実装
 # =========================================================
+
 from __future__ import annotations
 
 import logging
@@ -21,11 +22,28 @@ def _upsert(do_id: str, rec: Dict[str, Any]) -> None:
     """単純な delete → create で擬似 upsert。"""
     try:
         _do_repo.delete(do_id)
-    except Exception:  # noqa: BLE001 既存なしは無視
+    except Exception:
+        # 存在しない場合などは無視
         pass
     _do_repo.create(do_id, rec)
 
 
+# ----------------------------------------------------------------------
+# テスト用：Heartbeat を毎分プリントするタスク
+# ----------------------------------------------------------------------
+@celery_app.task(name="core.tasks.do_tasks.print_heartbeat")
+def print_heartbeat() -> None:
+    """
+    定期的に heartbeat を標準出力に出すテスト用タスク。
+    UTC のタイムスタンプを [heartbeat] タグ付きで出力します。
+    """
+    ts = datetime.now(timezone.utc).isoformat()
+    print(f"[heartbeat] {ts}")
+
+
+# ----------------------------------------------------------------------
+# メイン：Do フェーズを実行するタスク
+# ----------------------------------------------------------------------
 @celery_app.task(
     name="core.tasks.do_tasks.run_do_task",
     acks_late=True,
@@ -66,8 +84,9 @@ def run_do_task(do_id: str, plan_id: str, params: dict) -> None:  # noqa: ANN001
             },
         )
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.error("Do task failed: %s", exc, exc_info=True)
+        # 4) FAILED
         _upsert(
             do_id,
             {
@@ -78,4 +97,5 @@ def run_do_task(do_id: str, plan_id: str, params: dict) -> None:  # noqa: ANN001
                 "completed_at": datetime.now(timezone.utc).isoformat(),
             },
         )
+        # リトライのため例外を再送出
         raise

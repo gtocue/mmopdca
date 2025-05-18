@@ -161,8 +161,10 @@ def _validate_by_schemas(plan: Dict[str, Any]) -> None:
         section = schema_fp.stem.replace("_schema", "")
         target = plan.get(section) or plan.get("materials", {}).get(section)
         if target is not None:
-            _VALIDATOR.validate_json(target, schema_fp.name)
-
+            if schema_fp.name == "models_schema.json":
+                _VALIDATOR.validate_json({"models": target}, schema_fp.name)
+            else:
+                _VALIDATOR.validate_json(target, schema_fp.name)
 
 # -----------------------------------------------------------------
 # CLI quick-test:
