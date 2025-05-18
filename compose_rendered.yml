@@ -28,7 +28,7 @@ services:
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
       POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
     networks:
       mmopdca_default: null
     restart: unless-stopped
@@ -72,7 +72,7 @@ services:
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
       POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
     networks:
       mmopdca_default: null
     restart: on-failure
@@ -100,7 +100,7 @@ services:
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
       POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
     healthcheck:
       test:
         - CMD
@@ -123,12 +123,11 @@ services:
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
       POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
     healthcheck:
       test:
         - CMD-SHELL
-        - |
-          PGPASSWORD=SuperSafePgPassw0rd! pg_isready -U mmop_user -d mmopdca -q
+        - PGPASSWORD=SuperSafePgPassw0rd! pg_isready -U mmop_user -d mmopdca
       timeout: 5s
       interval: 10s
       retries: 5
@@ -154,7 +153,7 @@ services:
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
       POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
     image: grafana/grafana-oss:10.4.2
     networks:
       mmopdca_default: null
@@ -205,12 +204,13 @@ services:
   redis:
     command:
       - redis-server
+      - --requirepass=
     environment:
       DSL_ROOT: /mnt/data/dsl
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
       POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
     healthcheck:
       test:
         - CMD-SHELL
@@ -219,7 +219,7 @@ services:
       interval: 10s
       retries: 5
       start_period: 20s
-    image: redis:7-alpine
+    image: redis:7.2-alpine
     networks:
       mmopdca_default: null
     restart: unless-stopped
@@ -240,7 +240,7 @@ services:
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
       POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
     healthcheck:
       test:
         - CMD
@@ -284,7 +284,7 @@ services:
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
       POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 遨ｺ縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ縲ょｿ・ｦ√↑繧芽ｨｭ螳・
+      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
     networks:
       mmopdca_default: null
     restart: on-failure
