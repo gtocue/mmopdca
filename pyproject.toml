@@ -11,8 +11,9 @@ keywords     = ["mmopdca", "API", "backend"]
 
 # パッケージレイアウト
 packages = [
-  { include = "mmopdca" },
-  { include = "sdk", from = "." }
+  { include = "api" },
+  { include = "core" },
+  { include = "utils" }
 ]
 include  = [
   "mmopdca/**",
@@ -71,7 +72,7 @@ build-backend = "poetry.core.masonry.api"
 extension-pkg-whitelist = "pydantic"
 
 [tool.mypy]
-files                       = ["mmopdca", "sdk", "tests"]
+files                       = ["api", "core", "utils", "tests"]
 python_version              = "3.11"
 warn_unused_configs         = true
 warn_redundant_casts        = true
@@ -84,5 +85,5 @@ disallow_untyped_decorators = true
 disallow_any_generics       = true
 
 [[tool.mypy.overrides]]
-module = ["mmopdca.configuration", "sdk.configuration"]
+module = ["api", "core"]
 strict = true

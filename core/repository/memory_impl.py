@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 class MemoryRepository:
@@ -28,15 +28,37 @@ class MemoryRepository:
     # CRUD
     # --------------------------------------------------
     def create(self, key: str, record: Dict[str, Any]) -> None:
-        self._store()[key] = record
+        """
+        新規レコード作成。既存キーがあれば KeyError を投げる。
+        """
+        if key in self._store():
+            raise KeyError(f"Record {key!r} already exists")
+        self._store()[key] = record.copy()
 
-    def get(self, key: str) -> Dict[str, Any] | None:
+    def get(self, key: str) -> Optional[Dict[str, Any]]:
+        """
+        レコード取得。存在しなければ None を返す。
+        """
         return self._store().get(key)
 
+    def update(self, key: str, record: Dict[str, Any]) -> None:
+        """
+        既存レコードを更新。存在しなければ KeyError を投げる。
+        """
+        if key not in self._store():
+            raise KeyError(f"Record {key!r} does not exist")
+        self._store()[key] = record.copy()
+
     def delete(self, key: str) -> None:
+        """
+        レコード削除。存在しなくてもエラーにはしない。
+        """
         self._store().pop(key, None)
 
     def list(self) -> List[Dict[str, Any]]:
+        """
+        全レコード一覧を返す。
+        """
         return list(self._store().values())
 
     # --------------------------------------------------
@@ -44,7 +66,7 @@ class MemoryRepository:
     # --------------------------------------------------
     def upsert(self, key: str, record: Dict[str, Any]) -> None:
         """存在すれば更新・無ければ作成。"""
-        self._store()[key] = record
+        self._store()[key] = record.copy()
 
     def put(self, key: str, record: Dict[str, Any]) -> None:
         """metrics_repo 互換エイリアス。"""
