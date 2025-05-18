@@ -28,7 +28,6 @@ broker_url = os.getenv("CELERY_BROKER_URL", default_broker)
 default_backend = broker_url.replace("/0", "/1")
 result_backend = os.getenv("CELERY_RESULT_BACKEND", default_backend)
 
-# Celery アプリケーションのインスタンス化
 celery_app = Celery(
     "mmopdca",
     broker=broker_url,
@@ -53,20 +52,39 @@ celery_app.conf.update(
 
 # ----------------------------------------------------------------------
 # 定期実行ジョブ (beat_schedule) 定義
-# ※ テスト用に「print_heartbeat」を1分ごとに実行する設定を追加
 # ----------------------------------------------------------------------
 celery_app.conf.beat_schedule = {
-    # core/tasks/do_tasks.py に定義した print_heartbeat を毎分実行
-    'print-heartbeat-every-minute': {
-        'task': 'core.tasks.do_tasks.print_heartbeat',
-        'schedule': crontab(minute='*/1'),
+    # 毎分出力テスト用
+    "print-heartbeat-every-minute": {
+        "task": "core.tasks.do_tasks.print_heartbeat",
+        "schedule": crontab(minute="*/1"),
     },
 
-    # 例：他のジョブを追加する場合はここに書き足してください
-    # 'my-other-job': {
-    #     'task': 'core.tasks.do_tasks.my_other_task',
-    #     'schedule': crontab(hour=0, minute=0),
-    # },
+    # 例：run_do_task を毎時 0 分に呼び出す
+    "run-do-task-every-hour": {
+        "task": "core.tasks.do_tasks.run_do_task",
+        # 毎時 0 分に実行
+        "schedule": crontab(minute=0),
+        # ここを運用実行時の引数に置き換えてください
+        "args": (
+            "do-<your-id>-every-hour",    # do_id
+            "plan-<your-plan-id>",        # plan_id
+            {"param1": "foo", "param2": 42},  # params
+        ),
+    },
+
+    # 例：毎日深夜 1 時に実行するタスク
+    "daily-retrain-plan": {
+        "task": "core.tasks.do_tasks.run_do_task",
+        "schedule": crontab(hour=1, minute=0),
+        "args": (
+            "do-retrain-{{ds}}",    # 任意の識別子（例: 日付埋込み可）
+            "plan-retrain",         # リトレイン用プランID
+            {"epochs": 5},          # 任意のパラメータ
+        ),
+    },
+
+    # 他のタスクを追加する場合は、同様にキーを定義してください...
 }
 
 # ----------------------------------------------------------------------
@@ -74,7 +92,7 @@ celery_app.conf.beat_schedule = {
 # core/tasks/do_tasks.py 内の @shared_task デコレータ付きタスクを登録
 # ----------------------------------------------------------------------
 celery_app.autodiscover_tasks(
-    ['core.tasks.do_tasks'],
-    related_name='tasks',
+    ["core.tasks.do_tasks"],
+    related_name="tasks",
     force=True,
 )
