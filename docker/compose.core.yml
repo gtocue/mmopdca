@@ -14,7 +14,7 @@ services:
   api:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.main_api
+      dockerfile: Dockerfile.main_api
     user: "1000:1000"
     <<: *default-env
     environment:
@@ -47,7 +47,7 @@ services:
   worker:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.worker # ← ここを指定
+      dockerfile: Dockerfile.worker
       target: runtime
     user: "1000:1000"
     <<: *default-env
@@ -79,7 +79,7 @@ services:
   beat:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.worker # ← 必要なら同じ Worker 用 Dockerfile を指定
+      dockerfile: Dockerfile.worker
       target: runtime
     user: root
     <<: *default-env

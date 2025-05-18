@@ -10,11 +10,12 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     build-essential \
+    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy poetry configuration and install dependencies
 COPY pyproject.toml poetry.lock* README.md ./
-RUN pip install --no-cache-dir --upgrade pip poetry \
+RUN pip install --no-cache-dir --upgrade pip poetry poetry-plugin-export \
     && rm -f poetry.lock \
     && poetry export -f requirements.txt --output requirements.txt --without-hashes \
     && pip install --no-cache-dir -r requirements.txt
