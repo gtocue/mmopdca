@@ -1,24 +1,18 @@
-version: "3.9" # v3.9 警告は無害
+# docker/compose.db.yml
+version: "3.9"
 
 services:
   db:
     image: postgres:16-alpine
     env_file:
       - ../.env
-
     volumes:
       - pg_data:/var/lib/postgresql/data
-
-    # コンテナ内で ${VAR} を評価するために CMD-SHELL を利用
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >
-          PGPASSWORD=${POSTGRES_PASSWORD} pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -q
+      test: [ "CMD-SHELL", "PGPASSWORD=${POSTGRES_PASSWORD} pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -q" ]
       interval: 10s
       timeout: 5s
       retries: 5
-
     networks:
       - mmopdca_default
     restart: unless-stopped

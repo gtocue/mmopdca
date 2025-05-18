@@ -1,32 +1,33 @@
-# ────────── FastAPI イメージ ──────────
-FROM python:3.11-slim AS runtime
+# Dockerfile.main_api
+FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    DSL_ROOT=/mnt/data/dsl \
-    PIP_NO_CACHE_DIR=1
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential dos2unix && \
-    rm -rf /var/lib/apt/lists/*
-
+# 作業ディレクトリ
 WORKDIR /app
 
-# --- ① Poetry 依存 ---
-COPY pyproject.toml ./
-RUN pip install --upgrade pip poetry && \
-    poetry config virtualenvs.create false && \
-    poetry install --no-interaction --no-ansi --without dev --no-root
+# 依存関係を先にコピーしてキャッシュ活用
+COPY pyproject.toml poetry.lock ./
 
-# --- ② アプリ本体 ---
+# Poetry と依存ライブラリのインストール
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential dos2unix \
+    && pip install --upgrade pip poetry \
+    && poetry config virtualenvs.create false \
+    && poetry install --no-root --no-dev
+
+# form-data & JSONSchema 用パッケージを確実にインストール
+RUN pip install python-multipart jsonschema
+
+# アプリケーションコードと起動スクリプト
 COPY . .
-# --- init script ---
 COPY ops/init-dsl.sh /usr/local/bin/docker-entrypoint-init-dsl.sh
+
+# 改行コード変換＋実行権限付与
 RUN dos2unix /usr/local/bin/docker-entrypoint-init-dsl.sh \
     && chmod +x /usr/local/bin/docker-entrypoint-init-dsl.sh
 
-# --- ③ ここで DSL_ROOT を必ず作成 ---
-RUN mkdir -p "${DSL_ROOT}"
+# DSL データ用ディレクトリ作成（Compose 側で mount される）
+RUN mkdir -p /mnt/data/dsl
 
-EXPOSE 8001
-CMD ["uvicorn", "api.main_api:app", "--host", "0.0.0.0", "--port", "8001", "--proxy-headers"]
+# コンテナ起動時
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-init-dsl.sh"]
+CMD ["python", "-m", "uvicorn", "api.main_api:app", "--host", "0.0.0.0", "--port", "8001", "--proxy-headers"]

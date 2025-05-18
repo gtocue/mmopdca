@@ -1,10 +1,12 @@
-######################## docker/compose.core.yml ########################
-# Docker Compose V2 向け。version: は省略可。
-# depends_on は単純なリストに統一。
+# docker/compose.core.yml
+version: "3.9"
 
+# 共通定義
 x-env: &default-env
-  env_file: [ ../.env ]
+  env_file:
+    - ../.env
 
+# depends_on の healthcheck 用
 x-retry: &retry
   interval: 10s
   timeout: 5s
@@ -20,9 +22,11 @@ services:
     <<: *default-env
     environment:
       - DSL_ROOT
-      - CELERY_BROKER_URL
-      - CELERY_RESULT_BACKEND
-    entrypoint: [ "/usr/local/bin/docker-entrypoint-init-dsl.sh" ]
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CKPT_DIR=/mnt/checkpoints
+    entrypoint:
+      - /usr/local/bin/docker-entrypoint-init-dsl.sh
     command:
       - python
       - -m
@@ -35,8 +39,10 @@ services:
       - dsl_data:/mnt/data/dsl
       - checkpoints_data:/mnt/checkpoints
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - mmopdca_default
     restart: unless-stopped
@@ -50,21 +56,25 @@ services:
     <<: *default-env
     environment:
       - DSL_ROOT
-      - CELERY_BROKER_URL
-      - CELERY_RESULT_BACKEND
-    entrypoint: [ "/usr/local/bin/docker-entrypoint-init-dsl.sh" ]
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CKPT_DIR=/mnt/checkpoints
+    entrypoint:
+      - /usr/local/bin/docker-entrypoint-init-dsl.sh
     command:
       - celery
       - -A
       - core.celery_app:celery_app
       - worker
-      - "--loglevel=info"
+      - --loglevel=info
     volumes:
       - dsl_data:/mnt/data/dsl
       - checkpoints_data:/mnt/checkpoints
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - mmopdca_default
     restart: on-failure
@@ -74,20 +84,19 @@ services:
       context: ..
       dockerfile: Dockerfile
       target: runtime
-    # root で起動し、ディレクトリ権限を緩めてから init-dsl → celery beat を実行
     user: root
     <<: *default-env
     environment:
       - DSL_ROOT
-      - CELERY_BROKER_URL
-      - CELERY_RESULT_BACKEND
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DO_TOTAL_SHARDS
+      - CKPT_DIR=/mnt/checkpoints
     entrypoint:
       - sh
       - -c
       - |
-        mkdir -p /mnt/checkpoints
-        chmod 0777 /mnt/checkpoints
+        mkdir -p /mnt/checkpoints && chmod 0777 /mnt/checkpoints
         exec /usr/local/bin/docker-entrypoint-init-dsl.sh \
           celery -A core.celery_app:celery_app \
           beat --loglevel=info \
@@ -96,41 +105,14 @@ services:
       - dsl_data:/mnt/data/dsl
       - checkpoints_data:/mnt/checkpoints
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - mmopdca_default
     restart: on-failure
 
-  ## データストア
-  db:
-    image: postgres:16-alpine
-    <<: *default-env
-    healthcheck:
-      test: [ "CMD-SHELL", "PGPASSWORD=${POSTGRES_PASSWORD} pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
-      <<: *retry
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    networks:
-      - mmopdca_default
-    restart: unless-stopped
-
-  redis:
-    image: redis:7.2-alpine
-    <<: *default-env
-    command:
-      - redis-server
-      - "--requirepass="
-    healthcheck:
-      test: [ "CMD-SHELL", "redis-cli ping" ]
-      <<: *retry
-    volumes:
-      - redis_data:/data
-    networks:
-      - mmopdca_default
-    restart: unless-stopped
-
-  ## Exporter（本番用イメージに差し替え、ヘルスチェック有効化）
   redis-exporter:
     image: gtocue/redis-exporter:prod
     <<: *default-env
@@ -138,11 +120,10 @@ services:
       - --redis.addr=redis://redis:6379/0
     healthcheck:
       test: [ "CMD", "curl", "-sf", "http://localhost:9121/metrics", "||", "exit", "1" ]
-      interval: 10s
-      timeout: 2s
-      retries: 3
+      <<: *retry
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     networks:
       - mmopdca_default
     restart: unless-stopped
@@ -157,16 +138,14 @@ services:
       - CE_RETRY_INTERVAL=5
     healthcheck:
       test: [ "CMD", "curl", "-sf", "http://localhost:9808/metrics", "||", "exit", "1" ]
-      interval: 10s
-      timeout: 2s
-      retries: 3
+      <<: *retry
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     networks:
       - mmopdca_default
     restart: unless-stopped
 
-  ## 監視スタック
   prom:
     image: prom/prometheus:v2.52.0
     command:
@@ -177,8 +156,10 @@ services:
       - ../prom/rules_mmopdca.yml:/etc/prometheus/rules_mmopdca.yml:ro
       - prom_data:/prometheus
     depends_on:
-      - redis-exporter
-      - celery-exporter
+      redis-exporter:
+        condition: service_started
+      celery-exporter:
+        condition: service_started
     networks:
       - mmopdca_default
     restart: unless-stopped
@@ -193,7 +174,8 @@ services:
       - grafana_data:/var/lib/grafana
       - ../grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
-      - prom
+      prom:
+        condition: service_started
     networks:
       - mmopdca_default
     restart: unless-stopped

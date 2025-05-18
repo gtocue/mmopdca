@@ -6,7 +6,6 @@
 
 import os
 from pathlib import Path
-
 from dotenv import load_dotenv
 from celery import Celery
 
@@ -20,15 +19,18 @@ load_dotenv(dotenv_path=dotenv_path)
 # ----------------------------------------------------------------------
 # Celery ブローカー／バックエンド設定
 # ----------------------------------------------------------------------
-# REDIS_URL を優先的に読み込み。未設定時は REDIS_PASSWORD／REDIS_HOST から組み立てる
+# Redis 用設定
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
-REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
-broker_url = os.environ.get(
-    "REDIS_URL", f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
-)
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+# デフォルトの broker_url
+default_broker = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:6379/0"
+# 環境変数 CELERY_BROKER_URL があれば優先
+broker_url = os.getenv("CELERY_BROKER_URL", default_broker)
 
-# CELERY_RESULT_BACKEND を優先的に読み込み。未設定時は broker_url の別データベースにする
-result_backend = os.environ.get("CELERY_RESULT_BACKEND", broker_url.replace("/0", "/1"))
+# デフォルトの result_backend は broker の DB1
+default_backend = broker_url.replace("/0", "/1")
+# 環境変数 CELERY_RESULT_BACKEND があれば優先
+result_backend = os.getenv("CELERY_RESULT_BACKEND", default_backend)
 
 # Celery アプリケーションのインスタンス化
 celery_app = Celery(
@@ -41,17 +43,18 @@ celery_app = Celery(
 # Eager モード設定（同期実行・例外伝播）
 # ----------------------------------------------------------------------
 # CI／テスト環境では .env.ci から以下の環境変数を渡す想定
-always_eager = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "false").lower() in (
+always_eager = os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() in (
     "1",
     "true",
     "yes",
 )
-eager_propagates = os.environ.get("CELERY_TASK_EAGER_PROPAGATES", "false").lower() in (
+eager_propagates = os.getenv("CELERY_TASK_EAGER_PROPAGATES", "false").lower() in (
     "1",
     "true",
     "yes",
 )
 
+# Eager モードの設定を更新
 celery_app.conf.update(
     # タスクを同期実行するかどうか
     task_always_eager=always_eager,
@@ -65,4 +68,6 @@ celery_app.conf.update(
 # タスク定義の自動読み込み
 # core/tasks/do_tasks.py 内の @shared_task デコレータ付きタスクを登録
 # ----------------------------------------------------------------------
-celery_app.autodiscover_tasks(["core.tasks.do_tasks"], related_name="tasks", force=True)
+celery_app.autodiscover_tasks([
+    "core.tasks.do_tasks"
+], related_name="tasks", force=True)

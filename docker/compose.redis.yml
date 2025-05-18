@@ -1,3 +1,4 @@
+# docker/compose.redis.yml
 version: "3.9"
 
 services:
@@ -5,24 +6,16 @@ services:
     image: redis:7-alpine
     env_file:
       - ../.env
-
-    # 認証を切ってシンプル起動
-    command: >
-      redis-server
-
-    # PING だけチェックすれば OK
+    command: redis-server
     healthcheck:
       test: [ "CMD-SHELL", "redis-cli ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
-
     volumes:
       - redis_data:/data
-
     networks:
       - mmopdca_default
-
     restart: unless-stopped
 
 volumes:
