@@ -1,12 +1,11 @@
-# docker/compose.core.yml
 version: "3.9"
 
-# 共通定義
+# 共通 env_file 定義
 x-env: &default-env
   env_file:
     - ../.env
 
-# depends_on の healthcheck 用
+# Healthcheck リトライ設定
 x-retry: &retry
   interval: 10s
   timeout: 5s
@@ -183,8 +182,6 @@ services:
 volumes:
   dsl_data:
   checkpoints_data:
-  pg_data:
-  redis_data:
   prom_data:
   grafana_data:
 
