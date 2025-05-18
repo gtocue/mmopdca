@@ -12,8 +12,8 @@ FastAPI を入口に、バックエンドでは sklearn / yfinance / pandas 等�
 ```bash
 git clone https://github.com/your/mmopdca && cd mmopdca
 python -m venv .venv && source .venv/bin/activate  # Windows は .venv\Scripts\Activate
-poetry install --with dev
-poetry run uvicorn api.main:app --reload
+pip install -e ".[dev]"                      # dev 依存を含めてインストール
+uvicorn api.main_api:app --reload                # または ``poetry run``
 
 ## 📝 Plan DSL Loader Example
 To load a DSL file and merge defaults from the built-in models schema, run:

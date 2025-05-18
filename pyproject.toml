@@ -13,7 +13,8 @@ keywords     = ["mmopdca", "API", "backend"]
 packages = [
   { include = "api" },
   { include = "core" },
-  { include = "utils" }
+  { include = "utils" },
+  { include = "scripts" }
 ]
 include  = [
   "mmopdca_sdk/py.typed"

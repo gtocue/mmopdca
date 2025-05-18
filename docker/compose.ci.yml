@@ -59,7 +59,7 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=14d
     volumes:
-      - ./prom:/etc/prometheus:ro
+      - ../prom:/etc/prometheus:ro
     depends_on: [ redis-exporter, celery-exporter ]
     ports: [ "9090:9090" ]
 
