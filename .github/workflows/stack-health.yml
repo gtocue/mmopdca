@@ -44,7 +44,7 @@ jobs:
             curl -fs http://localhost:9808/metrics   && exit 0
             sleep 4
           done
-          echo "Timeout"; docker compose logs --tail=50; exit 1
+          echo "Timeout"; docker compose -f docker/compose.ci.yml logs --tail=50; exit 1
 
       - name: Docker Compose down
         if: always()
