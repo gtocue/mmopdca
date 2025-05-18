@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential && \
+    apt-get install -y --no-install-recommends build-essential dos2unix && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -20,7 +20,7 @@ RUN pip install --upgrade pip poetry && \
 
 # --- ② アプリ本体 ---
 COPY . .
-# Copy the initialization script and ensure it is executable
+# --- init script ---
 COPY ops/init-dsl.sh /usr/local/bin/docker-entrypoint-init-dsl.sh
 RUN dos2unix /usr/local/bin/docker-entrypoint-init-dsl.sh \
     && chmod +x /usr/local/bin/docker-entrypoint-init-dsl.sh

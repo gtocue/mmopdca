@@ -1,24 +1,24 @@
-#################### ディレクトリ除外 ####################
+#################### Directories to ignore ####################
 .git/
 __pycache__/
 tests/
 notebooks/
-k8s/
+infra/k8s/
 infra/terraform/
 .idea/
 .vscode/
-ops/**                      # ← まず ops 配下をすべて除外
+ ops/
 
-#################### ファイル除外 ####################
+#################### Files to ignore ####################
 *.pyc
 *.pyo
 *.pyd
 *.sqlite*
 *.db
 *.log
-.gitignore                  # （誤って commit しないため明示）
+.gitignore
 
-#################### 例外で拾い直す ####################
+#################### Exceptions ####################
 !pyproject.toml
 !poetry.lock
-!ops/init-dsl.sh            # ← 必要なシェルだけ再包含
+!ops/init-dsl.sh
