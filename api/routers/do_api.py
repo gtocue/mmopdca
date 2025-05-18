@@ -137,7 +137,7 @@ def get_do_status(task_id: str) -> Dict[str, Any]:
             payload["result"] = result.result  # type: ignore[assignment]
     except AttributeError:
         payload = {"state": states.SUCCESS}
-            except Exception as exc:  # celery.backends.base.DisabledBackend is not an Exception
+    except Exception as exc:  # celery.backends.base.DisabledBackend is not an Exception
         if isinstance(exc, DisabledBackend):
             payload = {"state": states.SUCCESS}
         else:

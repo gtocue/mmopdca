@@ -1,3 +1,4 @@
+# docker/compose.core.yml
 version: "3.9"
 
 # 共通 env_file 定義
@@ -42,11 +43,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    ports:
+      - "8001:8001"
     networks:
       - mmopdca_default
     restart: unless-stopped
-    ports:
-      - "8001:8001"
 
   worker:
     build:
@@ -124,6 +125,8 @@ services:
       <<: *retry
     volumes:
       - redis_data:/data
+    ports:
+      - "6379:6379"
     networks:
       - mmopdca_default
     restart: unless-stopped
@@ -135,11 +138,11 @@ services:
       - "--redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379"
     healthcheck:
       disable: true
+    ports:
+      - "9121:9121"
     networks:
       - mmopdca_default
     restart: unless-stopped
-    ports:
-      - "9121:9121"
 
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
@@ -149,11 +152,11 @@ services:
       - CE_PORT=9808
     healthcheck:
       disable: true
+    ports:
+      - "9808:9808"
     networks:
       - mmopdca_default
     restart: unless-stopped
-    ports:
-      - "9808:9808"
 
   db:
     image: postgres:16-alpine
@@ -167,6 +170,8 @@ services:
       <<: *retry
     volumes:
       - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     networks:
       - mmopdca_default
     restart: unless-stopped
@@ -185,11 +190,11 @@ services:
         condition: service_started
       celery-exporter:
         condition: service_started
+    ports:
+      - "9090:9090"
     networks:
       - mmopdca_default
     restart: unless-stopped
-    ports:
-      - "9090:9090"
 
   grafana:
     image: grafana/grafana-oss:10.4.2
@@ -203,11 +208,24 @@ services:
     depends_on:
       prom:
         condition: service_started
+    ports:
+      - "3000:3000"
     networks:
       - mmopdca_default
     restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    <<: *default-env
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     ports:
-      - "3000:3000"
+      - "9093:9093"
+    networks:
+      - mmopdca_default
+    restart: unless-stopped
 
 volumes:
   dsl_data:

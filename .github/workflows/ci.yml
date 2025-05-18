@@ -33,7 +33,7 @@ jobs:
       - name: Install root + SDK (+dev) deps
         run: |
           python -m venv .venv
-          . .venv/bin/activate
+          source .venv/bin/activate
           pip install --upgrade pip
           pip install -e ".[dev]"
           pip install -e "sdk-py[dev]"
@@ -44,7 +44,7 @@ jobs:
           MMOP_BASE_URL: http://localhost:8001
           CKPT_ROOT: ${{ runner.temp }}/mmop_ckpt
         run: |
-          . .venv/bin/activate
+          source .venv/bin/activate
           python sdk-py/examples/quickstart.py
 
       # 6) pytest
@@ -52,5 +52,5 @@ jobs:
         env:
           CKPT_ROOT: ${{ runner.temp }}/mmop_ckpt
         run: |
-          . .venv/bin/activate
+          source .venv/bin/activate
           pytest -q

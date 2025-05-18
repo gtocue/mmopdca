@@ -1,6 +1,6 @@
 # =========================================================
 # File: core/tasks/do_tasks.py
-# Name: Do フェーズの Celery タスク実装
+# Name: Do フェーズ & 運用タスクの Celery タスク実装
 # =========================================================
 
 from __future__ import annotations
@@ -13,6 +13,9 @@ from core.celery_app import celery_app
 from core.do.coredo_executor import run_do
 from core.repository.factory import get_repo
 from core.schemas.do_schemas import DoStatus
+
+# MD5 検証用ユーティリティを import
+from scripts.md5_check import check_s3_md5
 
 logger = logging.getLogger(__name__)
 _do_repo = get_repo("do")
@@ -39,6 +42,26 @@ def print_heartbeat() -> None:
     """
     ts = datetime.now(timezone.utc).isoformat()
     print(f"[heartbeat] {ts}")
+
+
+# ----------------------------------------------------------------------
+# 運用用：S3 上のファイルに対する MD5 検証ジョブ
+# ----------------------------------------------------------------------
+@celery_app.task(name="core.tasks.do_tasks.s3_md5_check")
+def s3_md5_check(bucket: str, key: str) -> None:
+    """
+    指定の S3 バケット/キーにあるファイルの MD5 をチェックし、結果をログ出力。
+    """
+    try:
+        ok, expected, actual = check_s3_md5(bucket, key)
+        status = "OK" if ok else "MISMATCH"
+        logger.info(
+            "[md5-check] %s/%s → %s (expected=%s actual=%s)",
+            bucket, key, status, expected, actual
+        )
+    except Exception as exc:
+        logger.error("[md5-check] エラー %s/%s: %s", bucket, key, exc, exc_info=True)
+        raise
 
 
 # ----------------------------------------------------------------------

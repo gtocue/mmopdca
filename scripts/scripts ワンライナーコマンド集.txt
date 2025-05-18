@@ -2,3 +2,5 @@
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 .\scripts\Test-ProdJob.ps1 -WaitSeconds 70
 
+# run S3 Md5 Test.ps1
+.\.venv\Scripts\Activate.ps1; pytest tests/test_s3_md5_check.py -q

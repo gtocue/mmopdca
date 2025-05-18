@@ -60,36 +60,40 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute="*/1"),
     },
 
-    # 例：run_do_task を毎時 0 分に呼び出す
+    # 実運用：S3 MD5 チェックを毎時 0 分に実行
+    "s3-md5-check-every-hour": {
+        "task": "core.tasks.do_tasks.s3_md5_check",
+        "schedule": crontab(minute=0),
+        # ここは実際のバケット名／キーに置き換えてください
+        "args": ("your-dsl-bucket-name", "path/to/your/script.py"),
+    },
+
+    # メイン Do タスクを毎時 0 分に呼び出す例
     "run-do-task-every-hour": {
         "task": "core.tasks.do_tasks.run_do_task",
-        # 毎時 0 分に実行
         "schedule": crontab(minute=0),
-        # ここを運用実行時の引数に置き換えてください
         "args": (
-            "do-<your-id>-every-hour",    # do_id
-            "plan-<your-plan-id>",        # plan_id
+            "do-hourly-0001",         # do_id
+            "plan-hourly-execution",  # plan_id
             {"param1": "foo", "param2": 42},  # params
         ),
     },
 
-    # 例：毎日深夜 1 時に実行するタスク
+    # 日次深夜 1:00 実行タスク例
     "daily-retrain-plan": {
         "task": "core.tasks.do_tasks.run_do_task",
         "schedule": crontab(hour=1, minute=0),
         "args": (
-            "do-retrain-{{ds}}",    # 任意の識別子（例: 日付埋込み可）
-            "plan-retrain",         # リトレイン用プランID
-            {"epochs": 5},          # 任意のパラメータ
+            "do-retrain-{{ds}}",  # 任意フォーマット可
+            "plan-retrain",
+            {"epochs": 5},
         ),
     },
-
-    # 他のタスクを追加する場合は、同様にキーを定義してください...
 }
 
 # ----------------------------------------------------------------------
 # タスク定義の自動読み込み
-# core/tasks/do_tasks.py 内の @shared_task デコレータ付きタスクを登録
+# core/tasks/do_tasks.py 内の @celery_app.task デコレータ付きタスクを登録
 # ----------------------------------------------------------------------
 celery_app.autodiscover_tasks(
     ["core.tasks.do_tasks"],
