@@ -4,10 +4,9 @@ services:
     image: redis:7-alpine
     env_file:
       - ../.env
-    command: >
-      redis-server ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
+    command: [ "sh", "-c", "exec redis-server ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}" ]
     healthcheck:
-      test: [ "CMD-SHELL", "redis-cli ${REDIS_PASSWORD:+-a ${REDIS_PASSWORD}} ping" ]
+      test: [ "CMD-SHELL", "redis-cli ${REDIS_PASSWORD:+-a $REDIS_PASSWORD} ping" ]
       interval: 10s
       timeout: 5s
       retries: 5

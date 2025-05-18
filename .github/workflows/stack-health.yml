@@ -1,9 +1,11 @@
-# GitHub Actions - Docker Stack Health
-name: stack-health        # ← ASCII のみ
+# .github/workflows/stack-health.yml
+name: stack-health
 
 on:
   push:
-    branches: [ main, develop ]
+    branches:
+      - main
+      - develop
   pull_request: {}
 
 jobs:
@@ -11,13 +13,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4      # 基本ステップ :contentReference[oaicite:0]{index=0}
-      - uses: docker/setup-buildx-action@v3  # buildx 初期化 :contentReference[oaicite:1]{index=1}
+      # 1) リポジトリをチェックアウト
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # ---------- .env を生成 ----------
+      # 2) Docker Buildx のセットアップ
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 3) .env ファイルを生成
       - name: Create .env
         run: |
-          cat > .env <<'EOF'
+          cat > .env << 'EOF'
           POSTGRES_DB=mmopdca
           POSTGRES_USER=mmop_user
           POSTGRES_PASSWORD=password
@@ -25,27 +32,37 @@ jobs:
           DSL_ROOT=/mnt/data/dsl
           TZ=UTC
           EOF
+          echo ">>> .env preview:"
           head -n 10 .env
 
-      # ---------- Stack 起動 ----------
+      # 4) スタックを起動
       - name: Docker Compose up
         run: |
-          docker compose --env-file .env -f docker/compose.ci.yml up -d --build
-          docker compose --env-file .env -f docker/compose.ci.yml ps
+          docker compose --env-file .env \
+            -f docker/compose.ci.yml up -d --build
+          docker compose --env-file .env \
+            -f docker/compose.ci.yml ps
 
-      # ---------- ヘルス待ち ----------
+      # 5) 各サービスのヘルスチェック待ち
       - name: Wait for endpoints
         run: |
           set -eu
           for i in {1..30}; do
-            curl -fs http://localhost:8001/docs      && \
-            curl -fs http://localhost:9090/          && \
-            curl -fs http://localhost:9121/metrics   && \
-            curl -fs http://localhost:9808/metrics   && exit 0
+            curl -fs http://localhost:8001/docs \
+              && curl -fs http://localhost:9090/ \
+              && curl -fs http://localhost:9121/metrics \
+              && curl -fs http://localhost:9808/metrics \
+              && echo "All endpoints are healthy!" \
+              && exit 0
+            echo "Waiting for services to become healthy... ($i/30)"
             sleep 4
           done
-          echo "Timeout"; docker compose -f docker/compose.ci.yml logs --tail=50; exit 1
+          echo "Timed out waiting for services."
+          docker compose -f docker/compose.ci.yml logs --tail=50
+          exit 1
 
+      # 6) スタックを停止・クリーンアップ
       - name: Docker Compose down
         if: always()
-        run: docker compose -f docker/compose.ci.yml down -v --remove-orphans
+        run: |
+          docker compose -f docker/compose.ci.yml down -v --remove-orphans

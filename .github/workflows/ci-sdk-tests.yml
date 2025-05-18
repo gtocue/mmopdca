@@ -1,46 +1,54 @@
 name: sdk-tests
 
 on:
-  push:          { branches: [main, feature/api-only-day1] }
-  pull_request:  { branches: [main] }
+  push:
+    branches: [main, feature/api-only-day1]
+  pull_request:
+    branches: [main]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11']          # 〃 matrix 形式で拡張しやすく
+        python-version: ['3.11']
 
     steps:
-      # 1) ソース取得
       - uses: actions/checkout@v4
 
-      # 2) Python + pip キャッシュ
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: pip                     # 自動で ~/.cache/pip をキャッシュ
+          cache: pip
 
-      # 3) 依存インストール
-      - name: Install root + SDK (+dev) deps
+      - name: Install dependencies
         run: |
           python -m venv .venv
           source .venv/bin/activate
           pip install --upgrade pip
-          pip install -e ".[dev]"          # ルート
-          pip install -e "sdk-py[dev]"     # SDK
+          pip install -e ".[dev]"
+          pip install -e "sdk-py[dev]"
           if [ -f requirements-ci.txt ]; then pip install -r requirements-ci.txt; fi
 
-      # 4) Quickstart 動作確認
+      - name: Start local API server
+        run: |
+          source .venv/bin/activate
+          # バックグラウンドで起動
+          uvicorn api.main_api:app --host 0.0.0.0 --port 8001 &
+          # /health が応答するまで最大20秒待つ
+          for i in {1..20}; do
+            curl -fs http://localhost:8001/health && break
+            sleep 1
+          done
+
       - name: Run SDK quickstart example
+        env:
+          MMOP_BASE_URL: http://localhost:8001
+          CKPT_ROOT: ${{ runner.temp }}/mmop_ckpt
         run: |
           source .venv/bin/activate
           python sdk-py/examples/quickstart.py
-        env:
-          MMOP_BASE_URL: http://localhost:8001
-          CKPT_ROOT: ${{ runner.temp }}/mmop_ckpt   # ← チェックポイント権限対策
 
-      # 5) pytest
       - name: Run pytest
         env:
           CKPT_ROOT: ${{ runner.temp }}/mmop_ckpt

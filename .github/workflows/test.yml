@@ -1,0 +1,51 @@
+# .github/workflows/test.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # 1) リポジトリをチェックアウト
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2) Python と pip キャッシュの準備
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      # 3) mmopdcaスタックを起動
+      - name: Start mmopdca stack
+        run: |
+          docker compose --env-file .env -f docker/compose.ci.yml up -d --build
+
+      # 4) HTTP ヘルスチェックが 200 になるまで待機
+      - name: Wait for API health endpoint
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent http://localhost:8001/health; then
+              echo "API is up!"
+              break
+            fi
+            echo "Waiting for API..."
+            sleep 2
+          done
+
+      # 5) pytest を実行
+      - name: Run pytest
+        run: |
+          pytest -q
+
+      # 6) スタックをクリーンアップ
+      - name: Tear down mmopdca stack
+        if: always()
+        run: |
+          docker compose -f docker/compose.ci.yml down -v --remove-orphans

@@ -1,8 +1,13 @@
 name: CI
 
 on:
-  push:          { branches: [main, feature/api-only-day1] }
-  pull_request:  { branches: [main] }
+  push:
+    branches:
+      - main
+      - feature/api-only-day1
+  pull_request:
+    branches:
+      - main
 
 jobs:
   test:
@@ -12,25 +17,43 @@ jobs:
       matrix:
         python-version: ['3.11']
 
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: mmopdca
+          POSTGRES_USER: mmopdca
+          POSTGRES_PASSWORD: mmopdca
+        ports: ['5432:5432']
+      prom:
+        image: prom/prometheus:v2.52.0
+        ports: ['9090:9090']
+      grafana:
+        image: grafana/grafana-oss:10.4.2
+        ports: ['3000:3000']
+
     steps:
-      # 1) ソース取得
+      # 1) コード取得
       - uses: actions/checkout@v4
 
-      # 2) Python + pip キャッシュ
+      # 2) Python 環境 & pip キャッシュ
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      # 3) ワークスペース概要 (デバッグ用)
-      - name: Show workspace tree (debug)
+      # 3) ワークスペース構造の表示（デバッグ用）
+      - name: Show workspace
         run: |
-          echo "::group::workspace"
-          (command -v tree >/dev/null && tree -L 2) || ls -R | head -100
+          echo "::group::Workspace"
+          tree -L 2 || ls -R | head -n 100
           echo "::endgroup::"
 
       # 4) 依存インストール
-      - name: Install root + SDK (+dev) deps
+      - name: Install dependencies
         run: |
           python -m venv .venv
           source .venv/bin/activate
@@ -39,8 +62,26 @@ jobs:
           pip install -e "sdk-py[dev]"
           if [ -f requirements-ci.txt ]; then pip install -r requirements-ci.txt; fi
 
-      # 5) Quickstart サンプル
-      - name: Run SDK quickstart example
+      # 5) Docker Compose でサービス起動
+      - name: Start MMOPDCA services
+        run: |
+          source .venv/bin/activate
+          docker-compose -f docker/compose.core.yml \
+                         -f docker/compose.db.yml \
+                         -f docker/compose.redis.yml up -d --build
+      - name: Wait for API healthy
+        run: |
+          source .venv/bin/activate
+          for i in {1..30}; do
+            if curl -sSf http://localhost:8001/health; then
+              echo "API ready"; break
+            fi
+            echo "Waiting for API... ($i)"
+            sleep 2
+          done
+
+      # 6) SDK Quickstart サンプル実行
+      - name: Run SDK quickstart
         env:
           MMOP_BASE_URL: http://localhost:8001
           CKPT_ROOT: ${{ runner.temp }}/mmop_ckpt
@@ -48,10 +89,30 @@ jobs:
           source .venv/bin/activate
           python sdk-py/examples/quickstart.py
 
-      # 6) pytest
-      - name: Run pytest
-        env:
-          CKPT_ROOT: ${{ runner.temp }}/mmop_ckpt
+      # 7) Pytest: ユニットテスト
+      - name: Run unit tests
         run: |
           source .venv/bin/activate
-          pytest -q
+          pytest -q --maxfail=1 --disable-warnings tests/unit
+
+      # 8) Pytest: 統合テスト
+      - name: Run integration tests
+        run: |
+          source .venv/bin/activate
+          pytest -q --maxfail=1 --disable-warnings tests/integration
+
+      # 9) Pytest: E2Eテスト
+      - name: Run e2e tests
+        env:
+          API_BASE_URL: http://localhost:8001
+        run: |
+          source .venv/bin/activate
+          pytest -q --maxfail=1 --disable-warnings tests/e2e
+
+      # 10) サービス停止
+      - name: Tear down services
+        if: always()
+        run: |
+          docker-compose -f docker/compose.core.yml \
+                         -f docker/compose.db.yml \
+                         -f docker/compose.redis.yml down -v
