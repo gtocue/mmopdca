@@ -24,6 +24,7 @@ WORKDIR /app
 # Poetry インストール＆依存解決
 COPY pyproject.toml poetry.lock* README.md ./
 RUN pip install --no-cache-dir --upgrade pip poetry \
+    && rm -f poetry.lock \
     && poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --without dev --no-root
 

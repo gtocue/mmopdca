@@ -17,6 +17,7 @@ WORKDIR /app
 # 依存定義の先読み
 COPY pyproject.toml poetry.lock* ./
 RUN pip install --no-cache-dir --upgrade pip poetry \
+    && rm -f poetry.lock \
     && poetry config virtualenvs.create false \
     && poetry install --no-root --no-interaction --no-ansi --without dev \
     && pip install python-multipart
