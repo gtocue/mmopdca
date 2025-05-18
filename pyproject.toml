@@ -16,7 +16,6 @@ packages = [
   { include = "utils" }
 ]
 include  = [
-  "mmopdca/**",
   "mmopdca_sdk/py.typed"
 ]
 
@@ -39,6 +38,7 @@ yfinance          = "^0.2"
 python-multipart  = "^0.0.6"
 # JSON Schema 検証用
 jsonschema        = "^4.19.0"
+fastjsonschema    = "^2.19"
 pyyaml            = "^6"
 
 [tool.poetry.group.dev.dependencies]
