@@ -43,6 +43,8 @@ services:
     networks:
       - mmopdca_default
     restart: unless-stopped
+    ports:
+      - "8001:8001"
 
   worker:
     build:
@@ -136,6 +138,8 @@ services:
     networks:
       - mmopdca_default
     restart: unless-stopped
+  ports:
+    - "9121:9121"
 
   celery-exporter:
     image: danihodovic/celery-exporter:0.9.1
@@ -148,6 +152,8 @@ services:
     networks:
       - mmopdca_default
     restart: unless-stopped
+    ports:
+      - "9808:9808"
 
   db:
     image: postgres:16-alpine
@@ -182,6 +188,8 @@ services:
     networks:
       - mmopdca_default
     restart: unless-stopped
+    ports:
+      - "9090:9090"
 
   grafana:
     image: grafana/grafana-oss:10.4.2
@@ -198,6 +206,8 @@ services:
     networks:
       - mmopdca_default
     restart: unless-stopped
+    ports:
+      - "3000:3000"
 
 volumes:
   dsl_data:

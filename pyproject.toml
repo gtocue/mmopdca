@@ -17,7 +17,7 @@ packages = [
 ]
 include  = [
   "mmopdca/**",
-  "sdk/py.typed"
+  "mmopdca_sdk/py.typed"
 ]
 
 [tool.poetry.dependencies]
