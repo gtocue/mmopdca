@@ -20,6 +20,10 @@ RUN pip install --upgrade pip poetry && \
 
 # --- ② アプリ本体 ---
 COPY . .
+# Copy the initialization script and ensure it is executable
+COPY ops/init-dsl.sh /usr/local/bin/docker-entrypoint-init-dsl.sh
+RUN dos2unix /usr/local/bin/docker-entrypoint-init-dsl.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint-init-dsl.sh
 
 # --- ③ ここで DSL_ROOT を必ず作成 ---
 RUN mkdir -p "${DSL_ROOT}"

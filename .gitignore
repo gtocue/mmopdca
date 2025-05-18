@@ -29,6 +29,7 @@ poetry.lock
 docker-compose.yml
 docker/compose.flower.yml
 ops/init-*.sh
+!ops/init-dsl.sh
 docker-compose.ym*
 
 ########## アーカイブ・ログ ##########
