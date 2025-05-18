@@ -1,5 +1,3 @@
-version: "3.9"
-
 # 共通 env_file 定義
 x-env: &default-env
   env_file:
@@ -16,7 +14,7 @@ services:
   api:
     build:
       context: ..
-      dockerfile: Dockerfile.main_api
+      dockerfile: docker/Dockerfile.main_api
     user: "1000:1000"
     <<: *default-env
     environment:
@@ -49,7 +47,7 @@ services:
   worker:
     build:
       context: ..
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile.worker # ← ここを指定
       target: runtime
     user: "1000:1000"
     <<: *default-env
@@ -81,7 +79,7 @@ services:
   beat:
     build:
       context: ..
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile.worker # ← 必要なら同じ Worker 用 Dockerfile を指定
       target: runtime
     user: root
     <<: *default-env
@@ -121,40 +119,32 @@ services:
       test: [ "CMD-SHELL", "redis-cli ${REDIS_PASSWORD:+-a ${REDIS_PASSWORD}} ping" ]
       <<: *retry
     volumes:
-      - dsl_data:/mnt/data/dsl # Redis データ（場合に応じて分けても可）
+      - redis_data:/data
     networks:
       - mmopdca_default
     restart: unless-stopped
 
   redis-exporter:
-    image: gtocue/redis-exporter:prod
+    image: oliver006/redis_exporter:v1.60.0
     <<: *default-env
     command:
-      - --redis.addr=redis://redis:6379
+      - "--redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379"
+    ports:
+      - "9121:9121"
     healthcheck:
-      test: [ "CMD", "curl", "-sf", "http://localhost:9121/metrics", "||", "exit", "1" ]
-      <<: *retry
-    depends_on:
-      redis:
-        condition: service_healthy
+      disable: true
     networks:
       - mmopdca_default
     restart: unless-stopped
 
   celery-exporter:
-    image: gtocue/celery-exporter:prod
+    image: danihodovic/celery-exporter:0.9.1
     <<: *default-env
     environment:
-      - CE_BROKER_URL=redis://redis:6379/0
-      - CE_BACKEND_URL=redis://redis:6379/0
+      - CE_BROKER_URL=redis://default:${REDIS_PASSWORD_ENC}@redis:6379/0
       - CE_PORT=9808
-      - CE_RETRY_INTERVAL=5
     healthcheck:
-      test: [ "CMD", "curl", "-sf", "http://localhost:9808/metrics", "||", "exit", "1" ]
-      <<: *retry
-    depends_on:
-      redis:
-        condition: service_healthy
+      disable: true
     networks:
       - mmopdca_default
     restart: unless-stopped
@@ -167,7 +157,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: [ "CMD-SHELL", "PGPASSWORD=${POSTGRES_PASSWORD} pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -q" ]
       <<: *retry
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -212,6 +202,7 @@ services:
 volumes:
   dsl_data:
   checkpoints_data:
+  redis_data:
   pgdata:
   prom_data:
   grafana_data:

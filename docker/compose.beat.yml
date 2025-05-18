@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   beat:
     # プロジェクトルートの .env を読み込む

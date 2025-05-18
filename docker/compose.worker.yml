@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   beat:
     # ルートの .env を参照

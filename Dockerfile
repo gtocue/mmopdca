@@ -34,6 +34,8 @@ COPY . .
 # DSL 初期化スクリプトをコピー→整形→実行権限付与
 COPY ops/init-dsl.sh /usr/local/bin/docker-entrypoint-init-dsl.sh
 RUN dos2unix /usr/local/bin/docker-entrypoint-init-dsl.sh \
+    && groupadd -g 1000 app \
+    && useradd -u 1000 -g app -M app \
     && chmod +x /usr/local/bin/docker-entrypoint-init-dsl.sh
 
 
@@ -62,9 +64,9 @@ COPY --from=builder /usr/local/bin/docker-entrypoint-init-dsl.sh /usr/local/bin/
 # DSL／チェックポイント用ディレクトリを用意して所有権設定
 USER root
 RUN mkdir -p /mnt/data/dsl /mnt/checkpoints \
-    && chown 1000:1000 /mnt/data/dsl /mnt/checkpoints
+    && chown app:app /mnt/data/dsl /mnt/checkpoints
 
 # デフォルトユーザーに戻す
-USER 1000:1000
+USER app
 
 # ※Entrypoint/CMD は docker-compose.yml 側で指定します
