@@ -1,25 +1,29 @@
+# docker/compose.redis.yml
 version: "3.9"
 
 services:
-  # ----------------------------------------------------------------------------
-  # Redis 本体
-  # ----------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
     env_file:
-      - ../.env # プロジェクトルート直下の .env を読み込む
+      - ../.env
     command: >
-      redis-server --requirepass ${REDIS_PASSWORD}   # .env で定義したパスワードを使用
+      redis-server ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
     healthcheck:
-      test: >
-        ["CMD-SHELL",
-         "redis-cli -a \"${REDIS_PASSWORD}\" ping || exit 1"]
+      test: [ "CMD-SHELL", "redis-cli ${REDIS_PASSWORD:+-a ${REDIS_PASSWORD}} ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
     volumes:
       - redis_data:/data
     networks:
       - mmopdca_default
     restart: unless-stopped
+
+# ここで必ずボリュームを定義
+volumes:
+  redis_data:
+
+
+networks:
+  mmopdca_default:
+    external: true

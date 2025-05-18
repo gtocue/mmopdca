@@ -1,13 +1,22 @@
-# ファイル: docker/compose.exporter.redis.yml
-# 目的: Redis-Exporter を単独サービスとして起動し、ポート9121でメトリクスを公開（ヘルスチェック無効化）
+version: "3.9"
 
 services:
   redis-exporter:
-    image: oliver006/redis_exporter:v1.60.0
+    build:
+      context: .
+      dockerfile: Dockerfile.redis-exporter
+    env_file:
+      - ../.env
     command:
       - "--redis.addr=redis://default:${REDIS_PASSWORD_ENC}@redis:6379"
+    ports:
+      - "9121:9121"
     restart: unless-stopped
     healthcheck:
       disable: true
-    ports:
-      - "9121:9121"
+    networks:
+      - mmopdca_default
+
+networks:
+  mmopdca_default:
+    external: true

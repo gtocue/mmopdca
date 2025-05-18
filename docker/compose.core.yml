@@ -112,6 +112,20 @@ services:
       - mmopdca_default
     restart: on-failure
 
+  redis:
+    image: redis:7-alpine
+    <<: *default-env
+    command: >
+      redis-server ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli ${REDIS_PASSWORD:+-a ${REDIS_PASSWORD}} ping" ]
+      <<: *retry
+    volumes:
+      - dsl_data:/mnt/data/dsl # Redis データ（場合に応じて分けても可）
+    networks:
+      - mmopdca_default
+    restart: unless-stopped
+
   redis-exporter:
     image: gtocue/redis-exporter:prod
     <<: *default-env
@@ -141,6 +155,22 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    networks:
+      - mmopdca_default
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    <<: *default-env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      <<: *retry
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     networks:
       - mmopdca_default
     restart: unless-stopped
@@ -182,6 +212,7 @@ services:
 volumes:
   dsl_data:
   checkpoints_data:
+  pgdata:
   prom_data:
   grafana_data:
 
