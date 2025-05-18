@@ -1,0 +1,4 @@
+# Test-ProdJob.ps1
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+.\scripts\Test-ProdJob.ps1 -WaitSeconds 70
+
