@@ -26,6 +26,8 @@ uvicorn           = { version = "^0.30", extras = ["standard"] }
 pydantic          = ">=2,<3"
 python-dateutil   = ">=2.8.2"
 typing-extensions = ">=4.7.1"
+celery           = "^5.3"
+redis            = "^5"
 
 [tool.poetry.group.dev.dependencies]
 pytest                = "^8.3"
