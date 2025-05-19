@@ -66,9 +66,9 @@ jobs:
       - name: Start MMOPDCA services
         run: |
           source .venv/bin/activate
-          docker-compose -f docker/compose.core.yml \
-                         -f docker/compose.db.yml \
-                         -f docker/compose.redis.yml up -d --build
+          docker compose -f docker/compose.core.yml \
+                        -f docker/compose.db.yml \
+                        -f docker/compose.redis.yml up -d --build
       - name: Wait for API healthy
         run: |
           source .venv/bin/activate
@@ -113,6 +113,6 @@ jobs:
       - name: Tear down services
         if: always()
         run: |
-          docker-compose -f docker/compose.core.yml \
-                         -f docker/compose.db.yml \
-                         -f docker/compose.redis.yml down -v
+          docker compose -f docker/compose.core.yml \
+                        -f docker/compose.db.yml \
+                        -f docker/compose.redis.yml down -v
