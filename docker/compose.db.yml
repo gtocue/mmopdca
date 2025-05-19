@@ -3,20 +3,28 @@ services:
   db:
     image: postgres:16-alpine
 
-    # ↓ ここで直接渡す
+    # ───────── PostgreSQL 初期化 ─────────
+    # ここに直接リテラルで書くことで、
+    # env_file も --env-file も不要になります。
     environment:
-      - POSTGRES_USER=mmop_user
-      - POSTGRES_PASSWORD=SuperSafePgPassw0rd!
-      - POSTGRES_DB=mmopdca
+      POSTGRES_USER: mmop_user
+      POSTGRES_PASSWORD: SuperSafePgPassw0rd!
+      POSTGRES_DB: mmopdca
 
+    # ───────── ポート公開 ─────────
     ports:
       - "5432:5432"
 
+    # ───────── 永続化 ─────────
     volumes:
       - pg_data:/var/lib/postgresql/data
 
+    # ───────── 健康チェック ─────────
+    # ここも環境変数を使わず、リテラルでユーザー名／DB名を指定。
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -q"]
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U mmop_user -d mmopdca -q"
       interval: 10s
       timeout: 5s
       retries: 5
