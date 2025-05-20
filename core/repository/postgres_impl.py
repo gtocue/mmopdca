@@ -27,22 +27,23 @@ from .base import BaseRepository
 
 logger = logging.getLogger(__name__)
 
+
+# --------------------------------------------------------------------- #
+# env helper with bytes decoding
+# --------------------------------------------------------------------- #
 def _get_env_var(name: str) -> str | None:
-    val = os.environ.get(name)
-    if val is not None:
-        if isinstance(val, bytes):
-            try:
-                return val.decode("utf-8")
-            except UnicodeDecodeError:
-                return val.decode("cp932", "ignore")
-        return val
-    if hasattr(os, "environb"):
-        raw = os.environb.get(name.encode())
-        if raw is not None:
-            try:
-                return raw.decode("utf-8")
-            except UnicodeDecodeError:
-                return raw.decode("cp932", "ignore")
+    if name in os.environ:
+        return os.environ.get(name)
+    environb = getattr(os, "environb", None)
+    if environb:
+        bname = name.encode()
+        if bname in environb:
+            raw = environb[bname]
+            if isinstance(raw, bytes):
+                try:
+                    return raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    return raw.decode("cp932", "ignore")
     return None
 
 
