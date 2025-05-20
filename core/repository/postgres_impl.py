@@ -27,6 +27,24 @@ from .base import BaseRepository
 
 logger = logging.getLogger(__name__)
 
+def _get_env_var(name: str) -> str | None:
+    val = os.environ.get(name)
+    if val is not None:
+        if isinstance(val, bytes):
+            try:
+                return val.decode("utf-8")
+            except UnicodeDecodeError:
+                return val.decode("cp932", "ignore")
+        return val
+    if hasattr(os, "environb"):
+        raw = os.environb.get(name.encode())
+        if raw is not None:
+            try:
+                return raw.decode("utf-8")
+            except UnicodeDecodeError:
+                return raw.decode("cp932", "ignore")
+    return None
+
 
 # --------------------------------------------------------------------- #
 # DSN helper
@@ -36,17 +54,7 @@ def _env(primary: str, fallback: str, default: str = "") -> str:
 
 
 def _make_dsn() -> dict[str, Any] | str:
-    _raw_dsn: str | bytes | None = os.getenv("PG_DSN")
-    if _raw_dsn is None and hasattr(os, "environb"):
-        _raw_dsn = os.environb.get(b"PG_DSN")  # type: ignore[index]
-    if _raw_dsn:
-        if isinstance(_raw_dsn, bytes):
-            try:
-                dsn = _raw_dsn.decode("utf-8")
-            except UnicodeDecodeError:
-                dsn = _raw_dsn.decode("cp932", "ignore")
-        else:
-            dsn = _raw_dsn
+    if dsn := _get_env_var("PG_DSN"):
         return dsn  # 完全 DSN
     return dict(
         host=_env("PG_HOST", "POSTGRES_HOST", "db"),

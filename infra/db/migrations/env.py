@@ -29,6 +29,26 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+
+def _get_env_var(name: str) -> str | None:
+    """Return environment variable as str, decoding bytes if needed."""
+    val = os.environ.get(name)
+    if val is not None:
+        if isinstance(val, bytes):
+            try:
+                return val.decode("utf-8")
+            except UnicodeDecodeError:
+                return val.decode("cp932", "ignore")
+        return val
+    if hasattr(os, "environb"):
+        raw = os.environb.get(name.encode())
+        if raw is not None:
+            try:
+                return raw.decode("utf-8")
+            except UnicodeDecodeError:
+                return raw.decode("cp932", "ignore")
+    return None
+
 # ──────────────────────────────────────────────────────────
 # 基本設定
 # ──────────────────────────────────────────────────────────
@@ -36,23 +56,16 @@ config = context.config  # alembic.ini をパースした Config オブジェク
 
 # ======== DSN を環境変数で上書き ========
 # .ini の `sqlalchemy.url` はダミーで良い
-_raw_dsn: str | bytes | None = os.environ.get("PG_DSN")
-if _raw_dsn is None and hasattr(os, "environb"):
-    _raw_dsn = os.environb.get(b"PG_DSN")  # type: ignore[index]
+dsn_env = os.getenv("PG_DSN")
+if dsn_env:
+_raw_dsn = _get_env_var("PG_DSN")
 if _raw_dsn:
-    # Windows 環境では稀に bytes 型で入ってくることがあるため文字列化
-    if isinstance(_raw_dsn, bytes):
-        try:
-            dsn_env = _raw_dsn.decode("utf-8")
-        except UnicodeDecodeError:
-            dsn_env = _raw_dsn.decode("cp932", "ignore")
-    else:
-        dsn_env = _raw_dsn
+    dsn_env = _raw_dsn
 
     # psycopg3 用にドライバ接頭辞を補正
     if dsn_env.startswith("postgresql://"):
         dsn_env = dsn_env.replace("postgresql://", "postgresql+psycopg://", 1)
-        
+
     config.set_main_option("sqlalchemy.url", dsn_env)
 
 # ======== ロギング ========
