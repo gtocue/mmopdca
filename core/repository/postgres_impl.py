@@ -36,7 +36,17 @@ def _env(primary: str, fallback: str, default: str = "") -> str:
 
 
 def _make_dsn() -> dict[str, Any] | str:
-    if dsn := os.getenv("PG_DSN"):
+    _raw_dsn: str | bytes | None = os.getenv("PG_DSN")
+    if _raw_dsn is None and hasattr(os, "environb"):
+        _raw_dsn = os.environb.get(b"PG_DSN")  # type: ignore[index]
+    if _raw_dsn:
+        if isinstance(_raw_dsn, bytes):
+            try:
+                dsn = _raw_dsn.decode("utf-8")
+            except UnicodeDecodeError:
+                dsn = _raw_dsn.decode("cp932", "ignore")
+        else:
+            dsn = _raw_dsn
         return dsn  # 完全 DSN
     return dict(
         host=_env("PG_HOST", "POSTGRES_HOST", "db"),
