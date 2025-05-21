@@ -14,7 +14,7 @@ services:
     # env_file を使わず literals に固定
     environment:
       POSTGRES_USER:     mmop_user
-      POSTGRES_PASSWORD: SuperSafePgPassw0rd!
+      POSTGRES_PASSWORD: "SuperSafePgPassw0rd!"   # ← "" を付ける
       POSTGRES_DB:       mmopdca
       TZ:                UTC               # ログ時刻ずれ防止（任意）
 

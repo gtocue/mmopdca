@@ -12,4 +12,4 @@ services:
 
 networks:
   mmopdca_default:
-    external: true
+    name: mmopdca_default
