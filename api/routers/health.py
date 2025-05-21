@@ -21,7 +21,7 @@ _PG_DSN = dict(
     user=os.getenv("POSTGRES_USER", "postgres"),
     password=os.getenv("POSTGRES_PASSWORD", ""),
     host=os.getenv("POSTGRES_HOST", "localhost"),
-    port=int(os.getenv("POSTGRES_PORT", "5433")),
+    port=int(os.getenv("POSTGRES_PORT", "5432")),
     connect_timeout=2,
 )
 _REDIS_HOST = os.getenv("REDIS_HOST", "localhost")

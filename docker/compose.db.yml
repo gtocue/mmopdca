@@ -7,7 +7,7 @@
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: mmopdca-db
 
     # ────── 初期ユーザー / パスワード / DB ──────
@@ -20,7 +20,7 @@ services:
 
     # ────── ポート公開 ──────
     ports:
-      - "5433:5433"
+      - "5432:5432"
 
     # ────── データ永続化 ──────
     volumes:
