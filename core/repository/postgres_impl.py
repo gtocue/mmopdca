@@ -59,7 +59,7 @@ def _make_dsn() -> dict[str, Any] | str:
         return dsn  # 完全 DSN
     return dict(
         host=_env("PG_HOST", "POSTGRES_HOST", "db"),
-        port=int(_env("PG_PORT", "POSTGRES_PORT", "5432")),
+        port=int(_env("PG_PORT", "POSTGRES_PORT", "5433")),
         dbname=_env("PG_DB", "POSTGRES_DB", "mmopdca"),
         user=_env("PG_USER", "POSTGRES_USER", "mmop_user"),
         password=_env("PG_PASSWORD", "POSTGRES_PASSWORD", "secret"),

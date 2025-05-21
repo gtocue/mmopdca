@@ -27,7 +27,7 @@ jobs:
           POSTGRES_DB: mmopdca
           POSTGRES_USER: mmopdca
           POSTGRES_PASSWORD: mmopdca
-        ports: ['5432:5432']
+        ports: ['5433:5433']
       prom:
         image: prom/prometheus:v2.52.0
         ports: ['9090:9090']

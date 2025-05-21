@@ -170,7 +170,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5433"
     networks:
       - mmopdca_default
     restart: unless-stopped
