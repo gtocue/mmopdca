@@ -22,14 +22,15 @@ _do_repo = get_repo("do")
 
 
 def _upsert(do_id: str, rec: Dict[str, Any]) -> None:
-    """単純な delete → create で擬似 upsert。"""
+    """既存レコードを保持しつつフィールドを更新するアップサート"""
+    current = _do_repo.get(do_id) or {}
+    current.update(rec)
     try:
         _do_repo.delete(do_id)
     except Exception:
         # 存在しない場合などは無視
         pass
-    _do_repo.create(do_id, rec)
-
+    _do_repo.create(do_id, current)
 
 # ----------------------------------------------------------------------
 # テスト用：Heartbeat を毎分プリントするタスク

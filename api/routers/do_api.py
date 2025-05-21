@@ -50,11 +50,15 @@ def _merge_params(plan: PlanResponse, req: DoCreateRequest) -> Dict[str, Any]:
 
 
 def _upsert(rec: Dict[str, Any]) -> None:
+        """単純な delete→create ではなく既存値をマージして保存する."""
+    do_id = rec["do_id"]
+    current = _do_repo.get(do_id) or {}
+    current.update(rec)
     try:
-        _do_repo.delete(rec["do_id"])
+        _do_repo.delete(do_id)
     except Exception:
         pass
-    _do_repo.create(rec["do_id"], rec)
+    _do_repo.create(do_id, current)
 
 
 # --------------------------------------------------------------------- #

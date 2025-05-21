@@ -65,8 +65,10 @@ class MemoryRepository:
     # 追加分（metrics／Do 用）
     # --------------------------------------------------
     def upsert(self, key: str, record: Dict[str, Any]) -> None:
-        """存在すれば更新・無ければ作成。"""
-        self._store()[key] = record.copy()
+        """存在すれば既存レコードとマージし、無ければ作成。"""
+        merged = self._store().get(key, {}).copy()
+        merged.update(record)
+        self._store()[key] = merged
 
     def put(self, key: str, record: Dict[str, Any]) -> None:
         """metrics_repo 互換エイリアス。"""
