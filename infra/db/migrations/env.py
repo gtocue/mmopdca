@@ -1,31 +1,21 @@
 import os
 from logging.config import fileConfig
-
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-# このプロジェクトで定義している metadata をインポート
-from yourapp.models import Base  # ← 実際の Base(metadata) を指してください
-
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
 config = context.config
 
-# ─── 環境変数 PG_DSN を強制的にセット ───
-if os.getenv("PG_DSN"):
-    config.set_main_option("sqlalchemy.url", os.getenv("PG_DSN"))
-# ───────────────────────────────────────────
+fileConfig(config.config_file_name, encoding="utf-8")
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
-fileConfig(config.config_file_name)
+# Use metadata from models if available
+target_metadata = None
 
-# add your model's MetaData object here for 'autogenerate' support
-target_metadata = Base.metadata
+# Override DSN from environment
+if 'PG_DSN' in os.environ:
+    config.set_main_option('sqlalchemy.url', os.environ['PG_DSN'])
 
-def run_migrations_offline():
-    """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url")
+def run_migrations_offline() -> None:
+    url = config.get_main_option('sqlalchemy.url')
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -36,19 +26,15 @@ def run_migrations_offline():
     with context.begin_transaction():
         context.run_migrations()
 
-def run_migrations_online():
-    """Run migrations in 'online' mode."""
+def run_migrations_online() -> None:
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
+        prefix='sqlalchemy.',
         poolclass=pool.NullPool,
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

@@ -34,3 +34,15 @@ pip install -e ".[dev]"
 if [ -f requirements-ci.txt ]; then pip install -r requirements-ci.txt; fi
 pytest -q
 ```
+```
+## Database Migrations
+To initialize the PostgreSQL schema, start the database container and run Alembic.
+On Windows shells you **must** enable UTF-8, otherwise ``configparser`` fails
+with ``UnicodeDecodeError: 'cp932' codec can't decode``. Set the environment
+variable or run Python with ``-X utf8``:
+
+```powershell
+$Env:PYTHONUTF8 = '1'         # ensure config is read as UTF-8
+$Env:PG_DSN = 'postgresql://mmop_user:SuperSafePgPassw0rd!@localhost:5432/mmopdca'
+alembic upgrade head
+```

@@ -214,12 +214,11 @@ services:
     restart: unless-stopped
 
   alertmanager:
-    image: prom/alertmanager:v0.25.0
+    build:
+      context: .
+      dockerfile: Dockerfile.alertmanager
+    image: mmopdca_alertmanager:latest
     <<: *default-env
-    command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-    volumes:
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     ports:
       - "9093:9093"
     networks:
