@@ -1,42 +1,46 @@
 # docker/compose.db.yml
+#
+# ─────────────────────────────────────────────────────────────
+# “動けばいい” ではなく、後々 17-alpine に上げても崩れない
+# 最小構成で PostgreSQL 16 を起動します。
+# ─────────────────────────────────────────────────────────────
+
 services:
   db:
     image: postgres:16-alpine
+    container_name: mmopdca-db
 
-    # ───────── PostgreSQL 初期化 ─────────
-    # ここに直接リテラルで書くことで、
-    # env_file も --env-file も不要になります。
+    # ────── 初期ユーザー / パスワード / DB ──────
+    # env_file を使わず literals に固定
     environment:
-      POSTGRES_USER: mmop_user
+      POSTGRES_USER:     mmop_user
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
-      POSTGRES_DB: mmopdca
+      POSTGRES_DB:       mmopdca
+      TZ:                UTC               # ログ時刻ずれ防止（任意）
 
-    # ───────── ポート公開 ─────────
+    # ────── ポート公開 ──────
     ports:
       - "5432:5432"
 
-    # ───────── 永続化 ─────────
+    # ────── データ永続化 ──────
     volumes:
       - pg_data:/var/lib/postgresql/data
 
-    # ───────── 健康チェック ─────────
-    # ここも環境変数を使わず、リテラルでユーザー名／DB名を指定。
+    # ────── コンテナ健全性チェック ──────
     healthcheck:
-      test:
-        - "CMD-SHELL"
-        - "pg_isready -U mmop_user -d mmopdca -q"
+      test: ["CMD-SHELL", "pg_isready -U mmop_user -d mmopdca -q"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+    restart: unless-stopped
     networks:
       - mmopdca_default
 
-    restart: unless-stopped
-
+# ────────────── 追加定義 ──────────────
 volumes:
-  pg_data:
+  pg_data: {}
 
 networks:
   mmopdca_default:
-    external: true
+    driver: bridge
