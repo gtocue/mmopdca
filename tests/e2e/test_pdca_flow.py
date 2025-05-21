@@ -12,9 +12,27 @@ from core.common.io_utils import save_predictions, save_meta, load_predictions
 from core.schemas.meta_schemas import MetaInfo, MetricSpec
 from core.check.check_executor import CheckExecutor
 from core.constants import ensure_directories
+import pandas as pd
 
 # …（ダミー DataFrame 作成部分は省略せずそのまま）…
 
+def _make_dummy_df() -> pd.DataFrame:
+    """テスト用の簡易 DataFrame を生成"""
+    return pd.DataFrame(
+        {
+            "symbol": ["TEST"] * 3,
+            "ts": [
+                datetime(2024, 1, 1),
+                datetime(2024, 1, 2),
+                datetime(2024, 1, 3),
+            ],
+            "horizon": [1, 1, 1],
+            "y_true": [1.0, 1.5, 2.0],
+            "y_pred": [1.1, 1.4, 1.9],
+            "model_id": ["dummy"] * 3,
+        }
+    )
+    
 def test_pdca_min_cycle(tmp_path) -> None:
     ensure_directories()
     plan_id = "plan_" + uuid.uuid4().hex[:6]
