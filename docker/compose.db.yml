@@ -1,34 +1,22 @@
-# docker/compose.db.yml
-#
-# ─────────────────────────────────────────────────────────────
-# “動けばいい” ではなく、後々 17-alpine に上げても崩れない
-# 最小構成で PostgreSQL 16 を起動します。
-# ─────────────────────────────────────────────────────────────
-
 services:
   db:
     image: postgres:17-alpine
     container_name: mmopdca
 
-    # ────── 初期ユーザー / パスワード / DB ──────
-    # env_file を使わず literals に固定
     environment:
-      POSTGRES_USER:     mmop_user
-      POSTGRES_PASSWORD: "SuperSafePgPassw0rd!"   # ← "" を付ける
+      POSTGRES_USER:     mmopdca
+      POSTGRES_PASSWORD: "SuperSafePgPassw0rd!"
       POSTGRES_DB:       mmopdca
-      TZ:                UTC               # ログ時刻ずれ防止（任意）
+      TZ:                UTC
 
-    # ────── ポート公開 ──────
     ports:
       - "5432:5432"
 
-    # ────── データ永続化 ──────
     volumes:
       - pg_data:/var/lib/postgresql/data
 
-    # ────── コンテナ健全性チェック ──────
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mmop_user -d mmopdca -q"]
+      test: ["CMD-SHELL", "pg_isready -U mmopdca -d mmopdca -q"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -37,7 +25,6 @@ services:
     networks:
       - mmopdca_default
 
-# ────────────── 追加定義 ──────────────
 volumes:
   pg_data: {}
 

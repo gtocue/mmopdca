@@ -81,7 +81,11 @@ def _cx():
                 "DB_BACKEND を memory/sqlite/redis にするか "
                 "`poetry install --with db` を実行してください。"
             )
-        _CX = psycopg.connect(**_make_dsn(), autocommit=True)  # type: ignore[arg-type]
+        dsn = _make_dsn()
+        if isinstance(dsn, str):
+            _CX = psycopg.connect(dsn, autocommit=True)
+        else:
+            _CX = psycopg.connect(**dsn, autocommit=True)
     return _CX
 
 

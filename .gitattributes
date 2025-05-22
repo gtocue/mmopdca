@@ -6,3 +6,4 @@
 *.yml   text eol=lf working-tree-encoding=UTF-8
 *.yaml  text eol=lf working-tree-encoding=UTF-8
 *.env   text eol=lf
+*.jar binary
