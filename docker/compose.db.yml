@@ -8,7 +8,7 @@
 services:
   db:
     image: postgres:17-alpine
-    container_name: mmopdca-db
+    container_name: mmopdca
 
     # ────── 初期ユーザー / パスワード / DB ──────
     # env_file を使わず literals に固定
