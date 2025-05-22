@@ -61,7 +61,7 @@ def _make_dsn() -> dict[str, Any] | str:
         host=_env("PG_HOST", "POSTGRES_HOST", "db"),
         port=int(_env("PG_PORT", "POSTGRES_PORT", "5432")),
         dbname=_env("PG_DB", "POSTGRES_DB", "mmopdca"),
-        user=_env("PG_USER", "POSTGRES_USER", "mmop_user"),
+        user=_env("PG_USER", "POSTGRES_USER", "mmopdca"),
         password=_env("PG_PASSWORD", "POSTGRES_PASSWORD", "secret"),
     )
 

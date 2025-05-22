@@ -27,8 +27,8 @@ services:
       DSL_ROOT: /mnt/data/dsl
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
-      POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
+      POSTGRES_USER: mmopdca
+      REDIS_PASSWORD: "# 空ならそのまま。必要なら設定"
     networks:
       mmopdca_default: null
     restart: unless-stopped
@@ -71,8 +71,8 @@ services:
       DSL_ROOT: /mnt/data/dsl
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
-      POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
+      POSTGRES_USER: mmopdca
+      REDIS_PASSWORD: "# 空ならそのまま。必要なら設定"
     networks:
       mmopdca_default: null
     restart: on-failure
@@ -99,15 +99,15 @@ services:
       DSL_ROOT: /mnt/data/dsl
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
-      POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
+      POSTGRES_USER: mmopdca
+      REDIS_PASSWORD: "# 空ならそのまま。必要なら設定"
     healthcheck:
       test:
         - CMD
         - curl
         - -sf
         - http://localhost:9808/metrics
-        - '||'
+        - "||"
         - exit
         - "1"
       timeout: 2s
@@ -122,12 +122,12 @@ services:
       DSL_ROOT: /mnt/data/dsl
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
-      POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
+      POSTGRES_USER: mmopdca
+      REDIS_PASSWORD: "# 空ならそのまま。必要なら設定"
     healthcheck:
       test:
         - CMD-SHELL
-        - PGPASSWORD=SuperSafePgPassw0rd! pg_isready -U mmop_user -d mmopdca
+        - PGPASSWORD=SuperSafePgPassw0rd! pg_isready -U mmopdca -d mmopdca
       timeout: 5s
       interval: 10s
       retries: 5
@@ -152,8 +152,8 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
-      POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
+      POSTGRES_USER: mmopdca
+      REDIS_PASSWORD: "# 空ならそのまま。必要なら設定"
     image: grafana/grafana-oss:10.4.2
     networks:
       mmopdca_default: null
@@ -209,8 +209,8 @@ services:
       DSL_ROOT: /mnt/data/dsl
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
-      POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
+      POSTGRES_USER: mmopdca
+      REDIS_PASSWORD: "# 空ならそのまま。必要なら設定"
     healthcheck:
       test:
         - CMD-SHELL
@@ -239,15 +239,15 @@ services:
       DSL_ROOT: /mnt/data/dsl
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
-      POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
+      POSTGRES_USER: mmopdca
+      REDIS_PASSWORD: "# 空ならそのまま。必要なら設定"
     healthcheck:
       test:
         - CMD
         - curl
         - -sf
         - http://localhost:9121/metrics
-        - '||'
+        - "||"
         - exit
         - "1"
       timeout: 2s
@@ -283,8 +283,8 @@ services:
       DSL_ROOT: /mnt/data/dsl
       POSTGRES_DB: mmopdca
       POSTGRES_PASSWORD: SuperSafePgPassw0rd!
-      POSTGRES_USER: mmop_user
-      REDIS_PASSWORD: '# 空ならそのまま。必要なら設定'
+      POSTGRES_USER: mmopdca
+      REDIS_PASSWORD: "# 空ならそのまま。必要なら設定"
     networks:
       mmopdca_default: null
     restart: on-failure

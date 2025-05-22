@@ -26,7 +26,7 @@ jobs:
         run: |
           cat > .env << 'EOF'
           POSTGRES_DB=mmopdca
-          POSTGRES_USER=mmop_user
+          POSTGRES_USER=mmopdca
           POSTGRES_PASSWORD=password
           REDIS_PASSWORD=
           DSL_ROOT=/mnt/data/dsl

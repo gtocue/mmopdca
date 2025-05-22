@@ -1,25 +1,27 @@
+# docker/compose.db.yml
 services:
   db:
     image: postgres:17-alpine
     container_name: mmopdca
 
     environment:
-      POSTGRES_USER:     mmopdca
-      POSTGRES_PASSWORD: "SuperSafePgPassw0rd!"
-      POSTGRES_DB:       mmopdca
-      TZ:                UTC
+      POSTGRES_USER:             mmopdca
+      POSTGRES_PASSWORD:         "SuperSafePgPassw0rd!"
+      POSTGRES_DB:               mmopdca
+      POSTGRES_HOST_AUTH_METHOD: trust
+      TZ:                        UTC
 
     ports:
       - "5432:5432"
 
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data   # ← ここだけ
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mmopdca -d mmopdca -q"]
+      test:     ["CMD-SHELL", "pg_isready -U mmopdca -d mmopdca -q"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout:  5s
+      retries:  5
 
     restart: unless-stopped
     networks:
