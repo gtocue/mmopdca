@@ -44,5 +44,6 @@ variable or run Python with ``-X utf8``:
 ```powershell
 $Env:PYTHONUTF8 = '1'         # ensure config is read as UTF-8
 $Env:PG_DSN = 'postgresql://mmopdca:SuperSafePgPassw0rd!@localhost:5432/mmopdca'
+# or `$Env:DATABASE_URL` if preferred
 alembic upgrade head
 ```

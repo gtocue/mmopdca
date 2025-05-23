@@ -57,6 +57,8 @@ def _env(primary: str, fallback: str, default: str = "") -> str:
 def _make_dsn() -> dict[str, Any] | str:
     if dsn := _get_env_var("PG_DSN"):
         return dsn  # 完全 DSN
+    if dsn := _get_env_var("DATABASE_URL"):
+        return dsn
     return dict(
         host=_env("PG_HOST", "POSTGRES_HOST", "db"),
         port=int(_env("PG_PORT", "POSTGRES_PORT", "5432")),
@@ -86,6 +88,11 @@ def _cx():
             _CX = psycopg.connect(dsn, autocommit=True)
         else:
             _CX = psycopg.connect(**dsn, autocommit=True)
+         dsn = _make_dsn()
+        if isinstance(dsn, str):
+            _CX = psycopg.connect(dsn, autocommit=True)
+        else:
+            _CX = psycopg.connect(**dsn, autocommit=True)           
     return _CX
 
 
