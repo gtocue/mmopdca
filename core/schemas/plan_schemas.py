@@ -8,6 +8,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
+import json
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -37,5 +38,14 @@ class PlanResponse(BaseModel):
 
     # DSL フィールドもそのまま保持
     model_config = ConfigDict(extra="allow")
+
+    def dict(self, *args, **kwargs):  # pragma: no cover - pydantic v1 compatibility
+        data = super().dict(*args, **kwargs)
+        extras = {k: v for k, v in self.__dict__.items() if k not in data}
+        data.update(extras)
+        return data
+
+    def json(self, *args, **kwargs):  # pragma: no cover - pydantic v1 compatibility
+        return json.dumps(self.dict(*args, **kwargs))
 
 __all__ = ["PlanCreateRequest", "PlanResponse"]

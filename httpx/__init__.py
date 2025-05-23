@@ -41,11 +41,18 @@ class URL:
     def __str__(self) -> str:  # pragma: no cover - debug
         return self._url.geturl()
 
+class Headers(dict):
+    """Minimal headers container supporting the API used in tests."""
+
+    def multi_items(self):
+        return list(self.items())
+
+
 class Request:
     def __init__(self, method: str, url: str, headers=None, stream=None):
         self.method = method
         self.url = URL(url)
-        self.headers = headers or {}
+        self.headers = Headers(headers or {})
         self.stream = stream or ByteStream(b"")
 
     def read(self) -> bytes:
@@ -54,7 +61,7 @@ class Request:
 class Response:
     def __init__(self, status_code: int = 200, headers=None, content: bytes = b"", stream=None, request: Request | None = None):
         self.status_code = status_code
-        self.headers = headers or {}
+        self.headers = Headers(headers or {})
         if stream is not None:
             content = stream.read()
         self._content = content
@@ -82,17 +89,18 @@ class Client:
     def __init__(self, *, app=None, base_url: str = "", headers=None, transport: BaseTransport | None = None, follow_redirects: bool = True, cookies=None):
         self.app = app
         self.base_url = URL(base_url)
-        self.headers = headers or {}
+        self.headers = Headers(headers or {})
         self.transport = transport
         self.follow_redirects = follow_redirects
         self.cookies = cookies
 
-    def request(self, method: str, url: str, *, content=None, data=None, files=None, json=None, params=None, headers=None, cookies=None, auth=None, follow_redirects=None, timeout=None, extensions=None):
+    def _merge_url(self, url: str | URL) -> URL:
         if isinstance(url, URL):
-            target_url = self.base_url.join(url.geturl())
-        else:
-            target_url = self.base_url.join(str(url))
-        target = target_url.geturl()
+            return self.base_url.join(url.geturl())
+        return self.base_url.join(str(url))
+
+    def request(self, method: str, url: str, *, content=None, data=None, files=None, json=None, params=None, headers=None, cookies=None, auth=None, follow_redirects=None, timeout=None, extensions=None):
+        target = self._merge_url(url).geturl()
         if files is not None:
             boundary = "----WebKitFormBoundary" + uuid.uuid4().hex
             body = bytearray()
@@ -106,7 +114,10 @@ class Client:
             content = bytes(body)
             headers = headers or {}
             headers['Content-Type'] = f'multipart/form-data; boundary={boundary}'
-        req = Request(method, target, headers={**self.headers, **(headers or {})}, stream=ByteStream(content or b""))
+        merged_headers = {}
+        merged_headers.update(self.headers)
+        merged_headers.update(headers or {})
+        req = Request(method, target, headers=merged_headers, stream=ByteStream(content or b""))
         if self.transport is not None:
             return self.transport.handle_request(req)
         data = content
@@ -161,6 +172,7 @@ __all__ = [
     'Request',
     'Response',
     'ByteStream',
+    'Headers',
     'BaseTransport',
     'Client',
     'USE_CLIENT_DEFAULT',
