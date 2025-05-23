@@ -41,9 +41,9 @@ class PredictionArtifact(BaseModel):
     # Compatibility helpers for pydantic v1
     # ------------------------------------------------------------------
     def model_dump_json(self, **kwargs) -> str:
-        """pydantic v2 compatible API"""
-        return self.json(**kwargs)
+        """Return JSON representation (pydantic v1 compat)."""
+        return super().model_dump_json(**kwargs)
 
     @classmethod
     def model_validate_json(cls, data: str, **kwargs) -> "PredictionArtifact":
-        return cls.parse_raw(data, **kwargs)
+        return super().model_validate_json(data, **kwargs)

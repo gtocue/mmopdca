@@ -18,7 +18,8 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
+from mmopdca_sdk.pydantic_compat import ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
 from mmopdca_sdk.models.validation_error import ValidationError
 from typing import Optional, Set

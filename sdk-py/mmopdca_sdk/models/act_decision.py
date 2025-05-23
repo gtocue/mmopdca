@@ -19,7 +19,8 @@ import re  # noqa: F401
 import json
 
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, Field, StrictStr
+from mmopdca_sdk.pydantic_compat import ConfigDict
 from typing import Any, ClassVar, Dict, List
 from mmopdca_sdk.models.act_action import ActAction
 from typing import Optional, Set

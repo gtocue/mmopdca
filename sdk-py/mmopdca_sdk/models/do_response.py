@@ -18,7 +18,8 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, Field, StrictStr
+from mmopdca_sdk.pydantic_compat import ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
 from typing_extensions import Annotated
 from mmopdca_sdk.models.do_status import DoStatus
@@ -33,16 +34,22 @@ class DoResponse(BaseModel):
 
     do_id: StrictStr = Field(description="Do 実行 ID (`do-xxxx` 形式)")
     plan_id: StrictStr = Field(description="紐づく Plan ID")
-    seq: Annotated[int, Field(strict=True, ge=1)] = Field(
-        description="DoCreateRequest.run_no のエコーバック（互換: 'seq'）"
+    seq: int = Field(
+        ...,
+        strict=True,
+        ge=1,
+        description="DoCreateRequest.run_no のエコーバック（互換: 'seq'）",
     )
     run_tag: Optional[StrictStr] = None
     status: DoStatus = Field(description="ジョブ状態")
     result: Optional[Dict[str, Any]] = None
     artifact_uri: Optional[StrictStr] = None
-    dashboard_url: Optional[
-        Annotated[str, Field(min_length=1, strict=True, max_length=2083)]
-    ] = None
+    dashboard_url: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=2083,
+        strict=True,
+    )
     __properties: ClassVar[List[str]] = [
         "do_id",
         "plan_id",

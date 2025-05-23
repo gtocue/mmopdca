@@ -20,12 +20,11 @@ import pprint
 import re  # noqa: F401
 from pydantic import (
     BaseModel,
-    ConfigDict,
     Field,
     StrictStr,
     ValidationError,
-    field_validator,
 )
+from mmopdca_sdk.pydantic_compat import ConfigDict, field_validator
 from typing import Dict, Optional
 from mmopdca_sdk.models.check_report import CheckReport
 from mmopdca_sdk.models.report_any_of_value import ReportAnyOfValue

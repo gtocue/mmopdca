@@ -20,15 +20,14 @@ import pprint
 import re  # noqa: F401
 from pydantic import (
     BaseModel,
-    ConfigDict,
     Field,
     StrictBool,
     StrictFloat,
     StrictInt,
     StrictStr,
     ValidationError,
-    field_validator,
 )
+from mmopdca_sdk.pydantic_compat import ConfigDict, field_validator
 from typing import Optional, Union
 from typing import Union, Any, List, Set, TYPE_CHECKING, Optional, Dict
 from typing_extensions import Literal, Self

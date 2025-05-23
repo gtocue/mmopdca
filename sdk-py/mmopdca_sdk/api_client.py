@@ -14,7 +14,15 @@ Do not edit the class manually.
 
 
 import datetime
-from dateutil.parser import parse
+try:
+    from dateutil.parser import parse
+except Exception:  # pragma: no cover - fallback for missing dependency
+    from datetime import datetime as _dt
+
+    def parse(value: str):
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+        return _dt.fromisoformat(value)
 from enum import Enum
 import decimal
 import json

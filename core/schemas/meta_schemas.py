@@ -61,7 +61,7 @@ class MetaInfo(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     model_config = ConfigDict(extra="forbid")
-    
+
     # ------------------------------------------------------------------
     # Compatibility helpers for pydantic v1
     # ------------------------------------------------------------------
@@ -73,7 +73,7 @@ class MetaInfo(BaseModel):
 
     @classmethod
     def model_validate(cls, data, **kwargs):  # type: ignore[override]
-        return cls.parse_obj(data)
+        return super().model_validate(data, **kwargs)
 
 
 # 公開シンボル
