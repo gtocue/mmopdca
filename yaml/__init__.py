@@ -60,6 +60,6 @@ def safe_load(stream: Any):
 
     return result
 
-    def safe_dump(data: Any, *_, **__):
+def safe_dump(data: Any, *_, **__) -> str:
+    """Serialize *data* to a JSON string."""
     return json.dumps(data)
-    

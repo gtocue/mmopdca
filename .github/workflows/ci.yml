@@ -13,7 +13,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      HOST_POSTGRES_PORT: '5432'
+      HOST_POSTGRES_PORT: '15432'
     strategy:
       fail-fast: false
       matrix:
