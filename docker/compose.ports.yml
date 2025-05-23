@@ -5,7 +5,7 @@ services:
 
   redis:
     ports:
-      - "6379:6379"
+      - "${HOST_REDIS_PORT:-6379}:6379"
 
   db:
     ports:

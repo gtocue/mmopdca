@@ -56,6 +56,7 @@ jobs:
       #7) pytest を実行
       - name: Run pytest
         run: |
+          source .venv/bin/activate        
           pytest -q
 
       # 8) スタックをクリーンアップ

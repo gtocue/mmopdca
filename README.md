@@ -46,3 +46,13 @@ $Env:PG_DSN = 'postgresql://mmopdca:SuperSafePgPassw0rd!@localhost:5432/mmopdca'
 # or `$Env:DATABASE_URL` if preferred
 alembic upgrade head
 ```
+
+## Docker Compose
+Redis exposes port `6379` on the host. If that port is already in use,
+set the `HOST_REDIS_PORT` environment variable to a free port before
+starting the containers:
+
+```bash
+export HOST_REDIS_PORT=16379
+docker compose up -d
+```

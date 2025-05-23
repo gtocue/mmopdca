@@ -12,6 +12,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      HOST_REDIS_PORT: '6379'
     strategy:
       fail-fast: false
       matrix:

@@ -28,7 +28,7 @@ services:
         - CMD-SHELL
         - "redis-cli ${REDIS_PASSWORD:+-a $REDIS_PASSWORD} ping"
     ports:
-      - "6379:6379"
+      - "${HOST_REDIS_PORT:-6379}:6379"
 
   db:
     image: postgres:16-alpine
