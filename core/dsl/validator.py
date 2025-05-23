@@ -25,7 +25,6 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-import fastjsonschema
 try:  # fastjsonschema may be unavailable in offline test env
     import fastjsonschema
 except ModuleNotFoundError:  # pragma: no cover - optional dependency

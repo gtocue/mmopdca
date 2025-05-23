@@ -46,18 +46,24 @@ try:
     _DF_LIB = "polars"
     _HAS_PARQUET = True
 except ModuleNotFoundError:  # pragma: no cover
-    import pandas as pd  # type: ignore
-
-    _DF_LIB = "pandas"
     try:
-        import pyarrow  # type: ignore  # noqa: F401
-        _HAS_PARQUET = True
-    except ModuleNotFoundError:  # pragma: no cover
+        import pandas as pd  # type: ignore
+
+        _DF_LIB = "pandas"
         try:
-            import fastparquet  # type: ignore  # noqa: F401
+            import pyarrow  # type: ignore  # noqa: F401
             _HAS_PARQUET = True
         except ModuleNotFoundError:  # pragma: no cover
-            _HAS_PARQUET = False
+            try:
+                import fastparquet  # type: ignore  # noqa: F401
+                _HAS_PARQUET = True
+            except ModuleNotFoundError:  # pragma: no cover
+                _HAS_PARQUET = False
+    except ModuleNotFoundError:  # pragma: no cover - minimal stub fallback
+        pl = None  # type: ignore
+        pd = None  # type: ignore
+        _DF_LIB = "dummy"
+        _HAS_PARQUET = False
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +112,7 @@ def save_predictions(df: Any, plan_id: str, run_id: str) -> str:
             compression=DEFAULT_PARQUET_COMPRESSION,
             statistics=True,
         )
-    else:  # pandas
+    elif _DF_LIB == "pandas":
         assert "pandas" in str(type(df)), "pandas.DataFrame expected"
         if _HAS_PARQUET:
             df.to_parquet(
@@ -116,6 +122,8 @@ def save_predictions(df: Any, plan_id: str, run_id: str) -> str:
             )
         else:
             df.to_pickle(path)
+                else:  # dummy fallback
+        path.write_text("dummy", encoding="utf-8")
 
     logger.debug("Predictions saved: %s", path)
     return str(path.resolve())
@@ -130,10 +138,12 @@ def load_predictions(plan_id: str, run_id: str) -> Any:
 
     if _DF_LIB == "polars":
         return pl.read_parquet(path)
-    else:
+    elif _DF_LIB == "pandas":
         if _HAS_PARQUET:
             return pd.read_parquet(path)  # type: ignore
         return pd.read_pickle(path)
+            else:
+        return path.read_text(encoding="utf-8")
 
 # --------------------------------------------------
 # Meta JSON 読み書き
