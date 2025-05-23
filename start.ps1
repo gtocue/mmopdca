@@ -43,6 +43,29 @@ function Check-Compose {
   Write-Host "`n✅ Compose 構文は有効です" -ForegroundColor Green
 }
 
+# ------------------------------------------------------------
+# Redis ポート競合チェック
+#   HOST_REDIS_PORT で指定されたポート (未指定なら 6379) が
+#   既に LISTEN されていないか確認する。
+# ------------------------------------------------------------
+function Port-InUse([int]$port) {
+  $listener = New-Object System.Net.Sockets.TcpListener([Net.IPAddress]::Loopback, $port)
+  try {
+    $listener.Start(); $listener.Stop(); return $false
+  }
+  catch {
+    return $true
+  }
+}
+
+function Check-RedisPort {
+  $port = if ($Env:HOST_REDIS_PORT) { [int]$Env:HOST_REDIS_PORT } else { 6379 }
+  if (Port-InUse $port) {
+    Write-Host "`n❌ Port $port is already in use. Set HOST_REDIS_PORT to a free port." -ForegroundColor Red
+    exit 1
+  }
+}
+
 if ($Down) {
   Write-Host "▶ 停止 & リソース削除…" -ForegroundColor Cyan
   & docker compose @flags down -v --remove-orphans
@@ -50,6 +73,7 @@ if ($Down) {
 
 if ($Up) {
   Check-Compose
+  Check-RedisPort
 
   Write-Host "`n▶ サービス起動中… (worker=3)" -ForegroundColor Cyan
   & docker compose @flags up -d --build --scale worker=3

@@ -82,9 +82,16 @@ class RedisRepository:
             or f"redis://127.0.0.1:6379/{db}"  # フォールバック
         )
 
-        self._r: redis.Redis = redis.from_url(
+        # redis-py <4.0 does not provide ``redis.from_url``. Fall back to
+        # ``Redis.from_url`` when necessary so unit tests run under the minimal
+        # stubbed environment.
+        from_url = getattr(redis, "from_url", None)
+        if from_url is None:
+            from_url = redis.Redis.from_url  # type: ignore[attr-defined]
+
+        self._r: redis.Redis = from_url(
             redis_url,
-            decode_responses=True,  # bytes → str 自動デコード
+            decode_responses=True,
             **redis_opts,
         )
         logger.debug("[RedisRepo] init prefix=%s url=%s", self._prefix, redis_url)
