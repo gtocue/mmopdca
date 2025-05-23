@@ -88,11 +88,6 @@ def _cx():
             _CX = psycopg.connect(dsn, autocommit=True)
         else:
             _CX = psycopg.connect(**dsn, autocommit=True)
-         dsn = _make_dsn()
-        if isinstance(dsn, str):
-            _CX = psycopg.connect(dsn, autocommit=True)
-        else:
-            _CX = psycopg.connect(**dsn, autocommit=True)           
     return _CX
 
 

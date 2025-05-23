@@ -50,7 +50,7 @@ def _merge_params(plan: PlanResponse, req: DoCreateRequest) -> Dict[str, Any]:
 
 
 def _upsert(rec: Dict[str, Any]) -> None:
-        """単純な delete→create ではなく既存値をマージして保存する."""
+    """単純な delete→create ではなく既存値をマージして保存する."""
     do_id = rec["do_id"]
     current = _do_repo.get(do_id) or {}
     current.update(rec)
