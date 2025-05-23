@@ -55,4 +55,11 @@ starting the containers:
 ```bash
 export HOST_REDIS_PORT=16379
 docker compose up -d
+
+PostgreSQL exposes port `5432` on the host. To avoid conflicts, you can
+set `HOST_POSTGRES_PORT` to a free port in the same way:
+
+```bash
+export HOST_POSTGRES_PORT=15432
+docker compose up -d
 ```

@@ -122,7 +122,7 @@ def save_predictions(df: Any, plan_id: str, run_id: str) -> str:
             )
         else:
             df.to_pickle(path)
-                else:  # dummy fallback
+    else:  # dummy fallback
         path.write_text("dummy", encoding="utf-8")
 
     logger.debug("Predictions saved: %s", path)
@@ -142,7 +142,7 @@ def load_predictions(plan_id: str, run_id: str) -> Any:
         if _HAS_PARQUET:
             return pd.read_parquet(path)  # type: ignore
         return pd.read_pickle(path)
-            else:
+    else:
         return path.read_text(encoding="utf-8")
 
 # --------------------------------------------------
