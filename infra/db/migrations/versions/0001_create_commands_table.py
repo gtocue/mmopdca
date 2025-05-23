@@ -1,7 +1,7 @@
 """Create commands table
 
 Revision ID: 0001_create_commands_table
-Revises:     None
+Revises: 7e0758401a54
 Create Date: 2025-05-XX YY:ZZ
 """
 from alembic import op
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision      = "0001_create_commands_table"
-down_revision = None
+down_revision = "7e0758401a54"
 branch_labels = None
 depends_on    = None
 
