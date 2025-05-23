@@ -1,9 +1,12 @@
+# -*- coding: utf-8 -*-
 """Create commands table
 
 Revision ID: 0001_create_commands_table
 Revises: 7e0758401a54
 Create Date: 2025-05-XX YY:ZZ
 """
+from __future__ import annotations
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -15,7 +18,8 @@ depends_on    = None
 
 
 def upgrade() -> None:
-    # UUID 生成関数を確保
+    """Create the commands table and pgcrypto extension."""
+    # Ensure UUID generation is available
         """Create table if it does not already exist."""
     # Ensure pgcrypto is available for gen_random_uuid()
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
