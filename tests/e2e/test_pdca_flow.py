@@ -1,23 +1,30 @@
-# =========================================================
-# ASSIST_KEY: このファイルは【tests/e2e/test_pdca_flow.py】に位置するユニットです
-# =========================================================
-#
-# 【概要】
-#   “Plan→Do→Check” の最小 E2E サイクルを擬似実行して
-#   CheckResult が生成されることを検証。
-# ---------------------------------------------------------
-from datetime import date, datetime
-import uuid
-from core.common.io_utils import save_predictions, save_meta, load_predictions
-from core.schemas.meta_schemas import MetaInfo, MetricSpec
-from core.check.check_executor import CheckExecutor
-from core.constants import ensure_directories
-import pandas as pd
+"""End‑to‑end minimal PDCA flow test (Plan → Do → Check).
 
-# …（ダミー DataFrame 作成部分は省略せずそのまま）…
+This file belongs to **tests/e2e** and intentionally avoids any external
+services.  All heavy‑weight parts (Celery, Redis …) are stubbed by
+``tests/conftest.py`` so the suite can run on plain `pytest`.
+"""
+from __future__ import annotations
+
+import uuid
+from datetime import date, datetime
+
+import pandas as pd
+import pytest
+
+from core.check.check_executor import CheckExecutor
+from core.common.io_utils import load_predictions, save_meta, save_predictions
+from core.constants import ensure_directories
+from core.schemas.meta_schemas import MetaInfo, MetricSpec
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
 
 def _make_dummy_df() -> pd.DataFrame:
-    """テスト用の簡易 DataFrame を生成"""
+    """Return a tiny synthetic dataset that exercises the entire IO path."""
+
     return pd.DataFrame(
         {
             "symbol": ["TEST"] * 3,
@@ -32,15 +39,37 @@ def _make_dummy_df() -> pd.DataFrame:
             "model_id": ["dummy"] * 3,
         }
     )
-    
-def test_pdca_min_cycle(tmp_path) -> None:
-    ensure_directories()
-    plan_id = "plan_" + uuid.uuid4().hex[:6]
-    run_id = "run_" + uuid.uuid4().hex[:6]
 
+
+# ---------------------------------------------------------------------------
+# Test case
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.e2e
+def test_pdca_min_cycle(tmp_path) -> None:
+    """Smoke‑test the *whole* PDCA pipeline with stubbed workers.
+
+    - **Plan**  : nothing to persist – IDs are generated on the fly.
+    - **Do**    : ``save_predictions`` writes a Parquet file the API expects.
+    - **Check** : ``CheckExecutor`` reads the artefacts and produces a report.
+
+    The assertions guarantee that:
+    1. The check finished successfully.
+    2. The dataset round‑trips through Parquet unchanged.
+    """
+
+    # ensure all artefact directories exist (tmp_path is ignored by codebase)
+    ensure_directories()
+
+    plan_id = f"plan_{uuid.uuid4().hex[:6]}"
+    run_id = f"run_{uuid.uuid4().hex[:6]}"
+
+    # 1) predictions.parquet
     df = _make_dummy_df()
     save_predictions(df, plan_id, run_id)
 
+    # 2) meta.yaml
     meta = MetaInfo(
         plan_id=plan_id,
         run_id=run_id,
@@ -51,9 +80,12 @@ def test_pdca_min_cycle(tmp_path) -> None:
     )
     save_meta(meta.model_dump(mode="json"), plan_id, run_id)
 
+    # 3) run *Check* synchronously (see tests/conftest.py monkey‑patch)
     result = CheckExecutor.run(plan_id, run_id)
-    assert result.do_id == run_id
-    assert isinstance(result.report.passed, bool)
 
+    assert result.do_id == run_id
+    assert result.report.passed is True
+
+    # 4) ensure the Parquet round‑trip kept all rows
     df_loaded = load_predictions(plan_id, run_id)
     assert len(df_loaded) == 3

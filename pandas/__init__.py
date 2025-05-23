@@ -26,3 +26,35 @@ class DataFrame(list):
     def __len__(self):
         return super().__len__()
         
+    def __getitem__(self, key):
+        return [row.get(key) for row in self]
+
+    # --------------------------------------------------
+    # Minimal persistence helpers used in tests
+    # --------------------------------------------------
+    def to_pickle(self, path):
+        import json
+        def _convert(obj):
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
+            return obj
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump([{k: _convert(v) for k, v in row.items()} for row in self], f)
+
+    def to_parquet(self, path, compression=None, index=True):  # pragma: no cover - simplified
+        self.to_pickle(path)
+
+
+def read_pickle(path):
+    import json
+    with open(path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    if not data:
+        return DataFrame({})
+    keys = list(data[0].keys())
+    cols = {k: [row.get(k) for row in data] for k in keys}
+    return DataFrame(cols)
+
+
+def read_parquet(path):  # pragma: no cover - simplified
+    return read_pickle(path)

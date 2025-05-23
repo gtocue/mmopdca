@@ -15,4 +15,4 @@ dates:
 indicators:
   moving_averages:
     SMA: { window: 20 }
-    EMA: { window }
+    EMA: { window: 50 }

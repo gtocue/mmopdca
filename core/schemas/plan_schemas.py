@@ -38,5 +38,8 @@ class PlanResponse(BaseModel):
     # DSL フィールドもそのまま保持
     model_config = ConfigDict(extra="allow")
 
+    class Config:
+        extra = "allow"
+
 
 __all__ = ["PlanCreateRequest", "PlanResponse"]

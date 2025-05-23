@@ -36,3 +36,14 @@ class PredictionArtifact(BaseModel):
     plan_id: str = Field(default_factory=lambda: f"plan-{uuid.uuid4().hex[:8]}")
     run_id: str = Field(default_factory=lambda: f"run-{uuid.uuid4().hex[:8]}")
     records: List[PredictionRecord]
+
+    # ------------------------------------------------------------------
+    # Compatibility helpers for pydantic v1
+    # ------------------------------------------------------------------
+    def model_dump_json(self, **kwargs) -> str:
+        """pydantic v2 compatible API"""
+        return self.json(**kwargs)
+
+    @classmethod
+    def model_validate_json(cls, data: str, **kwargs) -> "PredictionArtifact":
+        return cls.parse_raw(data, **kwargs)

@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       HOST_POSTGRES_PORT: '15432'
+      HOST_REDIS_PORT: '16379'
     strategy:
       fail-fast: false
       matrix:

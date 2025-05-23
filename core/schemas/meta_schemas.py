@@ -61,6 +61,19 @@ class MetaInfo(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     model_config = ConfigDict(extra="forbid")
+    
+    # ------------------------------------------------------------------
+    # Compatibility helpers for pydantic v1
+    # ------------------------------------------------------------------
+    def model_dump(self, *, mode: str = "python", **kwargs):  # type: ignore[override]
+        if mode == "json":
+            import json
+            return json.loads(self.json(**kwargs))
+        return self.dict(**kwargs)
+
+    @classmethod
+    def model_validate(cls, data, **kwargs):  # type: ignore[override]
+        return cls.parse_obj(data)
 
 
 # 公開シンボル

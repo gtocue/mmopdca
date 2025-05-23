@@ -50,18 +50,28 @@ except ModuleNotFoundError:  # pragma: no cover
 # --------------------------------------------------
 # メトリクス計算ユーティリティ
 # --------------------------------------------------
+def _to_list(obj):
+    return list(obj)
+
+
 def _mape(y_true, y_pred) -> float:
-    return float((abs((y_true - y_pred) / y_true)).mean()) * 100.0
+    yt = _to_list(y_true)
+    yp = _to_list(y_pred)
+    return float(sum(abs((a - b) / a) for a, b in zip(yt, yp)) / len(yt)) * 100.0
 
 
 def _rmse(y_true, y_pred) -> float:
-    return float(math.sqrt(((y_true - y_pred) ** 2).mean()))
+    yt = _to_list(y_true)
+    yp = _to_list(y_pred)
+    return float(math.sqrt(sum((a - b) ** 2 for a, b in zip(yt, yp)) / len(yt)))
 
 
 def _r2(y_true, y_pred) -> float:
-    mean_y = float(y_true.mean())
-    ss_tot = float(((y_true - mean_y) ** 2).sum())
-    ss_res = float(((y_true - y_pred) ** 2).sum())
+    yt = _to_list(y_true)
+    yp = _to_list(y_pred)
+    mean_y = sum(yt) / len(yt)
+    ss_tot = sum((a - mean_y) ** 2 for a in yt)
+    ss_res = sum((a - b) ** 2 for a, b in zip(yt, yp))
     return 1.0 - ss_res / ss_tot if ss_tot != 0 else 0.0
 
 

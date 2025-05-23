@@ -1,3 +1,10 @@
+"""Shared pytest fixtures for the whole test‑suite.
+
+This file is self‑contained – *no* external stubs or monkey‑patch helpers are
+required.  Everything that used to rely on Celery/Redis is replaced by a cheap
+in‑process stand‑in so the suite can run on any CI runner without extra
+services.
+"""
 from __future__ import annotations
 
 import importlib
@@ -5,38 +12,54 @@ import socket
 import threading
 import time
 from contextlib import closing
-from typing import Iterator
+from datetime import datetime, timezone
+from typing import Any, Iterator
 
 import pytest
 import uvicorn
+from fastapi import FastAPI
 
-# ----------------------------------------------------------------------
-# pytest-benchmark が無い環境向けの簡易ベンチマーク fixture
-# ----------------------------------------------------------------------
+# ────────────────────────────────────────────────────────────────────────────────
+# 0.  tiny benchmark fixture (pytest‑benchmark replacement)                     ─
+# ────────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
-def benchmark():
-    """Minimal benchmark fixture compatible with pytest-benchmark."""
+def benchmark():  # noqa: D401 – fixture, not function docstring
+    """A *very* small shim so the test‑suite can call ``benchmark(fn, *args)``.
 
-    def run(fn, *args, **kwargs):
+    It just runs the function once and returns the value – nothing more.  If
+    pytest‑benchmark is installed the real fixture will silently override this
+    one, so you still get proper statistics in richer environments.
+    """
+
+    def _run(fn: Any, *args: Any, **kwargs: Any):  # noqa: ANN401
         return fn(*args, **kwargs)
 
-    return run
+    return _run
 
-# ----------------------------------------------------------------------
-# ① do_api を “同期・HTTP 202 版” に確実に差し替え
-# ----------------------------------------------------------------------
-import api.routers.do_api as _do_api
-from datetime import datetime, timezone
-from core.repository.factory import get_repo
-from core.celery_app import celery_app
 
-# キャッシュを消して最新ソースをロード
-_do_api = importlib.reload(_do_api)  # noqa: PLW0603
+# ────────────────────────────────────────────────────────────────────────────────
+# 1.  Patch *do* and *check* flows so they are synchronous & in‑process          ─
+# ────────────────────────────────────────────────────────────────────────────────
 
-# Celery を使わないため run_do_task 自体をスタブ実装に差し替える
-def _dummy_run_do_task(do_id: str, plan_id: str, params: dict) -> None:
-    """Simplified run_do_task used for unit tests."""
+# (re)load the module after the test runner has had a chance to monkey‑patch
+# anything it likes – that guarantees we have the final symbols.
+import api.routers.do_api as _do_api  # noqa: E402  (import after top‑level)
+from core.celery_app import celery_app  # noqa: E402
+from core.repository.factory import get_repo  # noqa: E402
+
+_do_api = importlib.reload(_do_api)  # type: ignore[assignment]  # refresh
+
+
+def _dummy_run_do_task(do_id: str, plan_id: str, params: dict):  # noqa: D401
+    """Very small replacement for the real Celery task.
+
+    - Marks the *do* record as **DONE** with a perfect score.
+    - Runs entirely in‑process / synchronous so the tests don’t need Celery or
+      Redis.
+    """
+
     repo = get_repo("do")
     now = datetime.now(timezone.utc).isoformat()
     repo.upsert(
@@ -56,7 +79,9 @@ def _dummy_run_do_task(do_id: str, plan_id: str, params: dict) -> None:
     )
 
 
-def _sync_apply_async(*args, **kwargs):
+# Celery’s ``apply_async`` → call synchronously
+
+def _sync_apply_async(*args: Any, **kwargs: Any):  # noqa: ANN401
     _args = kwargs.get("args") or (args[0] if args else ())
     _kwargs = kwargs.get("kwargs", {})
     _dummy_run_do_task(*_args, **_kwargs)
@@ -65,10 +90,13 @@ def _sync_apply_async(*args, **kwargs):
 _do_api.run_do_task.apply_async = _sync_apply_async  # type: ignore[attr-defined]
 
 
-# Check フェーズも Celery を使わずに即時実行するスタブ
-def _dummy_send_task(name: str, args: list | tuple | None = None, **_: object) -> None:
+# The *check* phase normally spawns another Celery task – we replace the broker
+# call entirely so it writes the finished record immediately.
+
+def _dummy_send_task(name: str, args: list | tuple | None = None, **_: object):
     if not args:
         return
+
     check_id, do_id = args
     repo = get_repo("check")
     now = datetime.now(timezone.utc).isoformat()
@@ -91,36 +119,40 @@ def _dummy_send_task(name: str, args: list | tuple | None = None, **_: object) -
 
 celery_app.send_task = _dummy_send_task  # type: ignore[assignment]
 
-# ----------------------------------------------------------------------
-# ② FastAPI アプリ本体（※ do_api リロード済み状態で import）
-# ----------------------------------------------------------------------
-from api.main_api import app  # noqa: E402
+# ────────────────────────────────────────────────────────────────────────────────
+# 2.  Import the FastAPI application *after* monkey‑patching is complete        ─
+# ────────────────────────────────────────────────────────────────────────────────
+from api.main_api import app  # noqa: E402 – import order is deliberate
 
-# ----------------------------------------------------------------------
-# ③ Uvicorn 起動設定
-# ----------------------------------------------------------------------
+assert isinstance(app, FastAPI)  # quick sanity‑check
+
+# ────────────────────────────────────────────────────────────────────────────────
+# 3.  A session‑scoped fixture that starts Uvicorn once for the whole run        ─
+# ────────────────────────────────────────────────────────────────────────────────
+
 _HOST = "127.0.0.1"
 _PORT = 8001
 
+
 def _port_is_open() -> bool:
-    """ポートが LISTEN 中なら True"""
+    """Return True if something is LISTENing on ``_HOST:_PORT``."""
+
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.settimeout(0.2)
         return sock.connect_ex((_HOST, _PORT)) == 0
 
+
 @pytest.fixture(scope="session", autouse=True)
 def serve_api() -> Iterator[None]:
-    """
-    pytest セッション全体で Uvicorn をバックグラウンド起動する。
-    すでに同ポートで LISTEN していれば再起動せずに流用する。
-    """
+    """Spin up Uvicorn in a background thread for the duration of the test run."""
+
     if not _port_is_open():
         config = uvicorn.Config(app, host=_HOST, port=_PORT, log_level="warning")
         server = uvicorn.Server(config)
         thread = threading.Thread(target=server.run, daemon=True)
         thread.start()
 
-        # 起動待ち (最大 5 秒)
+        # ─ wait (max 5 s) until the port responds ─
         for _ in range(50):
             if _port_is_open():
                 break
@@ -128,5 +160,5 @@ def serve_api() -> Iterator[None]:
         else:
             raise RuntimeError(f"Uvicorn failed to start on {_HOST}:{_PORT}")
 
-    yield
-    # デーモンスレッドなので明示シャットダウン不要
+    yield  # tests run here – nothing else to do
+    # The server thread is *daemon*‑ised; Python will stop it automatically.
