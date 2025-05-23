@@ -72,5 +72,4 @@ set `HOST_PROM_PORT` accordingly:
 export HOST_PROM_PORT=19090
 docker compose up -d
 ```
-```
 If you see an error like 'Bind for 0.0.0.0:9090 failed: port is already allocated' when starting Prometheus, choose an unused port for HOST_PROM_PORT and rerun the compose command.
