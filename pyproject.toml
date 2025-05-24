@@ -30,7 +30,7 @@ typing-extensions = ">=4.7.1"
 celery            = "^5.3"
 redis             = "^5"
 python-dotenv     = "^1.0"
-numpy             = "^1.26"
+numpy             = ">=1.26,<2.0"
 pandas            = "^2.2"
 scikit-learn      = "^1.4"
 yfinance          = "^0.2"
@@ -93,3 +93,9 @@ disallow_any_generics       = true
 [[tool.mypy.overrides]]
 module = ["api", "core"]
 strict = true
+# ───────────── Ruff configuration (single source of truth) ─────────────
+[tool.ruff]
+extend-exclude = ["sdk-py", "httpx", "redis", "requests", "plugins"]
+
+[tool.ruff.lint]
+extend-ignore = ["E402"]            # import 順序例外だけ許容

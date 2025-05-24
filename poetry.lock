@@ -2550,4 +2550,4 @@ dev = ["httpx", "uvicorn"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<3.13"
-content-hash = "f1dd9b5e12ab7f77aa4222d4a2313eecb2feac659b0f5e81dfeea5c63691ff2f"
+content-hash = "f0f4730e44f94a54d633bdc25f66f884b4b9816a4a4cfb7e1299d8f27eaeeb6e"
