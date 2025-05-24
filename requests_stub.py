@@ -20,6 +20,8 @@ def _make_request(method: str, url: str, *, data=None, json_data=None):
         headers = {"Content-Type": "application/json"}
     else:
         headers = {}
+    if isinstance(data, str):
+        data = data.encode()
     req = _request.Request(url, data=data, headers=headers, method=method.upper())
     with _request.urlopen(req) as resp:
         return Response(resp.getcode(), dict(resp.headers), resp.read())
