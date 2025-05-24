@@ -14,6 +14,7 @@ import time
 from contextlib import closing
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterator
+import os
 
 import pytest
 import uvicorn
@@ -48,6 +49,12 @@ def benchmark():  # noqa: D401 – fixture, not function docstring
 import api.routers.do_api as _do_api  # noqa: E402  (import after top‑level)
 from core.celery_app import celery_app  # noqa: E402
 from core.repository.factory import get_repo  # noqa: E402
+
+# Force Celery into asynchronous mode regardless of environment variables so
+# ``celery_app.send_task`` is used and our in-process stand-ins take effect.
+celery_app.conf.task_always_eager = False
+celery_app.conf.task_eager_propagates = False
+celery_app.conf.task_store_eager_result = False
 
 _do_api = importlib.reload(_do_api)  # type: ignore[assignment]  # refresh
 
@@ -172,35 +179,45 @@ assert isinstance(app, FastAPI)  # quick sanity‑check
 # 3.  A session‑scoped fixture that starts Uvicorn once for the whole run        ─
 # ────────────────────────────────────────────────────────────────────────────────
 
+
+
 _HOST = "127.0.0.1"
 _PORT = 8001
 
 
-def _port_is_open() -> bool:
-    """Return True if something is LISTENing on ``_HOST:_PORT``."""
+def _port_is_open(port: int) -> bool:
+    """Return True if something is LISTENing on ``_HOST:port``."""
 
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
         sock.settimeout(0.2)
-        return sock.connect_ex((_HOST, _PORT)) == 0
+        return sock.connect_ex((_HOST, port)) == 0
 
 
 @pytest.fixture(scope="session", autouse=True)
 def serve_api() -> Iterator[None]:
     """Spin up Uvicorn in a background thread for the duration of the test run."""
 
-    if not _port_is_open():
-        config = uvicorn.Config(app, host=_HOST, port=_PORT, log_level="warning")
+    port = _PORT
+    if _port_is_open(port):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            sock.bind((_HOST, 0))
+            port = sock.getsockname()[1]
+
+    if not _port_is_open(port):
+        config = uvicorn.Config(app, host=_HOST, port=port, log_level="warning")
         server = uvicorn.Server(config)
         thread = threading.Thread(target=server.run, daemon=True)
         thread.start()
 
         # ─ wait (max 5 s) until the port responds ─
         for _ in range(50):
-            if _port_is_open():
+            if _port_is_open(port):
                 break
             time.sleep(0.1)
         else:
-            raise RuntimeError(f"Uvicorn failed to start on {_HOST}:{_PORT}")
+            raise RuntimeError(f"Uvicorn failed to start on {_HOST}:{port}")
+
+    os.environ["API_BASE_URL"] = f"http://{_HOST}:{port}"
 
     yield  # tests run here – nothing else to do
     # The server thread is *daemon*‑ised; Python will stop it automatically.

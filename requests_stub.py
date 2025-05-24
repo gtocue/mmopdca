@@ -1,6 +1,7 @@
 import json
 from urllib import request as _request
 
+
 class Response:
     def __init__(self, status_code: int, headers: dict, content: bytes):
         self.status_code = status_code
@@ -33,3 +34,10 @@ def get(url: str, **kwargs):
 
 def post(url: str, json=None, data=None, **kwargs):
     return _make_request("POST", url, data=data, json_data=json)
+
+
+__all__ = [
+    "Response",
+    "get",
+    "post",
+]

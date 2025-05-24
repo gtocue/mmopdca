@@ -4,7 +4,7 @@ import time
 import requests
 import pytest
 
-BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8001")
+BASE_DEFAULT = "http://127.0.0.1:8001"
 
 
 def _wait_for_health(base_url: str, timeout: int = 10) -> bool:
@@ -23,10 +23,11 @@ def _wait_for_health(base_url: str, timeout: int = 10) -> bool:
 
 @pytest.mark.integration
 def test_plan_do_flow_http():
-    if not _wait_for_health(BASE):
+    base = os.getenv("API_BASE_URL", BASE_DEFAULT)
+    if not _wait_for_health(base):
         pytest.skip("API server not reachable")
     # 1) Plan 登録
-    resp = requests.post(f"{BASE}/plan-dsl/", json={
+    resp = requests.post(f"{base}/plan-dsl/", json={
         "symbol": "AAPL",
         "start": "2024-01-01",
         "end":   "2024-12-31",
@@ -35,13 +36,13 @@ def test_plan_do_flow_http():
     plan_id = resp.json()["id"]
 
     # 2) Do 登録
-    resp = requests.post(f"{BASE}/do/{plan_id}", json={})
+    resp = requests.post(f"{base}/do/{plan_id}", json={})
     assert resp.status_code == 202
     do_id = resp.json()["do_id"]
 
     # 3) 完了待ち（最大120秒）
     for _ in range(120):
-        rec = requests.get(f"{BASE}/do/{do_id}").json()
+        rec = requests.get(f"{base}/do/{do_id}").json()
         if rec["status"] == "DONE":
             break
         time.sleep(1)
@@ -49,12 +50,12 @@ def test_plan_do_flow_http():
         pytest.fail("Do did not finish within timeout")
 
     # 4) Check 登録＆完了待ち
-    resp = requests.post(f"{BASE}/check/{do_id}", json={})
+    resp = requests.post(f"{base}/check/{do_id}", json={})
     assert resp.status_code == 202
     check_id = resp.json()["id"]
 
     for _ in range(120):
-        rep = requests.get(f"{BASE}/check/{check_id}").json()
+        rep = requests.get(f"{base}/check/{check_id}").json()
         if rep.get("report"):
             assert rep["report"]["status"] == "SUCCESS"
             return
