@@ -73,7 +73,11 @@ class DSLValidator:
 
                 self._cache[schema_path] = _noop
             else:
-                schema = json.loads(schema_path.read_text())
+                # JSON スキーマは UTF-8 で保存してあるため明示的にエンコーディングを
+                # 指定して読み込む。Windows 環境では既定が cp932 となり、
+                # 日本語コメントを含むスキーマを読み込む際に UnicodeDecodeError
+                # が発生するため。テスト実行時のエラー回避も兼ねる。
+                schema = json.loads(schema_path.read_text(encoding="utf-8"))
                 _resolve_refs(schema, schema_path.parent)
                 self._cache[schema_path] = fastjsonschema.compile(schema)
         return self._cache[schema_path]

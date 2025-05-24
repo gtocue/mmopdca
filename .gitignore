@@ -44,3 +44,6 @@ docker-compose.ym*
 ########## OpenAPI / 自動生成 ##########
 openapi.json
 openapitools.json
+# === runtime artifacts ===
+/artifacts/
+/pdca_data/
