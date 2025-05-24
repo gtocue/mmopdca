@@ -73,7 +73,7 @@ class DSLValidator:
 
                 self._cache[schema_path] = _noop
             else:
-                schema = json.loads(schema_path.read_text())
+                schema = json.loads(schema_path.read_text(encoding="utf-8"))
                 _resolve_refs(schema, schema_path.parent)
                 self._cache[schema_path] = fastjsonschema.compile(schema)
         return self._cache[schema_path]
