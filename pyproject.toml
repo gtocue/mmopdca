@@ -1,4 +1,4 @@
-[tool.ruff]
+
 extend-exclude = [
   "sdk-py",  # OpenAPI 自動生成
   "httpx",
@@ -7,5 +7,35 @@ extend-exclude = [
   "plugins",
 ]
 
+
+extend-ignore = ["E402"]  # import 順序を許容[tool.ruff]
+extend-exclude = [
+  "sdk-py", "httpx", "redis", "requests", "plugins",
+]
+
+
+extend-ignore = ["E402"]
+
+extend-exclude = [
+  "sdk-py", "httpx", "redis", "requests", "plugins",
+]
+
+
+extend-ignore = ["E402"]
+
+extend-exclude = ["sdk-py", "httpx", "redis", "requests", "plugins"]
+
+
+extend-ignore = ["E402"]
+
+
+extend-exclude = ["sdk-py", "httpx", "redis", "requests", "plugins"]
+
+
+extend-ignore = ["E402"]
+
+[tool.ruff]
+extend-exclude = ["sdk-py", "httpx", "redis", "requests", "plugins"]
+
 [tool.ruff.lint]
-extend-ignore = ["E402"]  # import 順序を許容
+extend-ignore = ["E402"]
