@@ -13,7 +13,7 @@ import threading
 import time
 from contextlib import closing
 from datetime import datetime, timezone
-from typing import Any, Iterator
+from typing import Any, Dict, Iterator
 
 import pytest
 import uvicorn
@@ -52,6 +52,27 @@ from core.repository.factory import get_repo  # noqa: E402
 _do_api = importlib.reload(_do_api)  # type: ignore[assignment]  # refresh
 
 
+def _repo_upsert(repo: Any, key: str, data: Dict[str, Any]) -> None:
+    """Best-effort upsert across different repository implementations."""
+
+    if hasattr(repo, "upsert"):
+        repo.upsert(key, data)
+        return
+
+    current = {}
+    try:
+        current = repo.get(key) or {}
+    except Exception:
+        pass
+
+    current.update(data)
+    try:
+        repo.delete(key)
+    except Exception:
+        pass
+    repo.create(key, current)
+
+
 def _dummy_run_do_task(do_id: str, plan_id: str, params: dict):  # noqa: D401
     """Very small replacement for the real Celery task.
 
@@ -62,7 +83,8 @@ def _dummy_run_do_task(do_id: str, plan_id: str, params: dict):  # noqa: D401
 
     repo = get_repo("do")
     now = datetime.now(timezone.utc).isoformat()
-    repo.upsert(
+    _repo_upsert(
+        repo,
         do_id,
         {
             "do_id": do_id,
@@ -118,7 +140,7 @@ def _dummy_send_task(name: str, args: list | tuple | None = None, **_: object):
                 "completed_at": now,
             }
         )
-        repo.upsert(check_id, rec)
+        _repo_upsert(repo, check_id, rec)
 
     # 2024-06-09: Use a background thread to update the record slightly later
     # instead of ``threading.Timer`` which occasionally fails to fire in CI.
@@ -127,7 +149,7 @@ def _dummy_send_task(name: str, args: list | tuple | None = None, **_: object):
     def _run() -> None:
         time.sleep(0.05)
         repo = get_repo("check")
-        for _ in range(20):
+        for _ in range(40):  # wait up to ~2s for record creation
             if repo.get(check_id) is not None:
                 break
             time.sleep(0.05)
