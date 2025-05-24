@@ -22,7 +22,7 @@ from datetime import date
 from pydantic import BaseModel, StrictStr
 from mmopdca_sdk.pydantic_compat import ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
-from typing import Optional, Set
+from typing import Set
 from typing_extensions import Self
 
 

@@ -1,12 +1,16 @@
 # conftest_e2e.py
-import os, time, threading, socket, importlib
-import pytest, uvicorn
+import time
+import threading
+import socket
+import pytest
+import uvicorn
 from api.main_api import app as _app
 
 HOST, PORT = "127.0.0.1", 8001
 
 def _port_open():
-    s = socket.socket(); s.settimeout(0.2)
+    s = socket.socket()
+ s.settimeout(0.2)
     return s.connect_ex((HOST, PORT)) == 0
 
 @pytest.fixture(scope="session", autouse=True)

@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 # データフレームライブラリ (polars > pandas 優先)
 # --------------------------------------------------
 try:
-    import polars as pl  # type: ignore
+    import polars  # noqa: F401 as pl  # type: ignore
 
     _DF_LIB = "polars"
 except ModuleNotFoundError:  # pragma: no cover

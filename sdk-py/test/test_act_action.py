@@ -15,7 +15,6 @@ Do not edit the class manually.
 
 import unittest
 
-from mmopdca_sdk.models.act_action import ActAction
 
 
 class TestActAction(unittest.TestCase):

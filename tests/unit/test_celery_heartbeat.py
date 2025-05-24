@@ -1,6 +1,5 @@
 # tests/unit/test_celery_heartbeat.py
 
-import pytest
 from celery.schedules import crontab
 
 from core.celery_app import celery_app

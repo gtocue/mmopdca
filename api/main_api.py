@@ -27,7 +27,6 @@ from fastapi import (
     WebSocket,
 )
 from fastapi.security.api_key import APIKeyHeader
-from fastapi.responses import StreamingResponse
 
 # ─────────────────────────── env / logger
 load_dotenv(find_dotenv())  # *.env を再帰探索して環境変数に投入
@@ -37,7 +36,6 @@ logger.setLevel(logging.INFO)
 # ----------------------------------------------------------------------
 # Celery タスクモジュールを必ずインポート（Eager モードでも登録されるよう）
 # ----------------------------------------------------------------------
-import core.tasks.do_tasks  # type: ignore  # run_do_task を登録
 
 # ----------------------------------------------------------------------
 # API Key 認証設定

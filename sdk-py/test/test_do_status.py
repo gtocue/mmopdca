@@ -15,7 +15,6 @@ Do not edit the class manually.
 
 import unittest
 
-from mmopdca_sdk.models.do_status import DoStatus
 
 
 class TestDoStatus(unittest.TestCase):

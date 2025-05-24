@@ -1,6 +1,5 @@
 # test_ws_progress_events.py
 import os
-import pytest
 from starlette.testclient import TestClient
 from api.main_api import app
 

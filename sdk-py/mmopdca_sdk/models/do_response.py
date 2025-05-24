@@ -21,9 +21,8 @@ import json
 from pydantic import BaseModel, Field, StrictStr
 from mmopdca_sdk.pydantic_compat import ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
-from typing_extensions import Annotated
 from mmopdca_sdk.models.do_status import DoStatus
-from typing import Optional, Set
+from typing import Set
 from typing_extensions import Self
 
 
