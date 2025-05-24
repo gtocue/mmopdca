@@ -72,13 +72,6 @@ def enqueue_check(do_id: str) -> JSONResponse:
     task_id = uuid.uuid4().hex
     check_id = f"check-{task_id[:8]}"
 
-    # Celery に enqueue (文字列タスク名)
-    celery_app.send_task(
-        "core.tasks.check_tasks.run_check_task",
-        args=[check_id, do_id],
-        task_id=task_id,
-    )
-
     # 初期レコード作成
     rec: Dict[str, Any] = {
         "id": check_id,
@@ -89,6 +82,13 @@ def enqueue_check(do_id: str) -> JSONResponse:
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     _upsert(rec)
+
+    # Celery に enqueue (文字列タスク名)
+    celery_app.send_task(
+        "core.tasks.check_tasks.run_check_task",
+        args=[check_id, do_id],
+        task_id=task_id,
+    )
 
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,

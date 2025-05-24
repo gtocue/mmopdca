@@ -42,8 +42,12 @@ class PredictionArtifact(BaseModel):
     # ------------------------------------------------------------------
     def model_dump_json(self, **kwargs) -> str:
         """Return JSON representation (pydantic v1 compat)."""
-        return super().model_dump_json(**kwargs)
+        if hasattr(super(), "model_dump_json"):
+            return super().model_dump_json(**kwargs)
+        return self.json(**kwargs)
 
     @classmethod
     def model_validate_json(cls, data: str, **kwargs) -> "PredictionArtifact":
-        return super().model_validate_json(data, **kwargs)
+        if hasattr(super(), "model_validate_json"):
+            return super().model_validate_json(data, **kwargs)
+        return cls.parse_raw(data, **kwargs)
