@@ -1,12 +1,30 @@
 # tests/integration/test_plan_do_flow_http.py
+import os
 import time
 import requests
 import pytest
 
-BASE = "http://127.0.0.1:8001"  # 適宜環境変数化してもよい
+BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8001")
+
+
+def _wait_for_health(base_url: str, timeout: int = 10) -> bool:
+    """Return ``True`` if ``GET /health`` succeeds within ``timeout`` seconds."""
+
+    deadline = time.time() + timeout
+    health_url = f"{base_url.rstrip('/')}/health"
+    while time.time() < deadline:
+        try:
+            if requests.get(health_url, timeout=3).status_code == 200:
+                return True
+        except requests.RequestException:
+            pass
+        time.sleep(1)
+    return False
 
 @pytest.mark.integration
 def test_plan_do_flow_http():
+        if not _wait_for_health(BASE):
+        pytest.skip("API server not reachable")
     # 1) Plan 登録
     resp = requests.post(f"{BASE}/plan-dsl/", json={
         "symbol": "AAPL",

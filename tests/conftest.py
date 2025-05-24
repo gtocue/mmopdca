@@ -122,8 +122,15 @@ def _dummy_send_task(name: str, args: list | tuple | None = None, **_: object):
 
     # 2024-06-09: Use a background thread to update the record slightly later
     # instead of ``threading.Timer`` which occasionally fails to fire in CI.
+        # Wait until the initial record has been created before updating so the
+    # synchronous upsert in the API handler doesn’t overwrite our data.
     def _run() -> None:
-        time.sleep(0.01)
+        time.sleep(0.05)
+                repo = get_repo("check")
+        for _ in range(20):
+            if repo.get(check_id) is not None:
+                break
+            time.sleep(0.05)
         _update()
 
     threading.Thread(target=_run, daemon=True).start()
