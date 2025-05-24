@@ -1,53 +1,45 @@
-"""
-api.routers.ai_key_api
-----------------------
-
-Sprint-2: “AI-Key PoC” 用のシンプルなキー管理エンドポイント。
-外部サービスへはアクセスせず **インメモリ** で完結させているため、
-ユニットテストでもネットワークアクセスを必要としません。
-
-❌ 永続化なし
-❌ 本番環境用途なし
-✅ 生成・一覧・削除 が出来ればテストは通る
-"""
-
 from __future__ import annotations
 
-import secrets
-from typing import Final, List
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import JSONResponse
 
-router: Final = APIRouter(prefix="/ai-key", tags=["ai-key"])
+from core.repository.factory import get_repo
 
-# PoC 用 ─ メモリ上でのみ保持
-_KEYS: list[str] = []
+router = APIRouter(prefix="/ai-key", tags=["ai-key"])
 
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
-def create_key() -> dict[str, str]:
-    """32 文字のランダム API キーを発行して返す。"""
-    key = secrets.token_hex(16)
-    _KEYS.append(key)
-    return {"key": key}
+_repo = get_repo("ai_key")
 
 
-@router.get("/", response_model=List[str])
-def list_keys() -> list[str]:
-    """現在登録されているキーをすべて返す。"""
-    return _KEYS.copy()
+@router.post(
+    "/",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create AI key",
+)
+def create_ai_key() -> JSONResponse:
+    key = uuid.uuid4().hex
+    now = datetime.now(timezone.utc).isoformat()
+    _repo.create(key, {"id": key, "created_at": now})
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content={"key": key})
 
 
-@router.delete("/{key}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_key(key: str) -> Response:
-    """
-    指定キーを削除。存在しなければ 404。
+@router.get(
+    "/{key}",
+    summary="Get AI key",
+)
+def get_ai_key(key: str) -> Dict[str, Any]:
+    rec = _repo.get(key)
+    if rec is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="AI key not found")
+    return rec
 
-    204 はボディを返せないため、空 `Response` を明示的に返す。
-    """
-    try:
-        _KEYS.remove(key)
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="key not found") from exc
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+@router.get(
+    "/",
+    summary="List AI keys",
+)
+def list_ai_keys() -> List[Dict[str, Any]]:
+    return list(_repo.list())
