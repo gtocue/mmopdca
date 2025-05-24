@@ -1,8 +1,8 @@
 services:
   celery-exporter:
     build:
-      context: .
-      dockerfile: Dockerfile.celery-exporter
+      context: ./celery-exporter      # ← フォルダをビルドコンテキストに
+      dockerfile: Dockerfile          # ← 中の Dockerfile 名
     env_file:
       - ../.env
     environment:
