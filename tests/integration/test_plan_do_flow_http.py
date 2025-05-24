@@ -23,7 +23,7 @@ def _wait_for_health(base_url: str, timeout: int = 10) -> bool:
 
 @pytest.mark.integration
 def test_plan_do_flow_http():
-        if not _wait_for_health(BASE):
+    if not _wait_for_health(BASE):
         pytest.skip("API server not reachable")
     # 1) Plan 登録
     resp = requests.post(f"{BASE}/plan-dsl/", json={
