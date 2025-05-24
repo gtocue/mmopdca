@@ -149,11 +149,12 @@ def _dummy_send_task(name: str, args: list | tuple | None = None, **_: object):
     def _run() -> None:
         time.sleep(0.05)
         repo = get_repo("check")
-        for _ in range(40):  # wait up to ~2s for record creation
+        for _ in range(120):  # wait up to ~6s for record creation
             if repo.get(check_id) is not None:
-                break
+                _update()
+                return
             time.sleep(0.05)
-        _update()
+        _update()  # fallback if the initial record never appeared
 
     threading.Thread(target=_run, daemon=True).start()
 

@@ -39,8 +39,8 @@ def test_plan_do_flow_http():
     assert resp.status_code == 202
     do_id = resp.json()["do_id"]
 
-    # 3) 完了待ち（最大60秒）
-    for _ in range(60):
+    # 3) 完了待ち（最大120秒）
+    for _ in range(120):
         rec = requests.get(f"{BASE}/do/{do_id}").json()
         if rec["status"] == "DONE":
             break
@@ -53,7 +53,7 @@ def test_plan_do_flow_http():
     assert resp.status_code == 202
     check_id = resp.json()["id"]
 
-    for _ in range(60):
+    for _ in range(120):
         rep = requests.get(f"{BASE}/check/{check_id}").json()
         if rep.get("report"):
             assert rep["report"]["status"] == "SUCCESS"

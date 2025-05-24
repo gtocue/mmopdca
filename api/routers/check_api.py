@@ -72,12 +72,16 @@ def enqueue_check(do_id: str) -> JSONResponse:
     task_id = uuid.uuid4().hex
     check_id = f"check-{task_id[:8]}"
 
-    # Celery に enqueue (文字列タスク名)
-    celery_app.send_task(
-        "core.tasks.check_tasks.run_check_task",
-        args=[check_id, do_id],
-        task_id=task_id,
-    )
+    # Celery に enqueue, or run synchronously when eager
+    if celery_app.conf.task_always_eager:
+        from core.tasks.check_tasks import run_check_task  # Lazy import
+        run_check_task(check_id, do_id)  # 同期実行
+    else:
+        celery_app.send_task(
+            "core.tasks.check_tasks.run_check_task",
+            args=[check_id, do_id],
+            task_id=task_id,
+        )
 
     # 初期レコード作成
     rec: Dict[str, Any] = {
