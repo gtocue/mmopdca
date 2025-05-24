@@ -9,7 +9,7 @@ from datetime import date
 from typing import Optional
 
 import json
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 
 
 # POST /plan/ 用 --------------------------------------------------------
@@ -37,7 +37,8 @@ class PlanResponse(BaseModel):
     created_at: str
 
     # DSL フィールドもそのまま保持
-    model_config = ConfigDict(extra="allow")
+    class Config:
+        extra = "allow"
 
     def dict(self, *args, **kwargs):  # pragma: no cover - pydantic v1 compatibility
         data = super().dict(*args, **kwargs)
