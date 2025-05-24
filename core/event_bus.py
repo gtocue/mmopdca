@@ -43,7 +43,7 @@ import os
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
@@ -67,9 +67,10 @@ class EventEnvelope(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict, description="Event body")
     version: int = Field(1, description="イベントスキーマバージョン")
 
-    class Config:
-        json_encoders = {datetime: lambda v: v.isoformat()}
-        frozen = True  # イミュータブル
+    model_config = ConfigDict(
+        json_encoders={datetime: lambda v: v.isoformat()},
+        frozen=True,
+    )
 
 
 # ---------------------------------------------------------------------------
