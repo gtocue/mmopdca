@@ -76,7 +76,6 @@ class MetaInfo(BaseModel):
 
     @classmethod
     def model_validate(cls, data, **kwargs):  # type: ignore[override]
-        return super().model_validate(data, **kwargs)
         try:
             return super().model_validate(data, **kwargs)
         except AttributeError:  # pragma: no cover - pydantic v1

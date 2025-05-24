@@ -38,7 +38,8 @@ class PlanResponse(BaseModel):
 
     # DSL フィールドもそのまま保持
     model_config = ConfigDict(extra="allow")
-        class Config:  # pragma: no cover - pydantic v1 fallback
+
+    class Config:  # pragma: no cover - pydantic v1 fallback
         extra = "allow"
 
     def dict(self, *args, **kwargs):  # pragma: no cover - pydantic v1 compatibility
