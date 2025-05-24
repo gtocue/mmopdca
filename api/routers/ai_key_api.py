@@ -1,45 +1,47 @@
-"""AI-Key PoC router (Sprint-2 #2-3).
-
-- POST /ai-key/         … 新しい API キーを発行して返す
-- GET  /ai-key/{key_id} … 登録済みキーのメタ情報を返す
-※ストレージはメモリ辞書。プロセス再起動で消える PoC 版。
 """
+api.routers.ai_key_api
+----------------------
+
+Sprint-2: “AI-Key PoC” 用のシンプルなキー管理エンドポイント。
+外部サービスへはアクセスせず、**インメモリ** で完結させているため
+ユニットテストでもネットワークエラーになりません。
+
+❌ 永続化なし
+❌ 本番環境用途なし
+✅ 生成・一覧・削除 が出来ればテストは通る
+"""
+
 from __future__ import annotations
 
 import secrets
-import uuid
-from datetime import datetime, timezone
-from typing import Final
+from typing import Final, List
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
 
 router: Final = APIRouter(prefix="/ai-key", tags=["ai-key"])
 
-# ───────────── In-memory store ──────────────
-_STORE: dict[str, "AIKey"] = {}
+# メモリ上にだけ保持（PoC 用）
+_KEYS: list[str] = []
 
 
-class AIKey(BaseModel):
-    id: str = Field(description="UUID4 文字列")
-    key: str = Field(description="実際に HTTP Header に乗る値")
-    created_at: datetime
+@router.post("/", status_code=status.HTTP_201_CREATED)
+def create_key() -> dict[str, str]:
+    """32 文字のランダム API キーを発行して返す。"""
+    key = secrets.token_hex(16)
+    _KEYS.append(key)
+    return {"key": key}
 
 
-# ───────────── Endpoints ─────────────────────
-@router.post("/", response_model=AIKey, status_code=status.HTTP_201_CREATED)
-def create_key() -> AIKey:
-    key_obj = AIKey(
-        id=str(uuid.uuid4()),
-        key=secrets.token_urlsafe(32),
-        created_at=datetime.now(timezone.utc),
-    )
-    _STORE[key_obj.id] = key_obj
-    return key_obj
+@router.get("/", response_model=List[str])
+def list_keys() -> list[str]:
+    """現在登録されているキーをすべて返す。"""
+    return _KEYS.copy()
 
 
-@router.get("/{key_id}", response_model=AIKey)
-def get_key(key_id: str) -> AIKey:
-    if key_id not in _STORE:
-        raise HTTPException(status_code=404, detail="AI-Key not found")
-    return _STORE[key_id]
+@router.delete("/{key}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_key(key: str) -> None:
+    """指定キーを削除。存在しなければ 404。"""
+    try:
+        _KEYS.remove(key)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "key not found") from exc
