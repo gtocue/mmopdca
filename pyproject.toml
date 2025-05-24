@@ -39,3 +39,8 @@ extend-exclude = ["sdk-py", "httpx", "redis", "requests", "plugins"]
 
 [tool.ruff.lint]
 extend-ignore = ["E402"]
+[tool.ruff]
+extend-exclude = ["sdk-py", "httpx", "redis", "requests", "plugins"]
+
+[tool.ruff.lint]
+extend-ignore = ["E402"]
