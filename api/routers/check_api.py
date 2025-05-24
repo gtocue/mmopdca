@@ -36,6 +36,9 @@ from celery import states
 from celery.backends.base import DisabledBackend
 from celery.result import AsyncResult
 
+# Import task module to register tasks with celery_app
+import core.tasks.check_tasks  # noqa: F401
+
 from core.celery_app import celery_app
 from core.repository.factory import get_repo
 from core.schemas.check_schemas import CheckResult
@@ -72,13 +75,6 @@ def enqueue_check(do_id: str) -> JSONResponse:
     task_id = uuid.uuid4().hex
     check_id = f"check-{task_id[:8]}"
 
-    # Celery に enqueue (文字列タスク名)
-    celery_app.send_task(
-        "core.tasks.check_tasks.run_check_task",
-        args=[check_id, do_id],
-        task_id=task_id,
-    )
-
     # 初期レコード作成
     rec: Dict[str, Any] = {
         "id": check_id,
@@ -89,6 +85,13 @@ def enqueue_check(do_id: str) -> JSONResponse:
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     _upsert(rec)
+
+    # Celery に enqueue (文字列タスク名) – eager 環境では同期実行される
+    celery_app.send_task(
+        "core.tasks.check_tasks.run_check_task",
+        args=[check_id, do_id],
+        task_id=task_id,
+    )
 
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,

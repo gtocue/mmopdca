@@ -90,10 +90,12 @@ def run_check_task(self, check_id: str, do_id: str) -> None:
 
         # 4) SUCCESS と report を保存
         rec = _check_repo.get(check_id) or {}
+        report_dict = (report.model_dump() if hasattr(report, "model_dump")
+                       else report.dict())
         rec.update(
             {
-                "status": report.status,
-                "report": report.model_dump(),
+                "status": result_payload.get("status", "SUCCESS"),
+                "report": report_dict,
                 "completed_at": datetime.now(timezone.utc).isoformat(),
             }
         )

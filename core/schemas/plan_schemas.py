@@ -36,8 +36,9 @@ class PlanResponse(BaseModel):
     end: Optional[date] = None
     created_at: str
 
-    # DSL フィールドもそのまま保持
-    model_config = ConfigDict(extra="allow")
+    # DSL フィールドもそのまま保持 (pydantic v1 compat)
+    class Config:
+        extra = "allow"
 
     def dict(self, *args, **kwargs):  # pragma: no cover - pydantic v1 compatibility
         data = super().dict(*args, **kwargs)
