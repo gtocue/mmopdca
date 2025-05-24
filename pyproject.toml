@@ -36,13 +36,14 @@ yfinance          = "^0.2"
 jsonschema        = "^4.19.0"
 fastjsonschema    = "^2.19"
 pyyaml            = "^6"
-pyarrow           = "^16.1"
+pyarrow           = "15.0.2"
 httpx             = "0.24.1"
 python-multipart  = "^0.0.8"
 starlette         = "0.27.0"
 httpcore          = "0.17.3"
 
 # ───────────── Development-only deps ─────────────
+polars = "^0.20"
 [tool.poetry.group.dev.dependencies]
 pytest                = "^8.3"
 pytest-cov            = "^5.0"
