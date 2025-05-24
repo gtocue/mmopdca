@@ -91,17 +91,30 @@ class BaseTransport:
         raise NotImplementedError
 
 class Client:
-    def __init__(self, *, app=None, base_url: str = "", headers=None, transport: BaseTransport | None = None, follow_redirects: bool = True, cookies=None):
+    def __init__(
+        self,
+        *,
+        app=None,
+        base_url: str = "",
+        headers=None,
+        transport: BaseTransport | None = None,
+        follow_redirects: bool = True,
+        cookies=None,
+    ):
         self.app = app
-        self.base_url = URL(base_url or "http://testserver")
+        self.base_url = URL(base_url)
         self.headers = Headers(headers or {})
         self.transport = transport
         self.follow_redirects = follow_redirects
         self.cookies = cookies
-        if self.app is not None and self.transport is None and _TestClient is not None:
-            self._test_client = _TestClient(self.app, base_url=self.base_url.geturl())
-        else:
-            self._test_client = None
+        self._asgi_client = None
+        if self.app is not None and self.transport is None:
+            try:
+                from starlette.testclient import TestClient as _TestClient
+
+                self._asgi_client = _TestClient(app, base_url=self.base_url.geturl())
+            except Exception:  # pragma: no cover - optional dependency
+                self._asgi_client = None
 
     def _merge_url(self, url: str | URL) -> URL:
         if isinstance(url, URL):
@@ -127,11 +140,18 @@ class Client:
         merged_headers.update(self.headers)
         merged_headers.update(headers or {})
         req = Request(method, target, headers=merged_headers, stream=ByteStream(content or b""))
+        if self._asgi_client is not None:
+            resp = self._asgi_client.request(
+                method,
+                target,
+                headers=merged_headers,
+                data=data,
+                json=json,
+                files=files,
+            )
+            return Response(resp.status_code, dict(resp.headers), resp.content, req)
         if self.transport is not None:
             return self.transport.handle_request(req)
-        if self._test_client is not None:
-            resp = self._test_client.request(method, target, headers=merged_headers, content=content, data=data, json=json)
-            return Response(resp.status_code, dict(resp.headers), resp.content, req)            
         data = content
         if json is not None:
             data = _json.dumps(json).encode()
@@ -148,45 +168,10 @@ class Client:
         return self.request('POST', url, content=content, data=data, json=json, **kwargs)
 
     def close(self):
-        if self._test_client is not None:
-            self._test_client.close()
+        pass
 
 class _UseClientDefault:
     pass
 
 USE_CLIENT_DEFAULT = _UseClientDefault()
 CookieTypes = object
-TimeoutTypes = object
-
-class _Types(SimpleNamespace):
-    URLTypes = object
-    QueryParamTypes = object
-    HeaderTypes = object
-    RequestContent = object
-    RequestFiles = object
-    AuthTypes = object
-    CookieTypes = object
-
-_types = _Types()
-
-class _ClientModule(SimpleNamespace):
-    USE_CLIENT_DEFAULT = USE_CLIENT_DEFAULT
-    UseClientDefault = _UseClientDefault
-    CookieTypes = object
-    TimeoutTypes = object
-
-_client = _ClientModule()
-
-import sys
-sys.modules[__name__ + '._types'] = _types
-sys.modules[__name__ + '._client'] = _client
-
-__all__ = [
-    'Request',
-    'Response',
-    'ByteStream',
-    'Headers',
-    'BaseTransport',
-    'Client',
-    'USE_CLIENT_DEFAULT',
-]

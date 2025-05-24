@@ -116,7 +116,6 @@ def save_predictions(df: Any, plan_id: str, run_id: str) -> str:
                 df = pl.DataFrame(df)
             except Exception as exc:  # pragma: no cover - sanity fallback
                 raise AssertionError("polars.DataFrame convertible expected") from exc
-
         df.write_parquet(
             path,
             compression=DEFAULT_PARQUET_COMPRESSION,
