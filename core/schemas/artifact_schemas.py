@@ -42,8 +42,14 @@ class PredictionArtifact(BaseModel):
     # ------------------------------------------------------------------
     def model_dump_json(self, **kwargs) -> str:
         """Return JSON representation (pydantic v1 compat)."""
-        return super().model_dump_json(**kwargs)
+        try:
+            return super().model_dump_json(**kwargs)
+        except AttributeError:  # pragma: no cover - pydantic v1
+            return self.json(**kwargs)
 
     @classmethod
     def model_validate_json(cls, data: str, **kwargs) -> "PredictionArtifact":
-        return super().model_validate_json(data, **kwargs)
+        try:
+            return super().model_validate_json(data, **kwargs)
+        except AttributeError:  # pragma: no cover - pydantic v1
+            return cls.parse_raw(data, **kwargs)

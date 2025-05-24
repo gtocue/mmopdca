@@ -98,23 +98,29 @@ def _dummy_send_task(name: str, args: list | tuple | None = None, **_: object):
         return
 
     check_id, do_id = args
-    repo = get_repo("check")
-    now = datetime.now(timezone.utc).isoformat()
-    repo.upsert(
-        check_id,
-        {
-            "id": check_id,
-            "do_id": do_id,
-            "status": "SUCCESS",
-            "report": {
+    print("dummy_send_task", name, args)
+
+    def _update() -> None:
+        repo = get_repo("check")
+        now = datetime.now(timezone.utc).isoformat()
+        rec = repo.get(check_id) or {}
+        rec.update(
+            {
+                "id": check_id,
+                "do_id": do_id,
                 "status": "SUCCESS",
-                "r2": 1.0,
-                "threshold": 0.8,
-                "passed": True,
-            },
-            "completed_at": now,
-        },
-    )
+                "report": {
+                    "status": "SUCCESS",
+                    "r2": 1.0,
+                    "threshold": 0.8,
+                    "passed": True,
+                },
+                "completed_at": now,
+            }
+        )
+        repo.upsert(check_id, rec)
+
+    threading.Timer(0.05, _update).start()
 
 
 celery_app.send_task = _dummy_send_task  # type: ignore[assignment]

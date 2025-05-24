@@ -66,14 +66,20 @@ class MetaInfo(BaseModel):
     # Compatibility helpers for pydantic v1
     # ------------------------------------------------------------------
     def model_dump(self, *, mode: str = "python", **kwargs):  # type: ignore[override]
-        if mode == "json":
-            import json
-            return json.loads(self.json(**kwargs))
-        return self.dict(**kwargs)
+        try:
+            return super().model_dump(mode=mode, **kwargs)
+        except AttributeError:  # pragma: no cover - pydantic v1
+            if mode == "json":
+                import json
+                return json.loads(self.json(**kwargs))
+            return self.dict(**kwargs)
 
     @classmethod
     def model_validate(cls, data, **kwargs):  # type: ignore[override]
-        return super().model_validate(data, **kwargs)
+        try:
+            return super().model_validate(data, **kwargs)
+        except AttributeError:  # pragma: no cover - pydantic v1
+            return cls.parse_obj(data)
 
 
 # 公開シンボル

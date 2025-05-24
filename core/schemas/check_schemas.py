@@ -29,6 +29,8 @@ class CheckReport(BaseModel):
     passed: bool = Field(..., description="閾値をクリアしたら True")
 
     model_config = ConfigDict(extra="allow")  # ★ 追加指標を許容
+    class Config:  # pragma: no cover - pydantic v1 fallback
+        extra = "allow"
 
 
 class CheckResult(BaseModel):
@@ -48,3 +50,5 @@ class CheckResult(BaseModel):
     )
 
     model_config = ConfigDict(from_attributes=True)
+    class Config:  # pragma: no cover - pydantic v1 fallback
+        orm_mode = True
