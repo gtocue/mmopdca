@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 
+from celery.exceptions import Retry
 from core.celery_app import celery_app
 from core.repository.factory import get_repo
 from core.schemas.check_schemas import CheckReport
@@ -78,6 +79,16 @@ def run_check_task(self, check_id: str, do_id: str) -> None:
 
         result_payload = rec_do.get("result", {})
 
+                # --- metrics dict をフラット化 ----------------------------------
+        # run_do_task の戻り値では各指標が ``metrics`` にネストされている。
+        # 古いフォーマットではトップレベルに直接存在していたため、双方の
+        # 形式を許容するよう ``metrics`` があれば展開しておく。
+        if isinstance(result_payload.get("metrics"), dict):
+            result_payload = {
+                **result_payload,
+                **result_payload["metrics"],
+            }
+
         # 2.2) 必須メトリクス揃い待ち
         required: List[str] = ["r2", "threshold", "passed"]
         missing = [k for k in required if k not in result_payload]
@@ -99,6 +110,9 @@ def run_check_task(self, check_id: str, do_id: str) -> None:
         )
         _upsert(check_id, rec)
 
+    except Retry:
+        # Retry は Celery に再スケジュールさせるためそのまま伝搬
+        raise
     except Exception as exc:
         # 5) 例外時は FAILURE とエラーメッセージを保存
         logger.error("Check task failed: %s", exc, exc_info=True)

@@ -120,7 +120,13 @@ def _dummy_send_task(name: str, args: list | tuple | None = None, **_: object):
         )
         repo.upsert(check_id, rec)
 
-    threading.Timer(0.05, _update).start()
+    # 2024-06-09: Use a background thread to update the record slightly later
+    # instead of ``threading.Timer`` which occasionally fails to fire in CI.
+    def _run() -> None:
+        time.sleep(0.01)
+        _update()
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 celery_app.send_task = _dummy_send_task  # type: ignore[assignment]
