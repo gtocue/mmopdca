@@ -21,24 +21,6 @@ jobs:
       matrix:
         python-version: ['3.11']
 
-    services:
-      redis:
-        image: redis:7-alpine
-        ports: ['6379:6379']
-      db:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: mmopdca
-          POSTGRES_USER: mmopdca
-          POSTGRES_PASSWORD: mmopdca
-        ports: ['5432:5432']
-      prom:
-        image: prom/prometheus:v2.52.0
-        ports: ['9090:9090']
-      grafana:
-        image: grafana/grafana-oss:10.4.2
-        ports: ['3000:3000']
-
     steps:
       # 1) コード取得
       - uses: actions/checkout@v4
