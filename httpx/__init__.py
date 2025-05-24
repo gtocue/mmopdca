@@ -175,3 +175,40 @@ class _UseClientDefault:
 
 USE_CLIENT_DEFAULT = _UseClientDefault()
 CookieTypes = object
+TimeoutTypes = object
+
+class _Types(SimpleNamespace):
+    URLTypes = object
+    QueryParamTypes = object
+    HeaderTypes = object
+    RequestContent = object
+    RequestFiles = object
+    AuthTypes = object
+    CookieTypes = object
+
+_types = _Types()
+
+class _ClientModule(SimpleNamespace):
+    USE_CLIENT_DEFAULT = USE_CLIENT_DEFAULT
+    UseClientDefault = _UseClientDefault
+    CookieTypes = object
+    TimeoutTypes = object
+
+_client = _ClientModule()
+
+import sys
+sys.modules[__name__ + '._types'] = _types
+sys.modules[__name__ + '._client'] = _client
+# also expose as attributes for modules that access ``httpx._client`` directly
+globals()["_types"] = _types
+globals()["_client"] = _client
+
+__all__ = [
+    'Request',
+    'Response',
+    'ByteStream',
+    'Headers',
+    'BaseTransport',
+    'Client',
+    'USE_CLIENT_DEFAULT',
+]
