@@ -1,0 +1,1 @@
+[{"symbol": "TEST", "ts": "2024-01-01T00:00:00", "horizon": 1, "y_true": 1.0, "y_pred": 1.1, "model_id": "dummy"}, {"symbol": "TEST", "ts": "2024-01-02T00:00:00", "horizon": 1, "y_true": 1.5, "y_pred": 1.4, "model_id": "dummy"}, {"symbol": "TEST", "ts": "2024-01-03T00:00:00", "horizon": 1, "y_true": 2.0, "y_pred": 1.9, "model_id": "dummy"}]
