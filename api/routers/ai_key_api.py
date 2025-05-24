@@ -3,8 +3,8 @@ api.routers.ai_key_api
 ----------------------
 
 Sprint-2: “AI-Key PoC” 用のシンプルなキー管理エンドポイント。
-外部サービスへはアクセスせず、**インメモリ** で完結させているため
-ユニットテストでもネットワークエラーになりません。
+外部サービスへはアクセスせず **インメモリ** で完結させているため、
+ユニットテストでもネットワークアクセスを必要としません。
 
 ❌ 永続化なし
 ❌ 本番環境用途なし
@@ -16,11 +16,11 @@ from __future__ import annotations
 import secrets
 from typing import Final, List
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 
 router: Final = APIRouter(prefix="/ai-key", tags=["ai-key"])
 
-# メモリ上にだけ保持（PoC 用）
+# PoC 用 ─ メモリ上でのみ保持
 _KEYS: list[str] = []
 
 
@@ -39,9 +39,15 @@ def list_keys() -> list[str]:
 
 
 @router.delete("/{key}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_key(key: str) -> None:
-    """指定キーを削除。存在しなければ 404。"""
+def delete_key(key: str) -> Response:
+    """
+    指定キーを削除。存在しなければ 404。
+
+    204 はボディを返せないため、空 `Response` を明示的に返す。
+    """
     try:
         _KEYS.remove(key)
     except ValueError as exc:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "key not found") from exc
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="key not found") from exc
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

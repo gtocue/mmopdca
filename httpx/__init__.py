@@ -4,6 +4,11 @@ import urllib.request
 from types import SimpleNamespace
 import uuid
 
+# Optional: used when `app` is passed for in-memory requests
+try:  # pragma: no cover - optional dependency
+    from starlette.testclient import TestClient as _TestClient
+except Exception:  # pragma: no cover - fallback when starlette is unavailable
+    _TestClient = None
 
 class URL:
     """Minimal URL implementation used by the test stubs."""
@@ -88,11 +93,15 @@ class BaseTransport:
 class Client:
     def __init__(self, *, app=None, base_url: str = "", headers=None, transport: BaseTransport | None = None, follow_redirects: bool = True, cookies=None):
         self.app = app
-        self.base_url = URL(base_url)
+        self.base_url = URL(base_url or "http://testserver")
         self.headers = Headers(headers or {})
         self.transport = transport
         self.follow_redirects = follow_redirects
         self.cookies = cookies
+        if self.app is not None and self.transport is None and _TestClient is not None:
+            self._test_client = _TestClient(self.app, base_url=self.base_url.geturl())
+        else:
+            self._test_client = None
 
     def _merge_url(self, url: str | URL) -> URL:
         if isinstance(url, URL):
@@ -120,6 +129,9 @@ class Client:
         req = Request(method, target, headers=merged_headers, stream=ByteStream(content or b""))
         if self.transport is not None:
             return self.transport.handle_request(req)
+        if self._test_client is not None:
+            resp = self._test_client.request(method, target, headers=merged_headers, content=content, data=data, json=json)
+            return Response(resp.status_code, dict(resp.headers), resp.content, req)            
         data = content
         if json is not None:
             data = _json.dumps(json).encode()
@@ -136,7 +148,8 @@ class Client:
         return self.request('POST', url, content=content, data=data, json=json, **kwargs)
 
     def close(self):
-        pass
+        if self._test_client is not None:
+            self._test_client.close()
 
 class _UseClientDefault:
     pass
