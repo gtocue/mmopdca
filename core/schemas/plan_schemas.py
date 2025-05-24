@@ -10,6 +10,7 @@ from typing import Optional
 
 import json
 from pydantic import BaseModel, Field, ConfigDict
+import pydantic
 
 
 # POST /plan/ 用 --------------------------------------------------------
@@ -39,12 +40,16 @@ class PlanResponse(BaseModel):
     # DSL フィールドもそのまま保持
     model_config = ConfigDict(extra="allow")
 
-    class Config:  # pragma: no cover - pydantic v1 fallback
-        extra = "allow"
+    if pydantic.__version__.startswith("1."):
+        class Config:  # pragma: no cover - pydantic v1 fallback
+            extra = "allow"
 
     def dict(self, *args, **kwargs):  # pragma: no cover - pydantic v1 compatibility
-        data = super().dict(*args, **kwargs)
-        extras = {k: v for k, v in self.__dict__.items() if k not in data}
+        try:
+            data = super().dict(*args, **kwargs)
+        except AttributeError:  # pragma: no cover - pydantic v2
+            data = super().model_dump(*args, **kwargs)
+        extras = getattr(self, "__pydantic_extra__", None) or {}
         data.update(extras)
         return data
 

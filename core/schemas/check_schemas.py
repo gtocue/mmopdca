@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Dict, Union, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
+import pydantic
 
 
 class CheckReport(BaseModel):
@@ -29,8 +30,9 @@ class CheckReport(BaseModel):
     passed: bool = Field(..., description="閾値をクリアしたら True")
 
     model_config = ConfigDict(extra="allow")  # ★ 追加指標を許容
-    class Config:  # pragma: no cover - pydantic v1 fallback
-        extra = "allow"
+    if pydantic.__version__.startswith("1."):
+        class Config:  # pragma: no cover - pydantic v1 fallback
+            extra = "allow"
 
 
 class CheckResult(BaseModel):
@@ -50,5 +52,6 @@ class CheckResult(BaseModel):
     )
 
     model_config = ConfigDict(from_attributes=True)
-    class Config:  # pragma: no cover - pydantic v1 fallback
-        orm_mode = True
+    if pydantic.__version__.startswith("1."):
+        class Config:  # pragma: no cover - pydantic v1 fallback
+            orm_mode = True
