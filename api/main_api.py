@@ -69,6 +69,7 @@ from api.routers.check_api import router as check_router  # type: ignore
 # ----------------------------------------------------------------------
 # Optional Routers（存在しなければ 501 Stub）
 # ----------------------------------------------------------------------
+
 def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
     try:
         module = import_module(path)
