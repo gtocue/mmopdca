@@ -72,5 +72,12 @@ set `HOST_PROM_PORT` accordingly:
 export HOST_PROM_PORT=19090
 docker compose up -d
 ```
-```
 If you see an error like 'Bind for 0.0.0.0:9090 failed: port is already allocated' when starting Prometheus, choose an unused port for HOST_PROM_PORT and rerun the compose command.
+## Viewing Logs
+To inspect container output, use service names with `docker compose logs`:
+```bash
+docker compose -f compose_rendered.yml logs api
+docker compose -f compose_rendered.yml logs db
+docker compose -f compose_rendered.yml logs redis
+```
+Using container names like `docker-api-1` will fail because `logs` expects service names.
