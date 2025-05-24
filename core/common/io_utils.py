@@ -106,7 +106,17 @@ def save_predictions(df: Any, plan_id: str, run_id: str) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
 
     if _DF_LIB == "polars":
-        assert isinstance(df, pl.DataFrame)
+        # ``df`` may originate from :mod:`pandas` even when ``polars`` is
+        # installed.  The previous implementation expected a ``pl.DataFrame``
+        # and failed with ``AssertionError`` when a pandas object was passed.
+        # To make the function robust across both libraries we attempt a
+        # conversion when the type does not match.
+        if not isinstance(df, pl.DataFrame):
+            try:  # convert pandas.DataFrame or list-of-dicts -> pl.DataFrame
+                df = pl.DataFrame(df)
+            except Exception as exc:  # pragma: no cover - sanity fallback
+                raise AssertionError("polars.DataFrame convertible expected") from exc
+
         df.write_parquet(
             path,
             compression=DEFAULT_PARQUET_COMPRESSION,

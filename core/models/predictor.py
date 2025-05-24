@@ -28,11 +28,14 @@ from datetime import datetime
 from typing import Dict
 
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor
+try:
+    from sklearn.ensemble import GradientBoostingRegressor
+except Exception:  # pragma: no cover - optional dependency
+    GradientBoostingRegressor = None  # type: ignore
 
 from core.data.loader import load
 from core.data.splitter import split_ts
-from core.eval.metrics import evaluate
+from core.models.metrics import evaluate
 from core.feature.engineering import make_features
 
 logger = logging.getLogger(__name__)

@@ -23,12 +23,6 @@ from __future__ import annotations
 from typing import Dict
 
 import numpy as np
-from sklearn.metrics import (
-    mean_absolute_error,
-    mean_absolute_percentage_error,
-    mean_squared_error,
-    r2_score,
-)
 
 __all__ = ["evaluate"]
 
@@ -36,23 +30,33 @@ __all__ = ["evaluate"]
 # ------------------------------------------------------------------ #
 # Public API
 # ------------------------------------------------------------------ #
+def _r2_score(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    ss_res = np.sum((y_true - y_pred) ** 2)
+    ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
+    return 1.0 - ss_res / ss_tot if ss_tot != 0 else 0.0
+
+
+def _mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    return float(np.mean(np.abs(y_true - y_pred)))
+
+
+def _rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    return float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
+
+
+def _mape(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ape = np.abs((y_true - y_pred) / y_true)
+        ape = ape[~np.isinf(ape)]
+        return float(np.mean(ape)) * 100 if ape.size else float("nan")
+
+
 def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
-    """
-    共通メトリクス計算。
+    """共通メトリクス計算."""
 
-    Parameters
-    ----------
-    y_true, y_pred : array-like
-        実測値 / 予測値
+    r2 = _r2_score(y_true, y_pred)
+    mae = _mae(y_true, y_pred)
+    rmse = _rmse(y_true, y_pred)
+    mape = _mape(y_true, y_pred)
 
-    Returns
-    -------
-    dict
-        {"r2": …, "mae": …, "rmse": …, "mape": …}
-    """
-    return {
-        "r2": r2_score(y_true, y_pred),
-        "mae": mean_absolute_error(y_true, y_pred),
-        "rmse": mean_squared_error(y_true, y_pred, squared=False),
-        "mape": mean_absolute_percentage_error(y_true, y_pred) * 100,
-    }
+    return {"r2": r2, "mae": mae, "rmse": rmse, "mape": mape}
