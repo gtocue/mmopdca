@@ -9,7 +9,14 @@ from datetime import date
 from typing import Optional
 
 import json
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
+from pydantic import __version__ as _pyd_version
+try:
+    from pydantic import ConfigDict as _Cfg
+    _IS_PYDANTIC_V2 = not _pyd_version.startswith("1")
+except Exception:  # pragma: no cover - pydantic v1
+    _Cfg = None
+    _IS_PYDANTIC_V2 = False
 
 
 # POST /plan/ 用 --------------------------------------------------------
@@ -37,7 +44,11 @@ class PlanResponse(BaseModel):
     created_at: str
 
     # DSL フィールドもそのまま保持
-    model_config = ConfigDict(extra="allow")
+    if _IS_PYDANTIC_V2 and _Cfg is not None:
+        model_config = _Cfg(extra="allow")
+    else:  # pragma: no cover - pydantic v1
+        class Config:
+            extra = "allow"
 
     def dict(self, *args, **kwargs):  # pragma: no cover - pydantic v1 compatibility
         data = super().dict(*args, **kwargs)

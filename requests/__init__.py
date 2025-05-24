@@ -21,6 +21,8 @@ def _request(method, url, *, data=None, json=None, timeout=None, headers=None):
         headers_dict = {'Content-Type': 'application/json'}
     else:
         headers_dict = {}
+    if isinstance(data, str):
+        data = data.encode()
     hdrs = {**(headers or {}), **headers_dict}
     req = urllib.request.Request(url, data=data, method=method, headers=hdrs)
     try:

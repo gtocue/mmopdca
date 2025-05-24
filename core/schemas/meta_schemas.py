@@ -24,6 +24,7 @@ from datetime import date, datetime
 from typing import List
 
 from pydantic import BaseModel, Field, ConfigDict
+from pydantic import __version__ as _pyd_version
 
 
 class MetricSpec(BaseModel):
@@ -73,7 +74,9 @@ class MetaInfo(BaseModel):
 
     @classmethod
     def model_validate(cls, data, **kwargs):  # type: ignore[override]
-        return super().model_validate(data, **kwargs)
+        if not _pyd_version.startswith("1"):
+            return super().model_validate(data, **kwargs)
+        return cls.parse_obj(data)
 
 
 # 公開シンボル
