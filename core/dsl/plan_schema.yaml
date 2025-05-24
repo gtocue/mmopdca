@@ -1,0 +1,17 @@
+  baseline:
+    type: object
+    required:
+      - lookback_days
+    properties:
+      lookback_days:
+        type: integer
+        minimum: 1
+        maximum: 365
+      horizon_days:
+        type: integer
+        minimum: 1
+        maximum: 90
+      strategy:
+        type: string
+        enum: [mean, median, last]
+    additionalProperties: false

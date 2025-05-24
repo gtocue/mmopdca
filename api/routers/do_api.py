@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from celery import states
 from celery.backends.base import DisabledBackend
@@ -29,18 +29,33 @@ _do_repo = get_repo("do")
 # 内部ユーティリティ
 # --------------------------------------------------------------------- #
 def _merge_params(plan: PlanResponse, req: DoCreateRequest) -> Dict[str, Any]:
+    """
+    Plan とリクエストをマージして Do タスク用パラメータ dict を返す。
+    start / end が両方とも欠落している場合は 400 を返す。
+    """
+    start_dt = req.start or plan.start
+    end_dt = req.end or plan.end
+
+    if start_dt is None or end_dt is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="start / end datetime が Plan とリクエストの両方で欠落しています",
+        )
+
     params: Dict[str, Any] = {
         "symbol": req.symbol or plan.symbol,
-        "start": (req.start or plan.start).isoformat(),
-        "end": (req.end or plan.end).isoformat(),
+        "start": start_dt.isoformat(),
+        "end": end_dt.isoformat(),
         "indicators": req.indicators or [],
         "run_no": req.run_no,
         "run_tag": req.run_tag,
     }
+
+    # symbol が空なら Plan.data.universe[0] を採用
     if not params["symbol"]:
-        univ = getattr(plan, "data", {}).get("universe", [])
-        if isinstance(univ, list) and univ:
-            params["symbol"] = str(univ[0])
+        universe = getattr(plan, "data", {}).get("universe", [])
+        if isinstance(universe, list) and universe:
+            params["symbol"] = str(universe[0])
         else:
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
@@ -50,7 +65,7 @@ def _merge_params(plan: PlanResponse, req: DoCreateRequest) -> Dict[str, Any]:
 
 
 def _upsert(rec: Dict[str, Any]) -> None:
-    """単純な delete→create ではなく既存値をマージして保存する."""
+    """delete→create ではなく既存値をマージして保存する。"""
     do_id = rec["do_id"]
     current = _do_repo.get(do_id) or {}
     current.update(rec)
@@ -78,7 +93,8 @@ def enqueue_do(plan_id: str, body: Optional[DoCreateRequest] = None) -> JSONResp
     plan = PlanResponse(**plan_raw)
 
     # 2) リクエスト補完
-    req = body or DoCreateRequest()
+    # ★ Pydantic モデルは必須フィールドがあるため空コンストラクトを使用
+    req: DoCreateRequest = body or DoCreateRequest.model_construct()
     req.run_no = req.run_no or req.seq or 1
     req.seq = req.run_no
 
@@ -108,11 +124,14 @@ def enqueue_do(plan_id: str, body: Optional[DoCreateRequest] = None) -> JSONResp
         }
     )
 
-    # 6) 実行
+    # 6) Celery 実行
     if celery_app.conf.task_always_eager:
         run_do_task(do_id, plan_id, params)  # 同期
     else:
-        run_do_task.apply_async(args=(do_id, plan_id, params), task_id=task_id)
+        # ★ apply_async の args 型は Tuple[Any, ...] と明示
+        run_do_task.apply_async(
+            args=cast(Tuple[Any, ...], (do_id, plan_id, params)), task_id=task_id
+        )
 
     return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"do_id": do_id, "task_id": task_id})
 
@@ -127,10 +146,7 @@ def get_do(do_id: str) -> DoResponse:
 
 @router.get("/status/{task_id}", response_model=Dict[str, Any], summary="Raw Celery task state")
 def get_do_status(task_id: str) -> Dict[str, Any]:
-    """
-    CI/単体テスト環境では Celery backend が DisabledBackend になる。
-    その場合 `.state` アクセス時に AttributeError が出るので SUCCESS 扱いにフォールバック。
-    """
+    """Celery backend が DisabledBackend の場合は SUCCESS 扱いにフォールバック。"""
     result = AsyncResult(task_id)
     try:
         state = result.state
@@ -141,7 +157,7 @@ def get_do_status(task_id: str) -> Dict[str, Any]:
             payload["result"] = result.result  # type: ignore[assignment]
     except AttributeError:
         payload = {"state": states.SUCCESS}
-    except Exception as exc:  # celery.backends.base.DisabledBackend is not an Exception
+    except Exception as exc:  # DisabledBackend は Exception を継承しない
         if isinstance(exc, DisabledBackend):
             payload = {"state": states.SUCCESS}
         else:

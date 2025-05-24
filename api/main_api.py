@@ -28,6 +28,7 @@ from fastapi import (
 )
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.responses import StreamingResponse
+from api.routers.trace_api import router as trace_router  # type: ignore
 
 # ─────────────────────────── env / logger
 load_dotenv(find_dotenv())  # *.env を再帰探索して環境変数に投入
