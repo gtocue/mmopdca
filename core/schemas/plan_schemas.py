@@ -39,6 +39,9 @@ class PlanResponse(BaseModel):
     # DSL フィールドもそのまま保持
     model_config = ConfigDict(extra="allow")
 
+    class Config:
+        extra = "allow"
+
     def dict(self, *args, **kwargs):  # pragma: no cover - pydantic v1 compatibility
         data = super().dict(*args, **kwargs)
         extras = {k: v for k, v in self.__dict__.items() if k not in data}

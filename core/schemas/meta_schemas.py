@@ -73,7 +73,9 @@ class MetaInfo(BaseModel):
 
     @classmethod
     def model_validate(cls, data, **kwargs):  # type: ignore[override]
-        return super().model_validate(data, **kwargs)
+        if hasattr(super(), "model_validate"):
+            return super().model_validate(data, **kwargs)
+        return cls.parse_obj(data)
 
 
 # 公開シンボル
