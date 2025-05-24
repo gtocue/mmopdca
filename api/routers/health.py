@@ -11,7 +11,10 @@ import socket
 import time
 from typing import Any, Callable, Dict, Tuple
 
-import psycopg2
+try:
+    import psycopg2
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    psycopg2 = None  # type: ignore
 from fastapi import APIRouter, Request, Response, status
 from fastapi.responses import JSONResponse
 
@@ -32,29 +35,42 @@ _REDIS_TIMEOUT = 2  # sec
 
 def _check_postgres() -> Tuple[str, bool, float]:
     t0 = time.perf_counter()
-    try:
-        with contextlib.closing(psycopg2.connect(**_PG_DSN)) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1;")
-                cur.fetchone()
+    if os.getenv("DB_BACKEND", "memory").lower() != "postgres":
         ok = True
-    except Exception:
+        dur = 0.0
+    elif psycopg2 is None:
         ok = False
-    return "postgres", ok, round(time.perf_counter() - t0, 4)
+        dur = round(time.perf_counter() - t0, 4)
+    else:
+        try:
+            with contextlib.closing(psycopg2.connect(**_PG_DSN)) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1;")
+                    cur.fetchone()
+            ok = True
+        except Exception:
+            ok = False
+        dur = round(time.perf_counter() - t0, 4)
+    return "postgres", ok, dur
 
 
 def _check_redis() -> Tuple[str, bool, float]:
     t0 = time.perf_counter()
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(_REDIS_TIMEOUT)
-    try:
-        sock.connect((_REDIS_HOST, _REDIS_PORT))
+    if os.getenv("DB_BACKEND", "memory").lower() != "redis":
         ok = True
-    except Exception:
-        ok = False
-    finally:
-        sock.close()
-    return "redis", ok, round(time.perf_counter() - t0, 4)
+        dur = 0.0
+    else:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(_REDIS_TIMEOUT)
+        try:
+            sock.connect((_REDIS_HOST, _REDIS_PORT))
+            ok = True
+        except Exception:
+            ok = False
+        finally:
+            sock.close()
+        dur = round(time.perf_counter() - t0, 4)
+    return "redis", ok, dur
 
 
 router = APIRouter(tags=["meta"])

@@ -106,7 +106,7 @@ except (ModuleNotFoundError, FileNotFoundError):
 # ----------------------------------------------------------------------
 # Legacy サブアプリ: 旧 HTML/UI ルートを /v1 にまとめる
 # ----------------------------------------------------------------------
-from api.routes.health import router as health_router  # type: ignore
+from api.routers.health import router as health_router  # type: ignore
 
 legacy_app = FastAPI(
     title="mmopdca Legacy",
