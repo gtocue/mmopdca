@@ -1,46 +1,87 @@
+# ─────────── プロジェクトルート: pyproject.toml（FIXED）───────────
+[tool.poetry]
+name         = "mmopdca"
+version      = "0.1.0"
+description  = "MMOPDCA API-only backend"
+authors      = ["gtocue <gtocue510@gmail.com>"]
+license      = "MIT"
+readme       = "README.md"
+repository   = "https://github.com/gtocue/mmopdca"
+keywords     = ["mmopdca", "API", "backend"]
 
-extend-exclude = [
-  "sdk-py",  # OpenAPI 自動生成
-  "httpx",
-  "redis",
-  "requests",
-  "plugins",
+# パッケージレイアウト
+packages = [
+  { include = "api" },
+  { include = "core" },
+  { include = "utils" },
+  { include = "scripts" }
 ]
+include = ["mmopdca_sdk/py.typed"]
 
+# ───────────── Runtime dependencies ─────────────
+[tool.poetry.dependencies]
+python            = ">=3.9,<3.13"
+fastapi           = "0.100.1"
+uvicorn           = { version = "^0.30", extras = ["standard"] }
+pydantic          = ">=2,<3"
+python-dateutil   = ">=2.8.2"
+typing-extensions = ">=4.7.1"
+celery            = "^5.3"
+redis             = "^5"
+python-dotenv     = "^1.0"
+numpy             = "^1.26"
+pandas            = "^2.2"
+scikit-learn      = "^1.4"
+yfinance          = "^0.2"
+jsonschema        = "^4.19.0"
+fastjsonschema    = "^2.19"
+pyyaml            = "^6"
+pyarrow           = "^16.1"
+httpx             = "0.24.1"
+python-multipart  = "^0.0.8"
+starlette         = "0.27.0"
+httpcore          = "0.17.3"
 
-extend-ignore = ["E402"]  # import 順序を許容[tool.ruff]
-extend-exclude = [
-  "sdk-py", "httpx", "redis", "requests", "plugins",
-]
+# ───────────── Development-only deps ─────────────
+[tool.poetry.group.dev.dependencies]
+pytest                = "^8.3"
+pytest-cov            = "^5.0"
+flake8                = "^7.0"
+mypy                  = "^1.10"
+black                 = "^25"
+isort                 = "^6"
+ruff                  = "^0.4"
+types-python-dateutil = "^2.9"
 
+# ───────────── Build backend ─────────────
+[build-system]
+requires      = ["poetry-core>=2.0,<3.0"]
+build-backend = "poetry.core.masonry.api"
 
-extend-ignore = ["E402"]
+# ───────────── Static analysis ─────────────
+[tool.pylint."MESSAGES CONTROL"]
+extension-pkg-whitelist = "pydantic"
 
-extend-exclude = [
-  "sdk-py", "httpx", "redis", "requests", "plugins",
-]
+[tool.mypy]
+files                       = ["api", "core", "utils", "tests"]
+python_version              = "3.11"
+warn_unused_configs         = true
+warn_redundant_casts        = true
+warn_unused_ignores         = true
+strict_equality             = true
+extra_checks                = true
+check_untyped_defs          = true
+disallow_subclassing_any    = true
+disallow_untyped_decorators = true
+disallow_any_generics       = true
 
+[[tool.mypy.overrides]]
+module = ["api", "core"]
+strict = true
 
-extend-ignore = ["E402"]
-
-extend-exclude = ["sdk-py", "httpx", "redis", "requests", "plugins"]
-
-
-extend-ignore = ["E402"]
-
-
-extend-exclude = ["sdk-py", "httpx", "redis", "requests", "plugins"]
-
-
-extend-ignore = ["E402"]
-
+# ───────────── Ruff (唯一の定義) ─────────────
 [tool.ruff]
 extend-exclude = ["sdk-py", "httpx", "redis", "requests", "plugins"]
 
 [tool.ruff.lint]
-extend-ignore = ["E402"]
-[tool.ruff]
-extend-exclude = ["sdk-py", "httpx", "redis", "requests", "plugins"]
-
-[tool.ruff.lint]
-extend-ignore = ["E402"]
+extend-ignore = ["E402"]        # import 順序の例外を許容
