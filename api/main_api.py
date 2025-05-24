@@ -3,8 +3,8 @@
 # =====================================================================
 #
 # mmopdca “MVP ルータ集約サービス API-only”。
-# 各フェーズのルータ群と /ws WebSocket ルートを 1 つの FastAPI インスタンスにマウントし、
-# Swagger / Redoc を公開します。
+# 各フェーズのルータ群と /ws WebSocket ルートを 1 つの FastAPI
+# インスタンスにマウントし、Swagger / Redoc を公開します。
 #
 # ポリシ
 #   1) 破壊的変更は禁止（追加のみ可）
@@ -18,24 +18,20 @@ import os
 from importlib import import_module
 from typing import Final
 
-from dotenv import load_dotenv, find_dotenv
-from fastapi import (
-    APIRouter,
-    FastAPI,
-    Depends,
-    HTTPException,
-    WebSocket,
-)
+from dotenv import find_dotenv, load_dotenv
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, WebSocket
 from fastapi.security.api_key import APIKeyHeader
+
+# Celery タスク登録（Eager モードでもタスクが見えるように *必ず* import）
+import core.tasks.do_tasks  # noqa: F401
+
+# Sprint-2: AI-Key PoC ルータ
+from api.routers.ai_key_api import router as ai_key_router
 
 # ─────────────────────────── env / logger
 load_dotenv(find_dotenv())  # *.env を再帰探索して環境変数に投入
 logger: Final = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-# ----------------------------------------------------------------------
-# Celery タスクモジュールを必ずインポート（Eager モードでも登録されるよう）
-# ----------------------------------------------------------------------
 
 # ----------------------------------------------------------------------
 # API Key 認証設定
@@ -50,9 +46,8 @@ def verify_api_key(x_api_key: str = Depends(api_key_header)) -> None:
     環境変数 API_KEY を設定している場合のみ有効化。
     """
     expected = os.getenv("API_KEY")
-    if expected:
-        if not x_api_key or x_api_key != expected:
-            raise HTTPException(status_code=401, detail="Invalid or missing API Key")
+    if expected and (not x_api_key or x_api_key != expected):
+        raise HTTPException(status_code=401, detail="Invalid or missing API Key")
 
 
 # ----------------------------------------------------------------------
@@ -63,11 +58,9 @@ from api.routers.plan_dsl_api import router as plan_dsl_router  # type: ignore
 from api.routers.do_api import router as do_router  # type: ignore
 from api.routers.check_api import router as check_router  # type: ignore
 
-
 # ----------------------------------------------------------------------
 # Optional Routers（存在しなければ 501 Stub）
 # ----------------------------------------------------------------------
-
 def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
     try:
         module = import_module(path)
@@ -84,7 +77,9 @@ def _import_optional(path: str, prefix: str, tag: str) -> APIRouter:
 
 
 act_router = _import_optional("api.routers.act_api", "/act", "act")
-metrics_router = _import_optional("api.routers.metrics_api", "/metrics-api", "metrics")
+metrics_router = _import_optional(
+    "api.routers.metrics_api", "/metrics-api", "metrics"
+)
 
 # ----------------------------------------------------------------------
 # Trace API (イベントストリーミング)
@@ -116,10 +111,8 @@ legacy_app = FastAPI(
     redoc_url="/v1/redoc",
 )
 
-# Health
 legacy_app.include_router(health_router)
 
-# 旧 UI 用ルータ（存在すれば）
 try:
     from api.routers.ui import router as ui_router  # type: ignore
 
@@ -137,20 +130,18 @@ app = FastAPI(
     contact={"name": "gtocue", "email": "gtocue510@gmail.com"},
 )
 
-# Health / Meta Routers (認証必須)
+# Health / Meta Routers（認証必須）
 app.include_router(
     health_router,
     dependencies=[Depends(verify_api_key)],
     include_in_schema=False,
 )
 meta_router = APIRouter(
-    prefix="/meta",
-    tags=["meta"],
-    dependencies=[Depends(verify_api_key)],
+    prefix="/meta", tags=["meta"], dependencies=[Depends(verify_api_key)]
 )
 app.include_router(meta_router)
 
-# Business Routers (認証必須)
+# Business Routers（認証必須）
 app.include_router(plan_router, dependencies=[Depends(verify_api_key)])
 app.include_router(plan_dsl_router, dependencies=[Depends(verify_api_key)])
 app.include_router(do_router, dependencies=[Depends(verify_api_key)])
@@ -158,44 +149,37 @@ app.include_router(check_router, dependencies=[Depends(verify_api_key)])
 app.include_router(act_router, dependencies=[Depends(verify_api_key)])
 app.include_router(metrics_router, dependencies=[Depends(verify_api_key)])
 app.include_router(events_router, dependencies=[Depends(verify_api_key)])
+app.include_router(ai_key_router, dependencies=[Depends(verify_api_key)])  # ★追加
 
 # Prometheus Exporter (/metrics) – 認証不要
 if exporter_app:
     app.mount("/metrics", exporter_app, name="metrics-exporter")
 
-
 # ----------------------------------------------------------------------
 # WebSocket 進捗ストリーミングエンドポイント
 # ----------------------------------------------------------------------
 @app.websocket("/ws/{run_id}")
-async def ws_progress(
-    websocket: WebSocket,
-    run_id: str,
-):
+async def ws_progress(websocket: WebSocket, run_id: str) -> None:
     """
-    run_id に対応する進捗を 1 から 5 まで順番に JSON 送信後、切断します。
-    x-api-key ヘッダを設定している場合は認証を行い、不正ならクローズ(1008)。
+    run_id に対応する進捗を 1→5 まで順番に送信して切断。
+    API キーが設定されている場合はヘッダ認証を行う。
     """
     expected = os.getenv("API_KEY")
-    if expected:
-        key = websocket.headers.get(API_KEY_NAME)
-        if not key or key != expected:
-            await websocket.close(code=1008)
-            return
+    if expected and websocket.headers.get(API_KEY_NAME) != expected:
+        await websocket.close(code=1008)
+        return
 
     await websocket.accept()
     for i in range(1, 6):
         await websocket.send_json({"progress": i})
     await websocket.close()
 
-
 # ----------------------------------------------------------------------
-# マウント: Legacy を /v1 に配置
+# Legacy を /v1 に配置
 # ----------------------------------------------------------------------
 app.mount("/v1", legacy_app)
 
-# ----------------------------------------------------------------------
 # NOTE:
 #   • 認証 / CORS / 共通エラーハンドラは別ユニットで追加予定
 #   • /metrics (exporter) と /metrics-api (CRUD) を分離
-# ----------------------------------------------------------------------
+# ---------------------------------------------------------------------
