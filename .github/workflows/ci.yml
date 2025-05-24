@@ -15,7 +15,7 @@ jobs:
     env:
       HOST_POSTGRES_PORT: '15432'
       HOST_REDIS_PORT: '16379'
-      HOST_PROM_PORT: '9090'
+      HOST_PROM_PORT: '19090'
     strategy:
       fail-fast: false
       matrix:
@@ -34,7 +34,7 @@ jobs:
         ports: ['5432:5432']
       prom:
         image: prom/prometheus:v2.52.0
-        ports: ['9090:9090']
+        ports: ['19090:9090']
       grafana:
         image: grafana/grafana-oss:10.4.2
         ports: ['3000:3000']

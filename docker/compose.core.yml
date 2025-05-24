@@ -190,7 +190,7 @@ services:
       celery-exporter:
         condition: service_started
     ports:
-      - "${HOST_PROM_PORT:-9090}:9090"
+      - "${HOST_PROM_PORT:-19090}:9090"
     networks:
       - mmopdca_default
     restart: unless-stopped

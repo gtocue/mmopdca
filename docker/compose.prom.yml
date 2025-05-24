@@ -1,4 +1,4 @@
 services:
   prom:
     ports:
-      - "${HOST_PROM_PORT:-9090}:9090"
+      - "${HOST_PROM_PORT:-19090}:9090"

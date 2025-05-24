@@ -41,9 +41,10 @@ Write-Host "`n📦 Containers status:"
 docker compose --env-file $EnvFile -f $ComposeFile ps
 
 # 6) HTTP エンドポイント疎通チェック
+$hostPromPort = ${Env:HOST_PROM_PORT} ? ${Env:HOST_PROM_PORT} : 19090
 $urls = @(
   "http://localhost:8001/docs",
-  "http://localhost:9090/-/ready",
+  "http://localhost:$hostPromPort/-/ready",
   "http://localhost:9121/metrics",
   "http://localhost:9808/metrics"
 )

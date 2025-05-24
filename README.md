@@ -65,12 +65,11 @@ export HOST_POSTGRES_PORT=15432
 docker compose up -d
 ```
 
-Prometheus exposes port `9090` on the host. If the port is taken,
+Prometheus exposes port `19090` on the host by default. If the port is taken,
 set `HOST_PROM_PORT` accordingly:
 
 ```bash
 export HOST_PROM_PORT=19090
 docker compose up -d
 ```
-```
-If you see an error like 'Bind for 0.0.0.0:9090 failed: port is already allocated' when starting Prometheus, choose an unused port for HOST_PROM_PORT and rerun the compose command.
+If you see an error like 'Bind for 0.0.0.0:19090 failed: port is already allocated' when starting Prometheus, choose an unused port for HOST_PROM_PORT and rerun the compose command.

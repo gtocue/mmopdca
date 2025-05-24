@@ -49,7 +49,7 @@ jobs:
           set -eu
           for i in {1..30}; do
             curl -fs http://localhost:8001/docs \
-              && curl -fs http://localhost:9090/ \
+              && curl -fs http://localhost:19090/ \
               && curl -fs http://localhost:9121/metrics \
               && curl -fs http://localhost:9808/metrics \
               && echo "All endpoints are healthy!" \
