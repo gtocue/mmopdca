@@ -37,6 +37,7 @@ except Exception:  # pragma: no cover - fallback for missing dependency
             timestr = timestr[:-1] + "+00:00"
         return _dt.fromisoformat(timestr)
 
+
 from enum import Enum
 import decimal
 import json
@@ -208,9 +209,12 @@ class ApiClient:
             header_params["Cookie"] = self.cookie
         if header_params:
             header_params = self.sanitize_for_serialization(header_params)
-            header_params = dict(
-                self.parameters_to_tuples(header_params, collection_formats)
+            header_params_list = self.parameters_to_tuples(
+                header_params, collection_formats
             )
+            header_params = {
+                str(k): str(v) for k, v in dict(header_params_list).items()
+            }
 
         # path parameters
         if path_params:
@@ -489,7 +493,11 @@ class ApiClient:
         else:
             return self.__deserialize_model(data, klass)
 
-    def parameters_to_tuples(self, params, collection_formats):
+    def parameters_to_tuples(
+        self,
+        params: Union[Dict[str, Any], List[Tuple[str, Any]]],
+        collection_formats: Optional[Dict[str, str]],
+    ) -> List[Tuple[str, str]]:
         """Get parameters as list of tuples, formatting collections.
 
         :param params: Parameters as dict or list of two-tuples
@@ -518,7 +526,11 @@ class ApiClient:
                 new_params.append((k, v))
         return new_params
 
-    def parameters_to_url_query(self, params, collection_formats):
+    def parameters_to_url_query(
+        self,
+        params: Union[Dict[str, Any], List[Tuple[str, Any]]],
+        collection_formats: Optional[Dict[str, str]],
+    ) -> str:
         """Get parameters as list of tuples, formatting collections.
 
         :param params: Parameters as dict or list of two-tuples
