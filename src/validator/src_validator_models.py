@@ -1,8 +1,10 @@
 from pydantic import BaseModel, Field, root_validator
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 class Baseline(BaseModel):
-    lookback_days: int = Field(..., ge=1, description="自動抽出 or 明示指定")
+    lookback_days: Optional[int] = Field(
+        None, ge=1, description="自動抽出 or 明示指定"
+    )
     horizon_days: int = Field(7, ge=1, le=90)
     strategy: Literal["mean", "median", "last"] = "mean"
 
@@ -27,4 +29,12 @@ class PlanSchema(BaseModel):
     @root_validator(pre=True)
     def apply_defaults_and_auto_fill(cls, values):
         # lookback_days / row_count の自動補完ロジックをここに書く
+                """Fill in missing optional values before validation."""
+
+        baseline = values.get("baseline")
+        if isinstance(baseline, dict):
+            # Default lookback_days to a reasonable value if not provided.
+            baseline.setdefault("lookback_days", 30)
+            values["baseline"] = baseline
+
         return values
