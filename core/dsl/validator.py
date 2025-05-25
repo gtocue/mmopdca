@@ -68,9 +68,10 @@ class BaselineModel(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def apply_defaults(cls, m: BaselineModel) -> BaselineModel:
+    def apply_defaults(self) -> "BaselineModel":
+        """Model-level post processing after validation."""
         # lookback_days が None の場合は後続の自動補完ロジックで埋める想定
-        return m
+        return self
 
 # ---------------------------------------------------------------------------
 # DSLValidator 本体
