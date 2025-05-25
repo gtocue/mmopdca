@@ -15,6 +15,7 @@ import pytest
 from core.check.check_executor import CheckExecutor
 from core.common.io_utils import load_predictions, save_meta, save_predictions
 from core.constants import ensure_directories
+from core.schemas.check_schemas import CheckReport
 from core.schemas.meta_schemas import MetaInfo, MetricSpec
 
 # ---------------------------------------------------------------------------
@@ -84,6 +85,8 @@ def test_pdca_min_cycle(tmp_path) -> None:
     result = CheckExecutor.run(plan_id, run_id)
 
     assert result.do_id == run_id
+    # ``report`` should be a ``CheckReport`` instance at this stage
+    assert isinstance(result.report, CheckReport)
     assert result.report.passed is True
 
     # 4) ensure the Parquet round‑trip kept all rows

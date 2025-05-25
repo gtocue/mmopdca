@@ -35,7 +35,7 @@ import re
 import tempfile
 
 from urllib.parse import quote
-from typing import Tuple, Optional, List, Dict, Union
+from typing import Tuple, Optional, List, Dict, Union, Any
 from pydantic import SecretStr
 
 from mmopdca_sdk.configuration import Configuration
@@ -52,7 +52,13 @@ from mmopdca_sdk.exceptions import (
     ServiceException,
 )
 
-RequestSerialized = Tuple[str, str, Dict[str, str], Optional[str], List[str]]
+RequestSerialized = Tuple[
+    str,
+    str,
+    Dict[str, str],
+    Optional[Any],
+    Optional[List[Tuple[str, str]]],
+]
 
 
 class ApiClient:
@@ -179,8 +185,7 @@ class ApiClient:
         :param _request_auth: set to override the auth_settings for an a single
                               request; this effectively ignores the authentication
                               in the spec for a single request.
-        :return: tuple of form (path, http_method, query_params, header_params,
-            body, post_params, files)
+        :return: tuple of form (method, url, header_params, body, post_params)
         """
 
         config = self.configuration
@@ -285,7 +290,7 @@ class ApiClient:
         self,
         response_data: rest.RESTResponse,
         response_types_map: Optional[Dict[str, ApiResponseT]] = None,
-    ) -> ApiResponse[ApiResponseT]:
+    ) -> ApiResponse[Any]:
         """Deserializes response into an object.
         :param response_data: RESTResponse object to be deserialized.
         :param response_types_map: dict of response types.
@@ -295,16 +300,18 @@ class ApiClient:
         msg = "RESTResponse.read() must be called before passing it to response_deserialize()"
         assert response_data.data is not None, msg
 
-        response_type = response_types_map.get(str(response_data.status), None)
-        if (
-            not response_type
-            and isinstance(response_data.status, int)
-            and 100 <= response_data.status <= 599
-        ):
-            # if not found, look for '1XX', '2XX', etc.
-            response_type = response_types_map.get(
-                str(response_data.status)[0] + "XX", None
-            )
+        response_type = None
+        if response_types_map:
+            response_type = response_types_map.get(str(response_data.status))
+            if (
+                not response_type
+                and isinstance(response_data.status, int)
+                and 100 <= response_data.status <= 599
+            ):
+                # if not found, look for '1XX', '2XX', etc.
+                response_type = response_types_map.get(
+                    str(response_data.status)[0] + "XX"
+                )
 
         # deserialize response data
         response_text = None
@@ -390,7 +397,7 @@ class ApiClient:
         }
 
     def deserialize(
-        self, response_text: str, response_type: str, content_type: Optional[str]
+        self, response_text: str, response_type: object, content_type: Optional[str]
     ):
         """Deserializes response into an object.
 
