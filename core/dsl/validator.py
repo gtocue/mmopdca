@@ -8,19 +8,19 @@ from __future__ import annotations
 
 変更履歴
 ──────────
-2025‑05‑25  v1.1  baseline.* (lookback_days, horizon_days, strategy) 対応
+2025‑05‑25  v1.2  Pydantic V2 スタイルへ移行
 """
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 try:
     import fastjsonschema  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover – optional dependency (CI offline)
     fastjsonschema = None  # type: ignore
 
-from pydantic import BaseModel, Field, ValidationError, validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # ヘルパー ― $ref の相対パスを絶対 URI へ解決
@@ -51,20 +51,26 @@ class PlanMetaModel(BaseModel):
 class PreprocessingModel(BaseModel):
     missing_value_methods: List[str]
     outlier_methods: List[str]
-    scaling_methods: Optional[List[str]] = None
+    scaling_methods: List[str] | None = None
 
 
 class BaselineModel(BaseModel):
     lookback_days: int = Field(..., ge=1, le=365)
-    horizon_days: Optional[int] = Field(None, ge=1, le=90)
-    strategy: Optional[str] = Field("mean")
+    horizon_days: int | None = Field(None, ge=1, le=90)
+    strategy: str | None = Field("mean")
 
-    @validator("strategy")
-    def _strategy_validate(cls, v: str) -> str:  # noqa: N805
+    @field_validator("strategy", mode="before")
+    @classmethod
+    def _strategy_validate(cls, v: str) -> str:
         allowed = {"mean", "median", "last"}
         if v not in allowed:
             raise ValueError(f"strategy must be one of {sorted(allowed)}")
         return v
+
+    @model_validator(mode="after")
+    def apply_defaults(cls, m: BaselineModel) -> BaselineModel:
+        # lookback_days が None の場合は後続の自動補完ロジックで埋める想定
+        return m
 
 # ---------------------------------------------------------------------------
 # DSLValidator 本体
@@ -99,20 +105,20 @@ class DSLValidator:
     def validate_plan_meta(self, meta: Dict[str, Any]) -> None:
         try:
             PlanMetaModel(**meta)
-        except ValidationError as e:  # noqa: TRY003
+        except ValidationError as e:
             raise ValueError(f"plan.meta validation failed: {e}") from e
 
     def validate_preprocessing(self, block: Dict[str, Any]) -> None:
         try:
             PreprocessingModel(**block)
-        except ValidationError as e:  # noqa: TRY003
+        except ValidationError as e:
             raise ValueError(f"preprocessing validation failed: {e}") from e
 
     def validate_baseline(self, baseline: Dict[str, Any]) -> None:
         """Baseline パラメータ専用バリデーション."""
         try:
             BaselineModel(**baseline)
-        except ValidationError as e:  # noqa: TRY003
+        except ValidationError as e:
             raise ValueError(f"baseline validation failed: {e}") from e
 
     # ----- entry point -----------------------------------------------------
@@ -124,3 +130,4 @@ class DSLValidator:
             self.validate_preprocessing(prep)
         if baseline := plan.get("baseline"):
             self.validate_baseline(baseline)
+
