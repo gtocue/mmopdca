@@ -28,8 +28,9 @@ class PlanSchema(BaseModel):
 
     @root_validator(pre=True)
     def apply_defaults_and_auto_fill(cls, values):
+        """Fill in missing optional values before validation."""
+
         # lookback_days / row_count の自動補完ロジックをここに書く
-                """Fill in missing optional values before validation."""
 
         baseline = values.get("baseline")
         if isinstance(baseline, dict):
