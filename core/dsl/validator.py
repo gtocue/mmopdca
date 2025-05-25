@@ -48,7 +48,11 @@ except ImportError:  # pragma: no cover - Pydantic v1 fallback
                     return result.dict()
                 return values
 
-            return root_validator(pre=False, allow_reuse=True)(wrapper)  # type: ignore
+            # NOTE: mypy/Pylance may flag ``pre=False`` for ``root_validator``
+            # since its ``pre`` parameter can be typed as ``Literal[True]`` in
+            # some stubs. Omitting the argument keeps the default behaviour
+            # (``pre=False``) while avoiding the type error.
+            return root_validator(allow_reuse=True)(wrapper)  # type: ignore[arg-type]
 
         return decorator
 
@@ -97,11 +101,10 @@ class BaselineModel(BaseModel):
             raise ValueError(f"strategy must be one of {sorted(allowed)}")
         return v
 
-    @model_validator(mode="after")
-    def apply_defaults(self) -> "BaselineModel":
+    @root_validator(pre=False)
+    def apply_defaults(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """Model-level post processing after validation."""
-        # lookback_days が None の場合は後続の自動補完ロジックで埋める想定
-        return self
+        return values
 
 # ---------------------------------------------------------------------------
 # DSLValidator 本体

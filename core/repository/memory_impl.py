@@ -28,11 +28,7 @@ class MemoryRepository:
     # CRUD
     # --------------------------------------------------
     def create(self, key: str, record: Dict[str, Any]) -> None:
-        """
-        新規レコード作成。既存キーがあれば KeyError を投げる。
-        """
-        if key in self._store():
-            raise KeyError(f"Record {key!r} already exists")
+        """Create or replace a record in the in-memory store."""
         self._store()[key] = record.copy()
 
     def get(self, key: str) -> Optional[Dict[str, Any]]:

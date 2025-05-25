@@ -77,6 +77,11 @@ class Response:
     def json(self):
         return _json.loads(self._content.decode())
 
+    def iter_lines(self):
+        """Yield content line by line similar to httpx.Response.iter_lines."""
+        for line in self._content.splitlines():
+            yield line
+
 class ByteStream(bytes):
     def read(self) -> bytes:  # pragma: no cover - compatibility
         return bytes(self)

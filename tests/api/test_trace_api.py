@@ -23,12 +23,12 @@ def setup_trace_repo(tmp_path, monkeypatch):
     repo = get_repo("trace")
     # テスト間で状態が残らないようストアをクリア
     if hasattr(repo, "keys"):
-        for k in repo.keys():
+        for k in getattr(repo, "keys")():
             repo.delete(k)
 
     # run_id 'test-run' として空レコードを準備
     if hasattr(repo, "upsert"):
-        repo.upsert("test-run", {})
+        getattr(repo, "upsert")("test-run", {})
     else:
         try:
             repo.create("test-run", {})

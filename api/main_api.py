@@ -13,6 +13,9 @@
 
 from __future__ import annotations
 
+# Ensure local compatibility patches are applied
+import sitecustomize  # noqa: F401
+
 import logging
 import os
 from importlib import import_module

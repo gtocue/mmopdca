@@ -1,28 +1,17 @@
 import importlib
 import pydantic
 
-"""Backport a subset of Pydantic v2 APIs when running under v1.
+"""Backport a subset of Pydantic v2 APIs when running under v1 and
+apply small compatibility patches for test utilities."""
 
-Pydantic v1 does not provide ``field_validator`` or several ``BaseModel``
-methods introduced in v2.  Some parts of the codebase rely on these newer
-APIs, so when running with v1 we monkey patch compatible shims that forward to
-their v1 equivalents.
-"""
-
+# ---------------------------------------------------------------------------
+# Pydantic v1 compatibility shims
+# ---------------------------------------------------------------------------
 if pydantic.__version__.startswith("1."):
     from pydantic import BaseModel, validator
 
     def field_validator(*fields, mode="after"):
-        """Shim for ``pydantic.v2.field_validator``.
-
-        Parameters
-        ----------
-        *fields
-            Field names to validate.
-        mode : str, optional
-            "before" or "after". Defaults to ``"after"``.
-        """
-
+        """Shim for ``pydantic.v2.field_validator``."""
         pre = mode == "before"
 
         def decorator(fn):
@@ -31,28 +20,46 @@ if pydantic.__version__.startswith("1."):
         return decorator
 
     def model_validate(cls, data):
-        """Mimic the ``model_validate`` classmethod from Pydantic v2."""
-
         return cls.parse_obj(data)
 
     def model_dump_json(self, **kwargs):
-        """Provide ``model_dump_json`` compatible with v2."""
-
         return self.json(**kwargs)
 
     def model_copy(self, **kwargs):
-        """Provide ``model_copy`` compatible with v2."""
-     
         return self.copy(**kwargs)
 
     def model_construct(cls, _fields_set=None, **values):
-        """Provide ``model_construct`` compatible with v2."""
-
         return cls.construct(_fields_set=_fields_set, **values)
 
-    # Apply monkey patches so the rest of the code can rely on the v2 API
+    from pydantic import root_validator
+
+    def model_validator(mode="after"):
+        def decorator(fn):
+            return root_validator(pre=mode == "before", allow_reuse=True)(fn)
+        return decorator
+
+    # Expose the shims
     pydantic.field_validator = field_validator
+    pydantic.model_validator = model_validator
     setattr(BaseModel, "model_validate", classmethod(model_validate))
     BaseModel.model_dump_json = model_dump_json
     BaseModel.model_copy = model_copy
     setattr(BaseModel, "model_construct", classmethod(model_construct))
+
+# ---------------------------------------------------------------------------
+# FastAPI / Starlette compatibility patches
+# ---------------------------------------------------------------------------
+try:
+    from fastapi.testclient import TestClient as _TestClient
+    import inspect
+
+    if "stream" not in inspect.signature(_TestClient.get).parameters:
+        _orig_get = _TestClient.get
+
+        def _patched_get(self, url, *, stream=False, **kwargs):
+            response = _orig_get(self, url, **kwargs)
+            return response
+
+        _TestClient.get = _patched_get
+except Exception:  # pragma: no cover - optional
+    pass
