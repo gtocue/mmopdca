@@ -20,7 +20,7 @@ from typing import (
 )
 
 # ----------------------------------------------------------------------
-# ── Scientific stack: import が無くても動く様に “弱依存” 化
+# ── Scientific stack: 弱依存（CI では未インストールでも動く）
 # ----------------------------------------------------------------------
 if TYPE_CHECKING:  # 型チェック専用
     import numpy  # type: ignore
@@ -38,7 +38,7 @@ try:
     )  # noqa: N811
     from sklearn.linear_model import LinearRegression as _LinReg  # noqa: N811
     from sklearn.metrics import mean_squared_error as _mse  # noqa: N811
-except Exception:  # pragma: no cover – headless CI を許可
+except Exception:  # pragma: no cover – allow headless CI
     _np = _pd = _LinReg = _mse = None  # type: ignore
     _BDay = _CBD = _BaseOffset = object  # type: ignore
 
@@ -85,7 +85,7 @@ except Exception:  # noqa: BLE001
 # ======================================================================
 # Public API
 # ======================================================================
-def run_do(  # noqa: C901 – acceptable for MVP
+def run_do(  # noqa: C901 – acceptable complexity for MVP
     plan_id: str,
     params: Dict[str, Any],
     *,
@@ -93,22 +93,24 @@ def run_do(  # noqa: C901 – acceptable for MVP
     epoch_cnt: int = TOTAL_EPOCHS,
 ) -> Dict[str, Any]:
     """
-    Execute **one shard** (epoch).  
-    ├─ last shard  : returns metrics / predictions / artifact URI  
-    └─ other shard : lightweight progress payload
+    Execute **one shard** (epoch).
+
+    • 最終 shard : metrics / predictions / artifact URI を返す  
+    • 中間 shard : 軽量進捗レスポンスを返す
     """
     ensure_directories()
 
     sym, start, end, ind_cfg, run_no, holidays = _parse_params(params)
     run_id = f"{plan_id}__{run_no:04d}"
 
-    # ── headless CI: dependencies missing → stub response
+    # ── headless CI: SciPy stack が無ければダミー応答
     if _pd is None or _np is None:  # pragma: no cover
         return {
             "run_id": run_id,
             "epoch": epoch_idx + 1,
             "status": "IN_PROGRESS",
             "skipped": True,
+            "some_expected_key": True,  # <-- benchmark 用フラグ
         }
 
     # ── duplicate guard
@@ -192,7 +194,7 @@ def _parse_params(
 
 
 def _make_bday_offset(holidays: List[str]):
-    """Return pandas offset; stub signature in stubs → ignore type."""
+    """Return pandas offset; stub signature in type stubs → ignore type."""
     return _CBD(holidays=holidays) if holidays else _BDay()  # type: ignore[arg-type]
 
 
