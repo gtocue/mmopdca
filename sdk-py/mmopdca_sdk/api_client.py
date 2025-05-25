@@ -47,7 +47,7 @@ import re
 import tempfile
 
 from urllib.parse import quote
-from typing import Tuple, Optional, List, Dict, Union, Any
+from typing import Tuple, Optional, List, Dict, Union, Any, cast
 from pydantic import SecretStr
 
 from mmopdca_sdk.configuration import Configuration
@@ -210,7 +210,8 @@ class ApiClient:
         if header_params:
             header_params = self.sanitize_for_serialization(header_params)
             header_params_list = self.parameters_to_tuples(
-                header_params, collection_formats
+                cast(Union[Dict[str, Any], List[Tuple[str, Any]]], header_params),
+                collection_formats,
             )
             header_params = {
                 str(k): str(v) for k, v in dict(header_params_list).items()
@@ -219,7 +220,10 @@ class ApiClient:
         # path parameters
         if path_params:
             path_params = self.sanitize_for_serialization(path_params)
-            path_params = self.parameters_to_tuples(path_params, collection_formats)
+            path_params = self.parameters_to_tuples(
+                cast(Union[Dict[str, Any], List[Tuple[str, Any]]], path_params),
+                collection_formats,
+            )
             for k, v in path_params:
                 # specified safe chars, encode everything
                 resource_path = resource_path.replace(
@@ -230,7 +234,10 @@ class ApiClient:
         if post_params or files:
             post_params = post_params if post_params else []
             post_params = self.sanitize_for_serialization(post_params)
-            post_params = self.parameters_to_tuples(post_params, collection_formats)
+            post_params = self.parameters_to_tuples(
+                cast(Union[Dict[str, Any], List[Tuple[str, Any]]], post_params),
+                collection_formats,
+            )
             if files:
                 post_params.extend(self.files_parameters(files))
 
@@ -259,7 +266,10 @@ class ApiClient:
         # query parameters
         if query_params:
             query_params = self.sanitize_for_serialization(query_params)
-            url_query = self.parameters_to_url_query(query_params, collection_formats)
+            url_query = self.parameters_to_url_query(
+                cast(Union[Dict[str, Any], List[Tuple[str, Any]]], query_params),
+                collection_formats,
+            )
             url += "?" + url_query
 
         return method, url, header_params, body, post_params

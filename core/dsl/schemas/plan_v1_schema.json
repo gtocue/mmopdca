@@ -3,133 +3,111 @@
     "$id": "plan_v1_schema.json",
     "title": "mmopdca Plan DSL v1",
     "type": "object",
-    "required": [
-        "plan_id",
-        "owner",
-        "data",
-        "dates",
-        "indicators"
-    ],
     "properties": {
-        "plan_id": {
+        "version": {
             "type": "string",
-            "pattern": "^[\\w\\-]+$"
+            "enum": [
+                "plan_v1"
+            ]
         },
-        "owner": {
-            "type": "string",
-            "format": "email"
-        },
-        "data": {
+        "baseline": {
             "type": "object",
-            "required": [
-                "source",
-                "universe",
-                "frequency"
-            ],
             "properties": {
-                "source": {
-                    "type": "string",
-                    "enum": [
-                        "yfinance",
-                        "csv",
-                        "database"
-                    ]
-                },
-                "universe": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "minItems": 1
-                },
-                "frequency": {
-                    "type": "string",
-                    "enum": [
-                        "1d",
-                        "1h",
-                        "1m"
-                    ]
-                },
-                "normalizer": {
-                    "type": "object",
-                    "properties": {
-                        "to_cdm": {
-                            "type": "string"
-                        },
-                        "options": {
-                            "type": "object"
-                        }
-                    },
-                    "additionalProperties": false
-                }
-            },
-            "additionalProperties": false
-        },
-        "dates": {
-            "type": "object",
-            "required": [
-                "train_start",
-                "train_end"
-            ],
-            "properties": {
-                "train_start": {
-                    "type": "string",
-                    "format": "date"
-                },
-                "train_end": {
-                    "type": "string",
-                    "format": "date"
-                },
-                "predict_horizon": {
+                "lookback_days": {
                     "type": "integer",
-                    "minimum": 1
+                    "minimum": 1,
+                    "description": "指定がなければ提出データの時系列期間（日数）を自動抽出して設定します。"
+                },
+                "horizon_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 90,
+                    "default": 7
+                },
+                "strategy": {
+                    "type": "string",
+                    "enum": [
+                        "mean",
+                        "median",
+                        "last"
+                    ],
+                    "default": "mean"
                 }
             },
             "additionalProperties": false
         },
-        "indicators": {
-            "type": "object"
+        "row_count": {
+            "type": "integer",
+            "minimum": 40,
+            "maximum": 10000,
+            "description": "提出データの行数を指定します（最低40行、最大10000行）。指定がなければ自動カウントされます。"
         },
-        "preprocessing": {
-            "$ref": "preprocessing_schema.json"
-        },
-        "parameters": {
-            "$ref": "parameters_schema.json"
-        },
-        "models": {
-            "$ref": "models_schema.json"
-        },
-        "auto_tuning": {
+        "feature_blocks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "params"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "enum": [
+                            "MovingAverage",
+                            "ExponentialSmoothing"
+                        ]
+                    },
+                    "params": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/definitions/MovingAverageParams"
+                            },
+                            {
+                                "$ref": "#/definitions/ExponentialSmoothingParams"
+                            }
+                        ]
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    },
+    "definitions": {
+        "MovingAverageParams": {
             "type": "object",
+            "required": [
+                "window"
+            ],
             "properties": {
-                "enabled": {
+                "window": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 30
+                },
+                "normalize": {
+                    "type": "boolean",
+                    "default": true
+                }
+            },
+            "additionalProperties": false
+        },
+        "ExponentialSmoothingParams": {
+            "type": "object",
+            "required": [
+                "alpha"
+            ],
+            "properties": {
+                "alpha": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "default": 0.2
+                },
+                "adjust": {
                     "type": "boolean",
                     "default": false
-                },
-                "n_trials": {
-                    "type": "integer",
-                    "minimum": 1
-                },
-                "hyperparam_space": {
-                    "type": "object"
-                },
-                "evaluation_defaults": {
-                    "type": "object"
-                }
-            },
-            "additionalProperties": false
-        },
-        "cost_estimate": {
-            "type": "object",
-            "properties": {
-                "records": {
-                    "type": "integer"
-                },
-                "est_runtime_min": {
-                    "type": "number"
-                },
-                "est_cost_usd": {
-                    "type": "number"
                 }
             },
             "additionalProperties": false
