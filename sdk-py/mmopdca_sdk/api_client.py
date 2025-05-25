@@ -19,12 +19,23 @@ try:
     from dateutil.parser import parse
 except Exception:  # pragma: no cover - fallback for missing dependency
     from datetime import datetime as _dt
+    from typing import Any
 
-    def parse(value: str):
-        if value.endswith("Z"):
-            value = value[:-1] + "+00:00"
-        return _dt.fromisoformat(value)
-
+    def parse(
+        timestr: Any,
+        parserinfo: Any | None = None,
+        *,
+        dayfirst: bool | None = None,
+        yearfirst: bool | None = None,
+        ignoretz: bool = False,
+        fuzzy: bool = False,
+        fuzzy_with_tokens: bool = False,
+        default: datetime.datetime | None = None,
+        tzinfos: Any | None = None,
+    ) -> datetime.datetime:
+        if timestr.endswith("Z"):
+            timestr = timestr[:-1] + "+00:00"
+        return _dt.fromisoformat(timestr)
 
 from enum import Enum
 import decimal

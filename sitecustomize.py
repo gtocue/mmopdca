@@ -52,7 +52,7 @@ if pydantic.__version__.startswith("1."):
 
     # Apply monkey patches so the rest of the code can rely on the v2 API
     pydantic.field_validator = field_validator
-    BaseModel.model_validate = classmethod(model_validate)
+    setattr(BaseModel, "model_validate", classmethod(model_validate))
     BaseModel.model_dump_json = model_dump_json
     BaseModel.model_copy = model_copy
-    BaseModel.model_construct = classmethod(model_construct)
+    setattr(BaseModel, "model_construct", classmethod(model_construct))
