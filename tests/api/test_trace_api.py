@@ -21,23 +21,39 @@ def setup_trace_repo(tmp_path, monkeypatch):
     テスト用に run_id 'test-run' が存在するようセットアップ。
     """
     repo = get_repo("trace")
-    # run_id 'test-run' として、空の状態を用意
-    repo.create("test-run", {})
+    # テスト間で状態が残らないようストアをクリア
+    if hasattr(repo, "keys"):
+        for k in repo.keys():
+            repo.delete(k)
+
+    # run_id 'test-run' として空レコードを準備
+    if hasattr(repo, "upsert"):
+        repo.upsert("test-run", {})
+    else:
+        try:
+            repo.create("test-run", {})
+        except KeyError:
+            pass
     return repo
 
 def test_trace_stream_success(client):
     """
     正常系: 存在する run_id でストリーミング開始レスポンスを受け取れること
     """
-    response = client.get("/trace/test-run", stream=True)
-    assert response.status_code == status.HTTP_200_OK
-    # 最初の数行を読み込んで SSE フォーマットを確認
-    lines = []
-    for chunk in response.iter_lines():
-        if chunk:
-            lines.append(chunk.decode())
-        if len(lines) >= 2:
-            break
+    if hasattr(client, "stream"):
+        with client.stream("GET", "/trace/test-run") as response:
+            assert response.status_code == status.HTTP_200_OK
+            lines = []
+            for chunk in response.iter_lines():
+                if chunk:
+                    lines.append(chunk.decode())
+                if len(lines) >= 2:
+                    break
+    else:
+        response = client.get("/trace/test-run")
+        assert response.status_code == status.HTTP_200_OK
+        lines = response.text.splitlines()
+
     assert lines[0].startswith("data: ")
     assert "run_id" in lines[0]
 

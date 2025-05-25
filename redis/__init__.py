@@ -1,9 +1,7 @@
 class Redis:
-    def __init__(self, *args, **kwargs):
-        pass
-        """Simple in-memory Redis mock used for unit tests."""
+    """Simple in-memory Redis mock used for unit tests."""
 
-    def __init__(self, *_, **__):
+    def __init__(self, *args, **kwargs):
         self._store = {}
 
     def set(self, key, value):
@@ -14,6 +12,10 @@ class Redis:
 
     def delete(self, key):
         self._store.pop(key, None)
+
+    def exists(self, *keys):
+        """Return the count of existing keys."""
+        return sum(1 for k in keys if k in self._store)
 
     def scan_iter(self, match="*"):
         if match.endswith("*"):

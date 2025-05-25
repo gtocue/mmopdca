@@ -20,7 +20,37 @@ try:
 except ModuleNotFoundError:  # pragma: no cover – optional dependency (CI offline)
     fastjsonschema = None  # type: ignore
 
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationError
+try:
+    from pydantic import field_validator, model_validator  # type: ignore
+except ImportError:  # pragma: no cover - Pydantic v1 fallback
+    from pydantic import validator, root_validator  # type: ignore
+
+    def field_validator(field: str, *, mode: str = "before"):
+        pre = mode == "before"
+
+        def decorator(fn):
+            return validator(field, pre=pre, allow_reuse=True)(fn)  # type: ignore
+
+        return decorator
+
+    def model_validator(*, mode: str = "after"):
+        pre = mode == "before"
+
+        def decorator(fn):
+            if pre:
+                return root_validator(pre=True, allow_reuse=True)(fn)  # type: ignore
+
+            def wrapper(cls, values):
+                self = cls.construct(**values)
+                result = fn(self)
+                if isinstance(result, BaseModel):
+                    return result.dict()
+                return values
+
+            return root_validator(pre=False, allow_reuse=True)(wrapper)  # type: ignore
+
+        return decorator
 
 # ---------------------------------------------------------------------------
 # ヘルパー ― $ref の相対パスを絶対 URI へ解決

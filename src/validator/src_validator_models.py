@@ -64,20 +64,11 @@ class PlanSchema(BaseModel):
     @root_validator(pre=True)
     def apply_defaults_and_auto_fill(cls, values: dict) -> dict:
         """
-        lookback_days と row_count を自動補完。
+        lookback_days を自動補完する。
         - lookback_days がない場合はデフォルト30日を設定
-        - row_count がない場合は提出データから行数をカウントする想定で
-          仮に 100 としておく（実装時に実データ読み込みで上書き）
         """
-        # baseline 部分の補完
         baseline = values.get("baseline")
         if isinstance(baseline, dict):
             baseline.setdefault("lookback_days", 30)
             values["baseline"] = baseline
-
-        # row_count の補完
-        if "row_count" not in values or values["row_count"] is None:
-            # TODO: 実装時に提出データを読み込んで len(rows) をセット
-            values["row_count"] = 100  
-
         return values
