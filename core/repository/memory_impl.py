@@ -77,6 +77,10 @@ class MemoryRepository:
     def keys(self) -> List[str]:
         """登録済みキー一覧を返す。"""
         return list(self._store().keys())
+    
+    def exists(self, key: str) -> bool:
+        """指定キーの存在を確認。"""
+        return key in self._store()
 
     # --------------------------------------------------
     # internal

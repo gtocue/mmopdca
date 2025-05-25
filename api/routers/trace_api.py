@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncIterator
+from typing import AsyncIterator, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -25,7 +25,7 @@ class TraceRecord(BaseModel):
     step: str = Field(..., description="処理ステップ名")
     status: str = Field(..., description="STARTED／COMPLETED／FAILED")
     timestamp: datetime = Field(..., description="ISO8601形式タイムスタンプ")
-    details: dict[str, any] = Field(default_factory=dict, description="任意の追加情報")
+    details: dict[str, Any] = Field(default_factory=dict, description="任意の追加情報")
 
 # --------------------------------------------------------------------- #
 # Internal: 擬似 SSE ストリーム

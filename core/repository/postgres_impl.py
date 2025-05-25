@@ -169,6 +169,16 @@ class PostgresRepository(BaseRepository):
             cur.execute(sql, (self.tenant_id, obj_id))
             row = cur.fetchone()
         return dict(row["data"]) if row else None
+    
+    def exists(self, obj_id: str) -> bool:
+        self._lazy()
+        sql = (
+            f'SELECT 1 FROM "{self.schema}"."{self.table}" '
+            "WHERE tenant_id=%s AND id=%s LIMIT 1"
+        )
+        with _cx().cursor() as cur:
+            cur.execute(sql, (self.tenant_id, obj_id))
+            return cur.fetchone() is not None
 
     def delete(self, obj_id: str) -> None:
         """キーを削除"""

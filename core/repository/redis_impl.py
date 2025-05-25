@@ -131,6 +131,9 @@ class RedisRepository:
             except json.JSONDecodeError:  # pragma: no cover
                 logger.warning("[RedisRepo] invalid JSON on key=%s", key)
         return docs
+    
+    def exists(self, id_: str) -> bool:
+        return self._r.exists(self._k(id_)) > 0
 
     # ------------------------------------------------------------------#
     # private

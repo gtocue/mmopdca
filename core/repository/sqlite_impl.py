@@ -126,6 +126,13 @@ class SQLiteRepository(BaseRepository):
                 (self.tenant_id, obj_id),
             )
 
+    def exists(self, obj_id: str) -> bool:
+        cur = self.conn.execute(
+            f"SELECT 1 FROM {self.quoted} WHERE tenant_id = ? AND id = ? LIMIT 1",
+            (self.tenant_id, obj_id),
+        )
+        return cur.fetchone() is not None
+
     # ------------------------------------------------------------------ #
     # housekeeping
     # ------------------------------------------------------------------ #
