@@ -144,7 +144,8 @@ class RedisRepository:
 if __name__ == "__main__":
     repo = RedisRepository(table="do_test")
     repo.create("abc", {"x": 1})
-    assert repo.get("abc")["x"] == 1
+    data = repo.get("abc")
+    assert data is not None and data["x"] == 1
     print("list:", repo.list())
     repo.delete("abc")
     print("✓ self-test OK")

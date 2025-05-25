@@ -99,12 +99,18 @@ def run_check_task(self, check_id: str, do_id: str) -> None:
         # 3) Pydantic でバリデート＆レポート生成
         report = CheckReport(**result_payload)
 
+                # Do フェーズ結果からレポート status を取得（存在しなければ passed
+        # を基に推定）
+        status_report = result_payload.get(
+            "status", "SUCCESS" if report.passed else "FAILURE"
+        )
+
         # 4) SUCCESS と report を保存
         rec = _check_repo.get(check_id) or {}
         rec.update(
             {
-                "status": report.status,
-                "report": report.model_dump(),
+                "status": status_report,
+                "report": {"status": status_report, **report.model_dump()},
                 "completed_at": datetime.now(timezone.utc).isoformat(),
             }
         )

@@ -93,8 +93,14 @@ def enqueue_do(plan_id: str, body: Optional[DoCreateRequest] = None) -> JSONResp
     plan = PlanResponse(**plan_raw)
 
     # 2) リクエスト補完
-    # ★ Pydantic モデルは必須フィールドがあるため空コンストラクトを使用
-    req: DoCreateRequest = body or DoCreateRequest.model_construct()
+    # ★ Pydantic v1 互換として construct() を fallback
+    if body is not None:
+        req = body
+    else:
+        construct = getattr(DoCreateRequest, "model_construct", None)
+        if construct is None:
+            construct = DoCreateRequest.construct  # type: ignore[attr-defined]
+        req = construct()  # type: ignore[call-arg]
     req.run_no = req.run_no or req.seq or 1
     req.seq = req.run_no
 

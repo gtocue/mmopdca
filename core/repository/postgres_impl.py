@@ -5,6 +5,8 @@
 #  • tenant_id + id を複合 PK に
 #  • eager=False なら pytest で DB が無くても import が通る
 # =====================================================================
+# Pylance(Pyright) の optional dependency 警告を抑制
+# pyright: reportMissingImports=false
 
 from __future__ import annotations
 
